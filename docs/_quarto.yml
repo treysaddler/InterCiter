@@ -17,6 +17,8 @@ website:
             text: Data Model
           - href: architecture.md
             text: Architecture
+          - href: external-data-integration.md
+            text: External Data Integration
           - href: scoring-and-review.md
             text: Scoring & Review
           - href: evaluation.md
@@ -44,6 +46,8 @@ website:
             text: Data Model
           - href: architecture.md
             text: Architecture
+          - href: external-data-integration.md
+            text: External Data Integration
           - href: scoring-and-review.md
             text: Scoring & Review
           - href: evaluation.md

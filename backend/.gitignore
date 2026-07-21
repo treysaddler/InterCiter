@@ -1,0 +1,7 @@
+# Python / backend artifacts (paths are relative to this backend/ directory)
+.venv/
+interciter.db
+*.db
+**/__pycache__/
+.pytest_cache/
+*.egg-info/

@@ -3,7 +3,7 @@
   "corpus_version": "t2d-glycemic-v1",
   "source": "pmc-oa",
   "exhaustive_claims": false,
-  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. Papers are CC BY-NC / CC BY-NC-ND. This is a draft pilot for adjudication (I. draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS. gold_id text fields quote or closely paraphrase the source sentence for span alignment.",
+  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. This is a draft pilot for adjudication (I draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS; gold_id text fields quote the source sentence for span alignment. A 6-paper citation neighborhood of GLP-1 receptor-agonist add-on/monotherapy in T2D: three trials (semaglutide PMC7839591, ecnoglutide PMC11437099, efsubaglutide PMC13369722), an efsubaglutide anchor that cites the semaglutide and ecnoglutide trials, an independent ecnoglutide trial (PMC12881390) and semaglutide post-hoc (PMC13243996) that corroborate them, and a semaglutide beta-cell meta-analysis (PMC12733705) that includes the semaglutide trial. Two cross-paper corroboration clusters (semaglutide, ecnoglutide) plus a within-paper restatement (efsubaglutide).",
   "papers": [
     {
       "doi": "10.1111/dom.14232",
@@ -154,9 +154,134 @@
           ]
         }
       ]
+    },
+    {
+      "doi": "10.3390/jcm14248734",
+      "pmcid": "PMC12733705",
+      "order": 4,
+      "license": "CC BY 4.0",
+      "title": "The Effect of Semaglutide on Pancreatic beta-Cell Function in Adults with Type 2 Diabetes: A Systematic Review and Meta-Analysis",
+      "citations": [
+        { "marker": "37", "resolved_doi": "10.1111/dom.14232" }
+      ],
+      "claims": [
+        {
+          "gold_id": "SMA-r1",
+          "text": "A total of 15 randomized controlled trials and one secondary analysis enrolling 6591 T2D patients were included",
+          "occurrence_type": "background_assertion",
+          "section": "3.1. Study Characteristics",
+          "effect_direction": null,
+          "negated": null,
+          "certainty": null,
+          "relations": [
+            {
+              "cited_doi": "10.1111/dom.14232",
+              "function": "direct_evidence",
+              "stance": "neutral",
+              "scope": "paper_level_only",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        },
+        {
+          "gold_id": "SMA-c1",
+          "text": "the observed benefits align with semaglutide's established clinical profile, which includes robust reductions in HbA1c, body weight",
+          "occurrence_type": "reported_result",
+          "section": "4. Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1038/s41467-025-68165-7",
+      "pmcid": "PMC12881390",
+      "order": 5,
+      "license": "CC BY 4.0",
+      "title": "Efficacy and safety of cAMP signalling-biased GLP-1 analogue ecnoglutide monotherapy versus placebo in type 2 diabetes",
+      "citations": [
+        { "marker": "18", "resolved_doi": "10.1038/s41467-024-52353-y" }
+      ],
+      "claims": [
+        {
+          "gold_id": "ECN2-c1",
+          "text": "both doses of ecnoglutide significantly reduced HbA1c more than placebo for both primary and secondary efficacy estimands",
+          "occurrence_type": "reported_result",
+          "section": "Primary outcome",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        },
+        {
+          "gold_id": "ECN2-r1",
+          "text": "These results agree with the findings in the phase 2 trial of ecnoglutide in participants with T2DM that was uncontrolled with diet, exercise, or single oral glucose-lowering medication",
+          "occurrence_type": "background_assertion",
+          "section": "Discussion",
+          "effect_direction": null,
+          "negated": null,
+          "certainty": null,
+          "relations": [
+            {
+              "cited_doi": "10.1038/s41467-024-52353-y",
+              "function": "direct_evidence",
+              "stance": "support",
+              "scope": "whole_claim",
+              "resolution": "claim_resolved",
+              "target_gold_id": "ECN-c2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "doi": "10.1111/dom.70770",
+      "pmcid": "PMC13243996",
+      "order": 6,
+      "license": "CC BY 4.0",
+      "title": "Semaglutide Treatment in Young Adults Living With Type 2 Diabetes: A Post Hoc Analysis From the SUSTAIN and PIONEER Programmes",
+      "citations": [
+        { "marker": "35", "resolved_doi": "10.1111/dom.14232" }
+      ],
+      "claims": [
+        {
+          "gold_id": "SEMA2-r1",
+          "text": "Semaglutide, a GLP-1 RA in the once-weekly subcutaneous and once-daily oral dose forms, has demonstrated significant reductions in both glycated haemoglobin A1c (HbA1C) and body weight",
+          "occurrence_type": "reported_result",
+          "section": "Introduction",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": [
+            {
+              "cited_doi": "10.1111/dom.14232",
+              "function": "background",
+              "stance": "support",
+              "scope": "partial_claim",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        },
+        {
+          "gold_id": "SEMA2-c1",
+          "text": "the present study demonstrates that not only is semaglutide efficacious in reducing HbA1c levels and BW in younger adults with T2D",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
     }
   ],
   "equivalences": [
-    ["EF-c1", "EF-c1b"]
+    ["EF-c1", "EF-c1b"],
+    ["SEMA-c1", "SEMA2-c1"],
+    ["ECN-c1", "ECN-c2", "ECN2-c1"]
   ]
 }

@@ -75,7 +75,7 @@ def test_real_corpus_loads_and_is_wellformed_offline():
     assert gold.source == "pmc-oa"
     # Sparsely annotated real papers: precision must be suppressed, recall reported.
     assert gold.exhaustive_claims is False
-    assert len(gold.papers) >= 3
+    assert len(gold.papers) >= 6
     assert all(p.pmcid and p.doi and p.license for p in gold.papers)
 
     # Antecedents precede citers by ingestion order.
@@ -93,6 +93,14 @@ def test_real_corpus_loads_and_is_wellformed_offline():
     ]
     assert resolved_targets, "pilot should exercise at least one claim_resolved relation"
     assert all(t in gold_ids for t in resolved_targets)
+
+    # At least one equivalence group spans independent papers (literature corroboration,
+    # distinct from same-paper model agreement).
+    paper_of = {c.gold_id: p.doi for p in gold.papers for c in p.claims}
+    cross_paper = [
+        group for group in gold.equivalences if len({paper_of.get(g) for g in group}) >= 2
+    ]
+    assert cross_paper, "expected a cross-paper corroboration equivalence group"
 
 
 @_netonly

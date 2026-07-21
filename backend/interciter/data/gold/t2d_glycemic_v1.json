@@ -3,7 +3,7 @@
   "corpus_version": "t2d-glycemic-v1",
   "source": "pmc-oa",
   "exhaustive_claims": false,
-  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. This is a draft pilot for adjudication (I draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS; gold_id text fields quote the source sentence for span alignment. A 9-paper citation neighborhood of GLP-1 receptor-agonist / dual-agonist therapy in T2D: primary trials (semaglutide PMC7839591, ecnoglutide PMC11437099, efsubaglutide PMC13369722 anchor citing the first two, independent ecnoglutide PMC12881390, semaglutide post-hoc PMC13243996) and systematic reviews / meta-analyses (semaglutide beta-cell PMC12733705, semaglutide-vs-sitagliptin PMC10375936, tirzepatide network MA PMC12085526, tirzepatide-vs-semaglutide MA PMC11153294). Equivalence groups mark semantically equivalent HbA1c-reduction claims for the clustering task (semaglutide x3, ecnoglutide x3, tirzepatide x2, plus a within-paper efsubaglutide restatement).",
+  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. This is a draft pilot for adjudication (I draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS; gold_id text fields quote the source sentence for span alignment. A 12-paper T2D glycemic-control neighborhood spanning several drug classes: GLP-1 RA / dual-agonist trials (semaglutide PMC7839591, ecnoglutide PMC11437099, efsubaglutide PMC13369722 anchor citing the first two, independent ecnoglutide PMC12881390, semaglutide post-hoc PMC13243996, dulaglutide monotherapy PMC6099453), systematic reviews / meta-analyses (semaglutide beta-cell PMC12733705, semaglutide-vs-sitagliptin PMC10375936, tirzepatide network MA PMC12085526, tirzepatide-vs-semaglutide MA PMC11153294), and metformin trials (PMC12389120, PMC4771973). Equivalence groups mark semantically equivalent glucose-lowering claims for the clustering task: semaglutide x3, ecnoglutide x3, tirzepatide x2, metformin x2, plus a within-paper efsubaglutide restatement.",
   "papers": [
     {
       "doi": "10.1111/dom.14232",
@@ -358,12 +358,73 @@
           "relations": []
         }
       ]
+    },
+    {
+      "doi": "10.1111/dom.13340",
+      "pmcid": "PMC6099453",
+      "order": 10,
+      "license": "CC BY-NC-ND 4.0",
+      "title": "Efficacy and safety of dulaglutide monotherapy compared with glimepiride in East Asian patients with type 2 diabetes (AWARD-CHN2)",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "DGL-c1",
+          "text": "The HbA1c reduction was significantly greater with both doses of dulaglutide compared with glimepiride",
+          "occurrence_type": "reported_result",
+          "section": "Efficacy variables",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.3390/ph18081149",
+      "pmcid": "PMC12389120",
+      "order": 11,
+      "license": "CC BY 4.0",
+      "title": "Polycystic Ovary Syndrome Attenuates the TSH-Lowering and Metabolic Effects of Metformin in Women with Hypothyroidism",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "MET1-c1",
+          "text": "In group I, metformin decreased fasting glucose, HbA1c, HOMA1-IR, TSH, LH, LH/FSH ratio, testosterone, and FAI",
+          "occurrence_type": "reported_result",
+          "section": "2. Results",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1136/bmjopen-2015-008376",
+      "pmcid": "PMC4771973",
+      "order": 12,
+      "license": "CC BY-NC 4.0",
+      "title": "Metformin versus placebo in combination with insulin analogues in patients with type 2 diabetes (CIMT trial)",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "MET2-c1",
+          "text": "HbA1c level at end of trial was lower in the metformin group compared with the placebo group",
+          "occurrence_type": "reported_result",
+          "section": "Glycaemic control, weight and insulin doses",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
     }
   ],
   "equivalences": [
     ["EF-c1", "EF-c1b"],
     ["SEMA-c1", "SEMA2-c1", "SSMA-c1"],
     ["ECN-c1", "ECN-c2", "ECN2-c1"],
-    ["TZMA1-c1", "TZMA2-c1"]
+    ["TZMA1-c1", "TZMA2-c1"],
+    ["MET1-c1", "MET2-c1"]
   ]
 }

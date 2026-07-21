@@ -26,6 +26,7 @@ _PREFIXES = {
     "EntityGrounding": "grnd",
     "Job": "job",
     "User": "user",
+    "UserSession": "sess",
 }
 
 

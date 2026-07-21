@@ -376,4 +376,33 @@ class User(Base):
     role: Mapped[enums.Role] = mapped_column(_enum(enums.Role), default=enums.Role.user)
     # Opaque bearer token. Stored hashed so a DB leak does not expose usable credentials.
     api_token_hash: Mapped[str] = mapped_column(String, unique=True, index=True)
+    # Deactivated accounts keep their history but can neither authenticate nor hold a
+    # live session (account management — docs/ui-design.md §6.4, Epic 4).
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class UserSession(Base):
+    """A server-side browser session (the BFF pattern — docs/ui-design.md §11).
+
+    The raw session secret lives only in an ``HttpOnly`` cookie; the database keeps
+    only its hash, mirroring the bearer-token model, so a DB leak never yields a
+    usable session. A per-session CSRF token guards cookie-authenticated writes.
+    """
+
+    __tablename__ = "app_session"
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("app_user.user_id"), index=True
+    )
+    # SHA-256 of the opaque cookie secret; the raw value never touches the database.
+    session_hash: Mapped[str] = mapped_column(String, unique=True, index=True)
+    # Double-submit CSRF token; required in a request header on unsafe cookie-auth writes.
+    csrf_token: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    # Absolute session lifetime (NIST SP 800-63B reauthentication ceiling).
+    absolute_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship("User")

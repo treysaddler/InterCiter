@@ -11,6 +11,8 @@ import tempfile
 
 _TMP = tempfile.mkdtemp(prefix="interciter-test-")
 os.environ["INTERCITER_DATABASE_URL"] = f"sqlite:///{_TMP}/test.db"
+# TestClient runs over http, so Secure cookies would be dropped; disable for tests.
+os.environ["INTERCITER_SESSION_COOKIE_SECURE"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

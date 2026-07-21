@@ -147,6 +147,61 @@ def _cmd_useradd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_userlist(args: argparse.Namespace) -> int:
+    from . import auth
+
+    init_db()
+    with SessionLocal() as session:
+        users = auth.list_users(session)
+    if not users:
+        print("(no users — create one with `interciter useradd <name> --role admin`)")
+        return 0
+    for u in users:
+        state = "active" if u.is_active else "inactive"
+        print(f"{u.user_id}  {u.role.value:<8}  {state:<8}  {u.display_name}")
+    return 0
+
+
+def _cmd_usermod(args: argparse.Namespace) -> int:
+    from . import auth
+    from .auth import LastAdminError
+    from .enums import Role
+
+    init_db()
+    with SessionLocal() as session:
+        user = auth.get_user(session, args.user_id)
+        if user is None:
+            print(f"No such user: {args.user_id}", file=sys.stderr)
+            return 1
+        try:
+            if args.role is not None:
+                auth.set_user_role(session, user, Role(args.role))
+            if args.active is not None:
+                auth.set_user_active(session, user, args.active)
+        except LastAdminError as exc:
+            print(f"Refused: {exc}", file=sys.stderr)
+            return 1
+        state = "active" if user.is_active else "inactive"
+        print(f"Updated {user.user_id}: role={user.role.value} ({state})")
+    return 0
+
+
+def _cmd_userrotate(args: argparse.Namespace) -> int:
+    from . import auth
+
+    init_db()
+    with SessionLocal() as session:
+        user = auth.get_user(session, args.user_id)
+        if user is None:
+            print(f"No such user: {args.user_id}", file=sys.stderr)
+            return 1
+        token = auth.rotate_api_token(session, user)
+    print(f"Rotated token for {user.user_id} (existing sessions revoked)")
+    print(f"  token: {token}")
+    print("  (shown once — store it now; only its hash is kept)")
+    return 0
+
+
 def _cmd_evaluate(args: argparse.Namespace) -> int:
     import json
 
@@ -398,6 +453,32 @@ def main(argv: list[str] | None = None) -> int:
         "--role", default="user", choices=["user", "reviewer", "admin"]
     )
     p_user.set_defaults(func=_cmd_useradd)
+
+    sub.add_parser("userlist", help="List accounts (id, role, state, name)").set_defaults(
+        func=_cmd_userlist
+    )
+
+    p_umod = sub.add_parser("usermod", help="Change a user's role and/or activation")
+    p_umod.add_argument("user_id", help="A user id (e.g. user_…)")
+    p_umod.add_argument(
+        "--role", default=None, choices=["user", "reviewer", "admin"], help="New role"
+    )
+    active = p_umod.add_mutually_exclusive_group()
+    active.add_argument(
+        "--activate", dest="active", action="store_const", const=True, default=None,
+        help="Reactivate the account",
+    )
+    active.add_argument(
+        "--deactivate", dest="active", action="store_const", const=False,
+        help="Deactivate the account (revokes its sessions)",
+    )
+    p_umod.set_defaults(func=_cmd_usermod)
+
+    p_urot = sub.add_parser(
+        "userrotate", help="Issue a new token for a user (revokes old token + sessions)"
+    )
+    p_urot.add_argument("user_id", help="A user id (e.g. user_…)")
+    p_urot.set_defaults(func=_cmd_userrotate)
 
     p_eval = sub.add_parser("evaluate", help="Run the evaluation harness on a gold corpus")
     p_eval.add_argument(

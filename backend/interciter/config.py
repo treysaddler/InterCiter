@@ -80,6 +80,15 @@ class Settings(BaseSettings):
     llm_prompt_template_version: str = "extract-v1"
     llm_batch_dir: str = ".cache/llm-batch"
 
+    # Browser sessions (the BFF cookie — docs/ui-design.md §11). The raw API token is
+    # exchanged once for an HttpOnly session cookie; the token never lives in the browser.
+    # ``secure`` MUST stay True in production (cookies only over TLS); set it False for
+    # local http dev (the Vite proxy talks to the backend over http on localhost).
+    session_cookie_secure: bool = True
+    # NIST SP 800-63B session timeouts: idle (inactivity) and absolute (reauth ceiling).
+    session_idle_timeout_minutes: int = 30
+    session_absolute_lifetime_hours: int = 12
+
     # Emit SQL for debugging.
     echo_sql: bool = False
 

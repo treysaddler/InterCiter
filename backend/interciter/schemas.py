@@ -315,7 +315,15 @@ class UserView(BaseModel):
     user_id: str
     display_name: str
     role: enums.Role
+    is_active: bool = True
     created_at: datetime
+
+
+class UserUpdate(BaseModel):
+    """Partial account update — role and/or activation (admin)."""
+
+    role: enums.Role | None = None
+    is_active: bool | None = None
 
 
 class UserCreated(UserView):
@@ -324,7 +332,34 @@ class UserCreated(UserView):
     api_token: str
 
 
+class TokenRotated(UserView):
+    """Returned once on rotation — the new raw token is exposed exactly once."""
+
+    api_token: str
+
+
 class CurrentUser(BaseModel):
     user_id: str
     display_name: str
     role: enums.Role
+
+
+# ---------------------------------------------------------------------------------
+# Browser session (BFF — docs/ui-design.md §11)
+# ---------------------------------------------------------------------------------
+
+
+class LoginRequest(BaseModel):
+    """Exchange a raw API token (sent once over TLS) for an HttpOnly session cookie."""
+
+    api_token: str
+
+
+class SessionInfo(BaseModel):
+    """Login/session response. The CSRF token must accompany cookie-auth writes."""
+
+    user_id: str
+    display_name: str
+    role: enums.Role
+    csrf_token: str
+    expires_at: datetime

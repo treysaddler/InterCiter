@@ -484,13 +484,24 @@ invalidates the server-side session).
 
 ### Backend impact (flagged for planning)
 
-The BFF pattern needs a small server-side session layer, which does not exist yet:
-- a login endpoint that exchanges a credential for the session cookie;
-- cookie auth accepted **alongside** the existing `Authorization: Bearer` header
-  (so CLI/API clients are unaffected);
-- a CSRF token endpoint and per-request verification for cookie-authenticated
-  writes;
-- server-side session store with idle/absolute expiry and logout invalidation.
+### Backend impact (implemented)
+
+The BFF session layer is built in the backend:
+- `POST /v1/auth/login` exchanges a raw API token (sent once) for the session;
+  sets `interciter_session` (`HttpOnly`) + a readable `interciter_csrf` cookie.
+- `POST /v1/auth/logout` revokes the server-side session and clears cookies;
+  `GET /v1/auth/csrf` lets the SPA recover its CSRF token after a reload.
+- Cookie auth is accepted **alongside** the existing `Authorization: Bearer`
+  header (CLI/API clients unchanged; bearer takes precedence, no CSRF).
+- Unsafe cookie-authenticated methods require a matching `X-CSRF-Token` header
+  (double-submit against the session's token).
+- Server-side session store (`app_session`) with sliding idle + absolute expiry
+  (`INTERCITER_SESSION_*` settings) and logout/deactivation invalidation.
+
+Account management (Epic 4) is also implemented: `is_active` on users;
+`GET /v1/users`, `PATCH /v1/users/{id}` (role / activation),
+`POST /v1/users/{id}/rotate-token`; CLI `userlist` / `usermod` / `userrotate`;
+a last-active-admin guard prevents self-lockout.
 
 ### Long-term direction
 

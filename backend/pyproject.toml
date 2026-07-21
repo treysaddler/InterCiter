@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings>=2.3",
     "defusedxml>=0.7.1",
     "python-multipart>=0.0.9",
+    "truststore>=0.9",
+    "certifi>=2024.2.2",
 ]
 
 [project.optional-dependencies]

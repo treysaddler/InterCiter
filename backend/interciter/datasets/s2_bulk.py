@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Settings, get_settings
+from ..net import RETRY_STATUSES, retry_delay, ssl_context
 
 # Datasets InterCiter builds off of, in rough order of usefulness for our slice.
 KNOWN_DATASETS = (
@@ -66,7 +67,6 @@ def _rate_limit(settings: Settings) -> None:
 
 def _get_json(url: str, settings: Settings) -> Any:
     _require_key(settings)
-    _rate_limit(settings)
     request = urllib.request.Request(
         url,
         headers={
@@ -76,13 +76,20 @@ def _get_json(url: str, settings: Settings) -> Any:
         },
     )
     max_bytes = 8 * 1024 * 1024  # metadata payloads are small (link lists)
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            raw = response.read(max_bytes + 1)
-    except urllib.error.HTTPError as exc:
-        raise S2DatasetsError(f"HTTP {exc.code} for {url}: {exc.reason}") from exc
-    except Exception as exc:  # noqa: BLE001
-        raise S2DatasetsError(f"request failed: {exc}") from exc
+    attempts = 5
+    for attempt in range(attempts):
+        _rate_limit(settings)
+        try:
+            with urllib.request.urlopen(request, timeout=30, context=ssl_context()) as response:
+                raw = response.read(max_bytes + 1)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in RETRY_STATUSES and attempt < attempts - 1:
+                time.sleep(retry_delay(attempt, exc.headers.get("Retry-After")))
+                continue
+            raise S2DatasetsError(f"HTTP {exc.code} for {url}: {exc.reason}") from exc
+        except Exception as exc:  # noqa: BLE001
+            raise S2DatasetsError(f"request failed: {exc}") from exc
     if len(raw) > max_bytes:
         raise S2DatasetsError("datasets metadata response unexpectedly large")
     try:
@@ -149,7 +156,7 @@ def download_shard(url: str, dest: Path) -> tuple[int, str]:
         url, headers={"User-Agent": "interciter (+https://github.com/treysaddler/InterCiter)"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=120) as response, tmp.open("wb") as fh:
+        with urllib.request.urlopen(request, timeout=120, context=ssl_context()) as response, tmp.open("wb") as fh:
             while True:
                 chunk = response.read(_DOWNLOAD_CHUNK)
                 if not chunk:

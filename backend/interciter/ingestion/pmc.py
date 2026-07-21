@@ -22,6 +22,7 @@ import urllib.request
 from pathlib import Path
 
 from ..config import Settings, get_settings
+from ..net import ssl_context
 
 _EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
@@ -68,7 +69,7 @@ def _get(url: str, settings: Settings, max_bytes: int) -> bytes:
         url, headers={"User-Agent": f"{settings.ncbi_tool} (+{settings.ncbi_email or 'no-email'})"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30, context=ssl_context()) as response:
             data = response.read(max_bytes + 1)
     except Exception as exc:  # urllib raises a variety of errors
         raise PMCFetchError(f"request failed: {exc}") from exc

@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Settings, get_settings
+from ..net import ssl_context
 
 _lock = threading.Lock()
 _last_request = 0.0
@@ -66,7 +67,7 @@ def _request(
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     max_bytes = settings.max_upload_bytes
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=60, context=ssl_context()) as response:
             raw = response.read(max_bytes + 1)
     except urllib.error.HTTPError as exc:
         raise RobokopError(f"HTTP {exc.code} for {url}: {exc.reason}") from exc

@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Settings, get_settings
+from ..net import RETRY_STATUSES, retry_delay, ssl_context
 
 # Field sets requested per endpoint. Kept explicit so cached payloads are predictable
 # and callers pay only for what they use.
@@ -112,20 +113,26 @@ def _request(
     method: str = "GET",
     body: dict | None = None,
 ) -> Any:
-    _rate_limit(settings)
     data = json.dumps(body).encode("utf-8") if body is not None else None
     headers = _headers(settings)
     if data is not None:
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     max_bytes = settings.max_upload_bytes
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            raw = response.read(max_bytes + 1)
-    except urllib.error.HTTPError as exc:
-        raise S2Error(f"HTTP {exc.code} for {url}: {exc.reason}") from exc
-    except Exception as exc:  # noqa: BLE001 — urllib raises a variety of errors
-        raise S2Error(f"request failed: {exc}") from exc
+    attempts = 5
+    for attempt in range(attempts):
+        _rate_limit(settings)
+        try:
+            with urllib.request.urlopen(request, timeout=30, context=ssl_context()) as response:
+                raw = response.read(max_bytes + 1)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in RETRY_STATUSES and attempt < attempts - 1:
+                time.sleep(retry_delay(attempt, exc.headers.get("Retry-After")))
+                continue
+            raise S2Error(f"HTTP {exc.code} for {url}: {exc.reason}") from exc
+        except Exception as exc:  # noqa: BLE001 — urllib raises a variety of errors
+            raise S2Error(f"request failed: {exc}") from exc
     if len(raw) > max_bytes:
         raise S2Error(f"response exceeds max_upload_bytes ({max_bytes})")
     try:

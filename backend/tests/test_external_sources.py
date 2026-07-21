@@ -22,13 +22,21 @@ from interciter import models
 from interciter.enums import AvailabilityState
 from interciter.services import enrichment
 from interciter.services import grounding
+from interciter.net import retry_delay
 _NET = os.environ.get("INTERCITER_NET_TESTS") == "1"
 _netonly = pytest.mark.skipif(not _NET, reason="network test; set INTERCITER_NET_TESTS=1")
 _HAS_KEY = bool(os.environ.get("INTERCITER_S2_API_KEY"))
 
 
-# --- Semantic Scholar id normalization ------------------------------------------
+def test_retry_delay_honors_retry_after_and_backoff():
+    assert retry_delay(0, "5") == 5.0
+    assert retry_delay(0, None, base=2.0) == 2.0
+    assert retry_delay(2, None, base=2.0) == 8.0
+    assert retry_delay(99, None, base=2.0, cap=30.0) == 30.0
+    assert retry_delay(0, "not-a-number", base=2.0) == 2.0  # bad header -> backoff
 
+
+# --- Semantic Scholar id normalization ------------------------------------------
 def test_normalize_paper_id_prefixes():
     assert semantic_scholar.normalize_paper_id("DOI:10.1/x") == "DOI:10.1/x"
     assert semantic_scholar.normalize_paper_id("pmid:123") == "PMID:123"
@@ -435,9 +443,13 @@ def test_live_robokop_ground_metformin():
     not (_NET and _HAS_KEY),
     reason="datasets live test; set INTERCITER_NET_TESTS=1 and INTERCITER_S2_API_KEY",
 )
-def test_live_datasets_pull_one_shard(tmp_path, monkeypatch):
-    monkeypatch.setenv("INTERCITER_S2_DATASETS_DIR", str(tmp_path))
-    settings = Settings(s2_datasets_dir=str(tmp_path))
-    manifest = store.pull_dataset("papers", max_shards=1, settings=settings)
-    assert manifest.shards
-    assert manifest.release_id
+def test_live_datasets_metadata_path():
+    # Validate the metadata path (auth, releases, download links) without pulling a
+    # multi-GB shard. The full download is exercised by the CLI smoke test, not CI.
+    releases = s2_bulk.list_releases()
+    assert releases
+    latest = s2_bulk.latest_release()["release_id"]
+    assert latest in releases
+    info = s2_bulk.dataset_files("tldrs", latest)
+    assert info["files"]
+    assert s2_bulk.shard_basename(info["files"][0])

@@ -323,6 +323,8 @@ class Job(Base):
     idempotency_key: Mapped[str | None] = mapped_column(
         String, nullable=True, unique=True, index=True
     )
+    # First-class ownership: the user who submitted the work (docs/architecture.md).
+    owner_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     paper_work_id: Mapped[str | None] = mapped_column(String, nullable=True)
     extraction_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -331,3 +333,23 @@ class Job(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
     )
+
+
+# ---------------------------------------------------------------------------------
+# Identity — minimal role-based auth + first-class ownership
+# ---------------------------------------------------------------------------------
+
+
+class User(Base):
+    """A principal. Ownership is first-class from day one; the role layer stays minimal
+    (``user`` / ``reviewer`` / ``admin``) per docs/architecture.md.
+    """
+
+    __tablename__ = "app_user"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    display_name: Mapped[str] = mapped_column(String)
+    role: Mapped[enums.Role] = mapped_column(_enum(enums.Role), default=enums.Role.user)
+    # Opaque bearer token. Stored hashed so a DB leak does not expose usable credentials.
+    api_token_hash: Mapped[str] = mapped_column(String, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

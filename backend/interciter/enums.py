@@ -122,3 +122,11 @@ class JobStatus(StrEnum):
     running = "running"
     succeeded = "succeeded"
     failed = "failed"
+
+
+class Role(StrEnum):
+    """Minimal role set (docs/architecture.md — Auth). ``admin`` implies all rights."""
+
+    user = "user"
+    reviewer = "reviewer"
+    admin = "admin"

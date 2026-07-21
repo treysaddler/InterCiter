@@ -43,6 +43,7 @@ class JobView(BaseModel):
     job_id: str
     job_type: enums.JobType
     status: enums.JobStatus
+    owner_id: str | None = None
     paper_work_id: str | None = None
     extraction_run_id: str | None = None
     result: dict[str, Any] | None = None
@@ -216,7 +217,6 @@ class OneHopTrace(BaseModel):
 
 class HumanClaimCreate(BaseModel):
     normalized_text: str
-    author_id: str
     passage_id: str | None = Field(
         default=None,
         description="Attach to an existing occurrence's passage; a new occurrence is created.",
@@ -231,7 +231,6 @@ class HumanClaimCreate(BaseModel):
 
 class InterpretationRevision(BaseModel):
     normalized_text: str
-    author_id: str
     qualifiers: dict[str, Any] | None = None
     material: bool = Field(
         default=True,
@@ -248,7 +247,6 @@ class RevisionResult(BaseModel):
 class ReviewDecisionCreate(BaseModel):
     subject_type: enums.ReviewSubjectType
     subject_id: str
-    reviewer_id: str
     decision_dimension: str
     label: str | None = None
     rationale: str | None = None
@@ -301,3 +299,32 @@ class ClaimScores(BaseModel):
 
     claim_id: str
     components: list[ScoreComponent] = []
+
+
+# ---------------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------------
+
+
+class UserCreate(BaseModel):
+    display_name: str
+    role: enums.Role = enums.Role.user
+
+
+class UserView(BaseModel):
+    user_id: str
+    display_name: str
+    role: enums.Role
+    created_at: datetime
+
+
+class UserCreated(UserView):
+    """Returned once on creation — the only time the raw token is exposed."""
+
+    api_token: str
+
+
+class CurrentUser(BaseModel):
+    user_id: str
+    display_name: str
+    role: enums.Role

@@ -19,6 +19,7 @@ interciter/
   schemas.py           Pydantic API DTOs (composed reader views + audit views)
   db.py                Engine / session / init_db
   ids.py               Prefixed opaque id generation
+  auth.py              Principals, token hashing, role/ownership core
   ingestion/
     parser.py          Hardened JATS/PMC XML parser (defusedxml)
     extractor.py       Swappable extraction interface + deterministic stub
@@ -27,7 +28,7 @@ interciter/
     projection.py      Composed claim views, one-hop trace, decomposed scores
     jobs.py            First-class job resources (polling model) + idempotency
     review.py          Human claims, revisions, review decisions, cluster fixes
-  api/                 FastAPI app + /v1 routers
+  api/                 FastAPI app + /v1 routers (incl. security.py auth deps)
   data/sample/         Two bundled JATS papers for the demo corpus
   sample.py            Seed the sample corpus
   cli.py               initdb / ingest / seed / serve
@@ -44,6 +45,7 @@ uv pip install -e '.[dev]'
 
 uv run pytest                      # run the test suite
 uv run interciter seed             # ingest the bundled sample corpus
+uv run interciter useradd me --role admin   # create a user, prints a bearer token
 uv run interciter serve --reload   # run the API at http://127.0.0.1:8000
 ```
 
@@ -52,6 +54,17 @@ Then open <http://127.0.0.1:8000/docs> for the interactive API, or:
 ```sh
 uv run interciter ingest interciter/data/sample/paper_a.xml
 ```
+
+## Auth
+
+Minimal role-based auth (`user` / `reviewer` / `admin`) plus first-class ownership, modeled
+from day one because retrofitting it is painful. Reads are open in the MVP; writes require a
+`Authorization: Bearer <token>` header. Create the first admin with `interciter useradd`, then
+manage further users through `POST /v1/users` (admin only). Tokens are stored only as hashes.
+
+- Submitting a paper records the submitter as the job owner.
+- Revising an interpretation is restricted to its author or a `reviewer`/`admin`.
+- Review decisions and cluster-member removal require `reviewer`/`admin`.
 
 ## What the vertical slice demonstrates
 
@@ -68,6 +81,8 @@ uv run interciter ingest interciter/data/sample/paper_a.xml
 - **Provenance** — every record points back to an `ExtractionRun`.
 - **Ingestion hardening** — size limits, `defusedxml` parsing, strict schema validation,
   and paper text treated strictly as data.
+- **Minimal roles + first-class ownership** — `reviewer`/`admin` gating and owner-scoped
+  edits, enforced on writes while reads stay open.
 
 ## Configuration
 

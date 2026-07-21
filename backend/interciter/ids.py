@@ -24,6 +24,7 @@ _PREFIXES = {
     "ReviewDecision": "rev",
     "Assessment": "asmt",
     "Job": "job",
+    "User": "user",
 }
 
 

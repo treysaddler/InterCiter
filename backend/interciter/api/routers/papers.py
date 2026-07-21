@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ... import models
+from ...auth import Principal
 from ...schemas import (
     ExtractionRunView,
     JobView,
@@ -18,6 +19,7 @@ from ...services import jobs
 from ...services.jobs import SubmissionError
 from ...services.projection import paper_view
 from ..deps import db_session
+from ..security import require_user
 
 router = APIRouter()
 
@@ -27,6 +29,7 @@ def _job_view(job: models.Job) -> JobView:
         job_id=job.job_id,
         job_type=job.job_type,
         status=job.status,
+        owner_id=job.owner_id,
         paper_work_id=job.paper_work_id,
         extraction_run_id=job.extraction_run_id,
         result=job.result,
@@ -41,10 +44,11 @@ def submit_paper(
     submission: PaperSubmission,
     response: Response,
     session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
 ) -> JobView:
     """Submit by DOI/PMID or inline open-access XML. Returns a job resource to poll."""
     try:
-        job = jobs.submit_ingest(session, submission)
+        job = jobs.submit_ingest(session, submission, owner_id=principal.user_id)
     except SubmissionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     response.headers["Location"] = f"/v1/jobs/{job.job_id}"

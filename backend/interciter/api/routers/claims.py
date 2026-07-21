@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ... import models
+from ...auth import NotAuthorized, Principal
 from ...schemas import (
     ClaimInterpretationView,
     ClaimOccurrenceView,
@@ -19,6 +20,7 @@ from ...schemas import (
 from ...services import projection, review
 from ...services.projection import NotFound
 from ..deps import db_session
+from ..security import require_user
 
 router = APIRouter()
 
@@ -42,10 +44,12 @@ def get_paper_claims(
 
 @router.post("/claims", response_model=ClaimInterpretationView, status_code=201)
 def create_claim(
-    payload: HumanClaimCreate, session: Session = Depends(db_session)
+    payload: HumanClaimCreate,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
 ) -> ClaimInterpretationView:
     try:
-        return review.create_human_claim(session, payload)
+        return review.create_human_claim(session, payload, principal)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -101,11 +105,14 @@ def revise_interpretation(
     interpretation_id: str,
     payload: InterpretationRevision,
     session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
 ) -> RevisionResult:
     try:
-        return review.revise_interpretation(session, interpretation_id, payload)
+        return review.revise_interpretation(session, interpretation_id, payload, principal)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except NotAuthorized as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/passages/{passage_id}", response_model=PassageView)

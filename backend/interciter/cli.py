@@ -47,6 +47,19 @@ def _cmd_seed(_: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_useradd(args: argparse.Namespace) -> int:
+    from .auth import create_user
+    from .enums import Role
+
+    init_db()
+    with SessionLocal() as session:
+        user, token = create_user(session, args.display_name, Role(args.role))
+    print(f"Created user {user.user_id} ({user.role.value})")
+    print(f"  token: {token}")
+    print("  (shown once — store it now; only its hash is kept)")
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -67,6 +80,13 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("seed", help="Seed the bundled sample corpus").set_defaults(
         func=_cmd_seed
     )
+
+    p_user = sub.add_parser("useradd", help="Create a user and print its token")
+    p_user.add_argument("display_name", help="Display name for the user")
+    p_user.add_argument(
+        "--role", default="user", choices=["user", "reviewer", "admin"]
+    )
+    p_user.set_defaults(func=_cmd_useradd)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

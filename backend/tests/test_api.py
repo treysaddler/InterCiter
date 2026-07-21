@@ -3,31 +3,32 @@
 from __future__ import annotations
 
 
-def _submit(client, name: str, **extra) -> dict:
+def _submit(client, name: str, headers: dict, **extra) -> dict:
     from helpers import load_sample
 
     body = {"xml": load_sample(name), **extra}
-    resp = client.post("/v1/papers", json=body)
+    resp = client.post("/v1/papers", json=body, headers=headers)
     assert resp.status_code == 202, resp.text
     return resp.json()
 
 
-def test_submit_and_poll_job(client):
-    job = _submit(client, "paper_b.xml")
+def test_submit_and_poll_job(client, user_headers):
+    job = _submit(client, "paper_b.xml", user_headers)
+    assert job["owner_id"]
     polled = client.get(f"/v1/jobs/{job['job_id']}").json()
     assert polled["status"] == "succeeded"
     assert polled["result"]["availability_state"] == "full_text_extracted"
 
 
-def test_idempotency_key_dedupes(client):
-    first = _submit(client, "paper_b.xml", idempotency_key="k-1")
-    second = _submit(client, "paper_b.xml", idempotency_key="k-1")
+def test_idempotency_key_dedupes(client, user_headers):
+    first = _submit(client, "paper_b.xml", user_headers, idempotency_key="k-1")
+    second = _submit(client, "paper_b.xml", user_headers, idempotency_key="k-1")
     assert first["job_id"] == second["job_id"]
 
 
-def test_full_read_flow_and_trace(client):
-    _submit(client, "paper_b.xml")
-    job_a = _submit(client, "paper_a.xml")
+def test_full_read_flow_and_trace(client, user_headers):
+    _submit(client, "paper_b.xml", user_headers)
+    job_a = _submit(client, "paper_a.xml", user_headers)
     work_id = job_a["result"]["work_id"]
 
     claims = client.get(f"/v1/papers/{work_id}/claims").json()
@@ -49,9 +50,9 @@ def test_full_read_flow_and_trace(client):
     assert found_claim_resolved
 
 
-def test_relationship_filtering(client):
-    _submit(client, "paper_b.xml")
-    job_a = _submit(client, "paper_a.xml")
+def test_relationship_filtering(client, user_headers):
+    _submit(client, "paper_b.xml", user_headers)
+    job_a = _submit(client, "paper_a.xml", user_headers)
     work_id = job_a["result"]["work_id"]
     claims = client.get(f"/v1/papers/{work_id}/claims").json()
 
@@ -62,8 +63,8 @@ def test_relationship_filtering(client):
     assert total_rels >= 3
 
 
-def test_malformed_xml_fails_job_not_request(client):
-    resp = client.post("/v1/papers", json={"xml": "<article>broken"})
+def test_malformed_xml_fails_job_not_request(client, user_headers):
+    resp = client.post("/v1/papers", json={"xml": "<article>broken"}, headers=user_headers)
     assert resp.status_code == 202
     job = resp.json()
     polled = client.get(f"/v1/jobs/{job['job_id']}").json()
@@ -71,13 +72,13 @@ def test_malformed_xml_fails_job_not_request(client):
     assert "parse" in (polled["error"] or "").lower()
 
 
-def test_empty_submission_rejected(client):
-    resp = client.post("/v1/papers", json={})
+def test_empty_submission_rejected(client, user_headers):
+    resp = client.post("/v1/papers", json={}, headers=user_headers)
     assert resp.status_code == 422
 
 
-def test_evidence_endpoints(client):
-    job = _submit(client, "paper_b.xml")
+def test_evidence_endpoints(client, user_headers):
+    job = _submit(client, "paper_b.xml", user_headers)
     work_id = job["result"]["work_id"]
     claims = client.get(f"/v1/papers/{work_id}/claims").json()
     claim = claims[0]

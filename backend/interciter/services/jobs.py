@@ -33,6 +33,7 @@ def submit_ingest(
     session: Session,
     submission: PaperSubmission,
     settings: Settings | None = None,
+    owner_id: str | None = None,
 ) -> models.Job:
     settings = settings or get_settings()
 
@@ -61,6 +62,7 @@ def submit_ingest(
         job_type=JobType.ingest,
         status=JobStatus.queued,
         idempotency_key=submission.idempotency_key,
+        owner_id=owner_id,
     )
     session.add(job)
     session.commit()

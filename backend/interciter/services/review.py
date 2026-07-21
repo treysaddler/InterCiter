@@ -13,11 +13,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
+from ..auth import NotAuthorized, Principal
 from ..enums import (
     AssertionStatus,
     MembershipStatus,
     RelationStance,
     ReviewSubjectType,
+    Role,
 )
 from ..ids import new_id
 from ..schemas import (
@@ -48,7 +50,7 @@ def _interp_view(interp: models.ClaimInterpretation) -> ClaimInterpretationView:
 
 
 def create_human_claim(
-    session: Session, payload: HumanClaimCreate
+    session: Session, payload: HumanClaimCreate, actor: Principal
 ) -> ClaimInterpretationView:
     if payload.occurrence_id:
         occurrence = session.get(models.ClaimOccurrence, payload.occurrence_id)
@@ -75,9 +77,9 @@ def create_human_claim(
         claim_occurrence_id=occurrence.occurrence_id,
         normalized_text=payload.normalized_text,
         qualifiers=payload.qualifiers,
-        author_id=payload.author_id,
+        author_id=actor.user_id,
         parent_interpretation_ids=[],
-        created_by=payload.author_id,
+        created_by=actor.user_id,
     )
     session.add(interp)
     session.commit()
@@ -85,20 +87,31 @@ def create_human_claim(
 
 
 def revise_interpretation(
-    session: Session, interpretation_id: str, payload: InterpretationRevision
+    session: Session,
+    interpretation_id: str,
+    payload: InterpretationRevision,
+    actor: Principal,
 ) -> RevisionResult:
     parent = session.get(models.ClaimInterpretation, interpretation_id)
     if parent is None:
         raise NotFound(f"interpretation {interpretation_id} not found")
+
+    # An edit is a correction claim about someone else's work: allowed only for the
+    # original author or a reviewer/admin (docs/data-model.md, scoring-and-review.md).
+    is_owner = parent.author_id is not None and parent.author_id == actor.user_id
+    if not (is_owner or actor.can_act_as(Role.reviewer)):
+        raise NotAuthorized(
+            "revising an interpretation requires being its author or a reviewer/admin"
+        )
 
     revision = models.ClaimInterpretation(
         interpretation_id=new_id("ClaimInterpretation"),
         claim_occurrence_id=parent.claim_occurrence_id,
         normalized_text=payload.normalized_text,
         qualifiers=payload.qualifiers if payload.qualifiers is not None else parent.qualifiers,
-        author_id=payload.author_id,
+        author_id=actor.user_id,
         parent_interpretation_ids=[interpretation_id],
-        created_by=payload.author_id,
+        created_by=actor.user_id,
     )
     session.add(revision)
 
@@ -124,13 +137,13 @@ def revise_interpretation(
 
 
 def create_review_decision(
-    session: Session, payload: ReviewDecisionCreate
+    session: Session, payload: ReviewDecisionCreate, actor: Principal
 ) -> ReviewDecisionView:
     decision = models.ReviewDecision(
         review_id=new_id("ReviewDecision"),
         subject_type=payload.subject_type,
         subject_id=payload.subject_id,
-        reviewer_id=payload.reviewer_id,
+        reviewer_id=actor.user_id,
         decision_dimension=payload.decision_dimension,
         label=payload.label,
         rationale=payload.rationale,
@@ -196,7 +209,7 @@ def get_cluster(session: Session, cluster_id: str) -> ClusterView:
 
 
 def remove_cluster_member(
-    session: Session, cluster_id: str, interpretation_id: str, removed_by: str
+    session: Session, cluster_id: str, interpretation_id: str, actor: Principal
 ) -> ClusterView:
     membership = session.scalar(
         select(models.ClusterMembership).where(
@@ -208,7 +221,7 @@ def remove_cluster_member(
     if membership is None:
         raise NotFound("active membership not found")
     membership.status = MembershipStatus.removed
-    membership.removed_by = removed_by
+    membership.removed_by = actor.user_id
     membership.removed_at = datetime.now(timezone.utc)
     session.commit()
     return get_cluster(session, cluster_id)

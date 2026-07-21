@@ -75,7 +75,7 @@ def test_real_corpus_loads_and_is_wellformed_offline():
     assert gold.source == "pmc-oa"
     # Sparsely annotated real papers: precision must be suppressed, recall reported.
     assert gold.exhaustive_claims is False
-    assert len(gold.papers) >= 6
+    assert len(gold.papers) >= 9
     assert all(p.pmcid and p.doi and p.license for p in gold.papers)
 
     # Antecedents precede citers by ingestion order.
@@ -101,6 +101,8 @@ def test_real_corpus_loads_and_is_wellformed_offline():
         group for group in gold.equivalences if len({paper_of.get(g) for g in group}) >= 2
     ]
     assert cross_paper, "expected a cross-paper corroboration equivalence group"
+    # Multiple drug clusters (e.g. semaglutide, ecnoglutide, tirzepatide).
+    assert len(cross_paper) >= 3
 
 
 @_netonly

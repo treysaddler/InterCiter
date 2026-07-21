@@ -3,7 +3,7 @@
   "corpus_version": "t2d-glycemic-v1",
   "source": "pmc-oa",
   "exhaustive_claims": false,
-  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. This is a draft pilot for adjudication (I draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS; gold_id text fields quote the source sentence for span alignment. A 6-paper citation neighborhood of GLP-1 receptor-agonist add-on/monotherapy in T2D: three trials (semaglutide PMC7839591, ecnoglutide PMC11437099, efsubaglutide PMC13369722), an efsubaglutide anchor that cites the semaglutide and ecnoglutide trials, an independent ecnoglutide trial (PMC12881390) and semaglutide post-hoc (PMC13243996) that corroborate them, and a semaglutide beta-cell meta-analysis (PMC12733705) that includes the semaglutide trial. Two cross-paper corroboration clusters (semaglutide, ecnoglutide) plus a within-paper restatement (efsubaglutide).",
+  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. This is a draft pilot for adjudication (I draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS; gold_id text fields quote the source sentence for span alignment. A 9-paper citation neighborhood of GLP-1 receptor-agonist / dual-agonist therapy in T2D: primary trials (semaglutide PMC7839591, ecnoglutide PMC11437099, efsubaglutide PMC13369722 anchor citing the first two, independent ecnoglutide PMC12881390, semaglutide post-hoc PMC13243996) and systematic reviews / meta-analyses (semaglutide beta-cell PMC12733705, semaglutide-vs-sitagliptin PMC10375936, tirzepatide network MA PMC12085526, tirzepatide-vs-semaglutide MA PMC11153294). Equivalence groups mark semantically equivalent HbA1c-reduction claims for the clustering task (semaglutide x3, ecnoglutide x3, tirzepatide x2, plus a within-paper efsubaglutide restatement).",
   "papers": [
     {
       "doi": "10.1111/dom.14232",
@@ -277,11 +277,93 @@
           "relations": []
         }
       ]
+    },
+    {
+      "doi": "10.1080/07853890.2023.2239830",
+      "pmcid": "PMC10375936",
+      "order": 7,
+      "license": "CC BY 4.0",
+      "title": "Comparative efficacy and safety profile of once-weekly Semaglutide versus once-daily Sitagliptin: a systematic review and meta-analysis",
+      "citations": [
+        { "marker": "15", "resolved_doi": "10.1111/dom.14232" }
+      ],
+      "claims": [
+        {
+          "gold_id": "SSMA-r1",
+          "text": "From this process, three randomized controlled trials (RCTs) were identified",
+          "occurrence_type": "background_assertion",
+          "section": "Eligible studies",
+          "effect_direction": null,
+          "negated": null,
+          "certainty": null,
+          "relations": [
+            {
+              "cited_doi": "10.1111/dom.14232",
+              "function": "direct_evidence",
+              "stance": "neutral",
+              "scope": "paper_level_only",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        },
+        {
+          "gold_id": "SSMA-c1",
+          "text": "Semaglutide demonstrated lower hemoglobin A1c (HbA1c) levels by approximately -1.5% and weight reductions of approximately -4.5 kg",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1007/s13300-025-01728-5",
+      "pmcid": "PMC12085526",
+      "order": 8,
+      "license": "CC BY-NC 4.0",
+      "title": "Efficacy and Safety of Tirzepatide Compared with GLP-1 RAs in Patients with Type 2 Diabetes: A Network Meta-Analysis",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "TZMA1-c1",
+          "text": "all three doses of tirzepatide demonstrated statistically significantly greater reductions in HbA1c and weight from baseline compared with several relevant GLP-1 RAs",
+          "occurrence_type": "reported_result",
+          "section": "Conclusions",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1007/s00125-024-06144-1",
+      "pmcid": "PMC11153294",
+      "order": 9,
+      "license": "CC BY 4.0",
+      "title": "Subcutaneously administered tirzepatide vs semaglutide for adults with type 2 diabetes: a systematic review and network meta-analysis",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "TZMA2-c1",
+          "text": "tirzepatide at doses of 15 mg, 10 mg and 5 mg demonstrated greater efficacy than semaglutide at doses of 2.0 mg, 1.0 mg and 0.5 mg in reducing HbA1c",
+          "occurrence_type": "reported_result",
+          "section": "Glycaemic efficacy",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
     }
   ],
   "equivalences": [
     ["EF-c1", "EF-c1b"],
-    ["SEMA-c1", "SEMA2-c1"],
-    ["ECN-c1", "ECN-c2", "ECN2-c1"]
+    ["SEMA-c1", "SEMA2-c1", "SSMA-c1"],
+    ["ECN-c1", "ECN-c2", "ECN2-c1"],
+    ["TZMA1-c1", "TZMA2-c1"]
   ]
 }

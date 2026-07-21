@@ -66,3 +66,19 @@ export interface CurrentUser {
   display_name: string
   role: string
 }
+
+export interface UserView {
+  user_id: string
+  display_name: string
+  role: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface SessionInfo {
+  user_id: string
+  display_name: string
+  role: string
+  csrf_token: string
+  expires_at: string
+}

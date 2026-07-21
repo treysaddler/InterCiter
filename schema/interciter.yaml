@@ -269,6 +269,7 @@ classes:
       - marker_span
       - cited_work_id
       - bibliographic_resolution_confidence
+      - source_metadata
     slot_usage:
       passage_id:
         identifier: false
@@ -454,6 +455,32 @@ classes:
       - computed_value
       - computed_at
 
+  # ---------------------------------------------------------------------------------
+  # Grounding layer — external entity normalization (derived, additive)
+  # ---------------------------------------------------------------------------------
+
+  EntityGrounding:
+    description: >-
+      A derived grounding of a claim entity to a canonical CURIE via an external
+      normalizer (e.g. ROBOKOP / Translator node normalization). Additive and
+      non-authoritative: it annotates an interpretation without ever rewriting it.
+    slots:
+      - grounding_id
+      - interpretation_id
+      - grounding_role
+      - grounded_term
+      - grounded_curie
+      - grounded_label
+      - entity_types
+      - grounding_source
+      - created_at
+    slot_usage:
+      interpretation_id:
+        identifier: false
+        range: ClaimInterpretation
+        required: true
+        description: The interpretation whose entity was grounded.
+
 # =====================================================================================
 # Slots
 # =====================================================================================
@@ -494,6 +521,9 @@ slots:
   assessment_id:
     identifier: true
     description: Stable identifier for an Assessment.
+  grounding_id:
+    identifier: true
+    description: Stable identifier for an EntityGrounding.
 
   # --- PaperWork ---
   title:
@@ -571,6 +601,10 @@ slots:
   bibliographic_resolution_confidence:
     range: Confidence
     description: Confidence that the mention was resolved to the correct cited work.
+  source_metadata:
+    description: >-
+      Serialized provenance/enrichment for the mention (e.g. Semantic Scholar citation
+      intents and inline contexts). Weak supervision only — not InterCiter's ontology.
 
   # --- ExtractionRun ---
   model:
@@ -742,3 +776,18 @@ slots:
   computed_at:
     range: datetime
     description: When the assessment was computed.
+
+  # --- EntityGrounding ---
+  grounding_role:
+    description: The claim qualifier role that was grounded (e.g. intervention, outcome).
+  grounded_term:
+    description: The surface term that was grounded.
+  grounded_curie:
+    description: The canonical CURIE the term resolved to, when resolved.
+  grounded_label:
+    description: The canonical label of the grounded entity, when available.
+  entity_types:
+    description: BioLink semantic types of the grounded entity.
+    multivalued: true
+  grounding_source:
+    description: The normalizer that produced the grounding (e.g. robokop).

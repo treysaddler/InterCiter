@@ -22,10 +22,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
 from ..config import Settings, get_settings
+from ..ids import new_id
 from ..ingestion import robokop
 
 # Qualifier keys that name a biomedical entity worth grounding.
@@ -106,6 +108,48 @@ def ground_interpretation(
         interpretation_id=interp.interpretation_id,
         groundings=ground_terms(terms, settings=settings, use_cache=use_cache),
     )
+
+
+def persist_grounding(
+    session: Session,
+    result: GroundingResult,
+    *,
+    source: str = "robokop",
+    replace: bool = True,
+) -> int:
+    """Persist a grounding result as additive ``EntityGrounding`` rows.
+
+    Non-mutating with respect to the interpretation: it only writes side-table rows.
+    With ``replace`` (default), existing rows for this interpretation + source are
+    cleared first so re-running is idempotent. Returns the number of rows written.
+    """
+    if result.interpretation_id is None:
+        return 0
+    if replace:
+        existing = session.scalars(
+            select(models.EntityGrounding)
+            .where(models.EntityGrounding.interpretation_id == result.interpretation_id)
+            .where(models.EntityGrounding.grounding_source == source)
+        )
+        for row in existing:
+            session.delete(row)
+
+    written = 0
+    for grounding in result.groundings:
+        session.add(
+            models.EntityGrounding(
+                grounding_id=new_id("EntityGrounding"),
+                interpretation_id=result.interpretation_id,
+                grounding_role=grounding.role,
+                grounded_term=grounding.term,
+                grounded_curie=grounding.curie,
+                grounded_label=grounding.label,
+                entity_types=grounding.types,
+                grounding_source=source,
+            )
+        )
+        written += 1
+    return written
 
 
 def knowledge_sources(edge: dict) -> dict:

@@ -23,6 +23,7 @@ _PREFIXES = {
     "RelationAssertion": "rel",
     "ReviewDecision": "rev",
     "Assessment": "asmt",
+    "EntityGrounding": "grnd",
     "Job": "job",
     "User": "user",
 }

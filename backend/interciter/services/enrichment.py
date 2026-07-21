@@ -81,6 +81,46 @@ def load_embedding(
     return json.loads(path.read_text(encoding="utf-8")).get("vector")
 
 
+def cosine(a: list[float], b: list[float]) -> float:
+    """Cosine similarity of two equal-length vectors (0.0 on any zero/mismatch)."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
+
+
+def rank_by_embedding(
+    query_corpus_id: str,
+    candidate_corpus_ids: list[str],
+    *,
+    top_k: int | None = None,
+    settings: Settings | None = None,
+) -> list[tuple[str, float]]:
+    """Rank candidate papers by SPECTER2 cosine to a query paper (paper-level only).
+
+    This is the design's **paper-level candidate narrowing** primitive — it narrows which
+    *papers* are worth a claim-level comparison, and is never used to assert claim
+    equivalence (that needs a sentence/cross-encoder). Candidates without a cached
+    embedding are skipped, so callers keep token-overlap as a fallback.
+    """
+    settings = settings or get_settings()
+    query = load_embedding(query_corpus_id, settings=settings)
+    if not query:
+        return []
+    scored: list[tuple[str, float]] = []
+    for cid in candidate_corpus_ids:
+        vector = load_embedding(cid, settings=settings)
+        if not vector:
+            continue
+        scored.append((cid, cosine(query, vector)))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored[:top_k] if top_k is not None else scored
+
+
 def _author_names(paper: dict) -> list[str]:
     return [a["name"] for a in paper.get("authors") or [] if a.get("name")]
 
@@ -121,12 +161,64 @@ def reference_links(
     return out
 
 
+def persist_reference_metadata(
+    session: Session,
+    work: models.PaperWork,
+    links: list[dict],
+    *,
+    source: str = "s2",
+) -> int:
+    """Attach resolved-reference intents/contexts to the citing work's mentions.
+
+    Matches each Semantic Scholar reference link to an existing ``CitationMention`` by the
+    cited work's DOI / PMID / corpusId and writes the enrichment onto the additive
+    ``source_metadata`` slot. Weak supervision only — intents are never mapped onto the
+    function/stance ontology. Returns the number of mentions updated.
+    """
+    by_doi = {l["cited_doi"]: l for l in links if l.get("cited_doi")}
+    by_pmid = {l["cited_pmid"]: l for l in links if l.get("cited_pmid")}
+    by_corpus = {l["cited_corpus_id"]: l for l in links if l.get("cited_corpus_id")}
+
+    mentions = session.scalars(
+        select(models.CitationMention)
+        .join(models.Passage, models.CitationMention.passage_id == models.Passage.passage_id)
+        .join(
+            models.PaperVersion,
+            models.Passage.paper_version_id == models.PaperVersion.version_id,
+        )
+        .where(models.PaperVersion.work_id == work.work_id)
+        .where(models.CitationMention.cited_work_id.is_not(None))
+    )
+
+    updated = 0
+    for mention in mentions:
+        cited = session.get(models.PaperWork, mention.cited_work_id)
+        if cited is None:
+            continue
+        link = (
+            (by_doi.get(cited.doi) if cited.doi else None)
+            or (by_pmid.get(cited.pmid) if cited.pmid else None)
+            or (by_corpus.get(cited.s2_corpus_id) if cited.s2_corpus_id else None)
+        )
+        if not link:
+            continue
+        mention.source_metadata = {
+            "provider": source,
+            "s2_intents": link.get("intents", []),
+            "contexts": link.get("contexts", []),
+            "is_influential": link.get("is_influential", False),
+        }
+        updated += 1
+    return updated
+
+
 def enrich_work(
     session: Session,
     work: models.PaperWork,
     *,
     fetch_embedding: bool = True,
     fetch_references: bool = False,
+    persist_references: bool = False,
     settings: Settings | None = None,
     use_cache: bool = True,
 ) -> EnrichmentResult:
@@ -181,10 +273,11 @@ def enrich_work(
             cache_embedding(work.s2_corpus_id, vector, settings=settings)
             result.embedding_dims = len(vector)
 
-    if fetch_references:
-        result.reference_links = len(
-            reference_links(s2_id, settings=settings, use_cache=use_cache)
-        )
+    if fetch_references or persist_references:
+        links = reference_links(s2_id, settings=settings, use_cache=use_cache)
+        result.reference_links = len(links)
+        if persist_references:
+            persist_reference_metadata(session, work, links)
 
     return result
 

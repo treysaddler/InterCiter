@@ -119,6 +119,9 @@ class CitationMention(Base):
     bibliographic_resolution_confidence: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )
+    # Additive provenance/enrichment (e.g. Semantic Scholar intents + contexts). Weak
+    # supervision only — never InterCiter's function/stance ontology.
+    source_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 # ---------------------------------------------------------------------------------
@@ -304,6 +307,27 @@ class Assessment(Base):
     algorithm_version: Mapped[str | None] = mapped_column(String, nullable=True)
     computed_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+# ---------------------------------------------------------------------------------
+# Grounding — external entity normalization (derived, additive, non-mutating)
+# ---------------------------------------------------------------------------------
+
+
+class EntityGrounding(Base):
+    __tablename__ = "entity_grounding"
+
+    grounding_id: Mapped[str] = mapped_column(String, primary_key=True)
+    interpretation_id: Mapped[str] = mapped_column(
+        ForeignKey("claim_interpretation.interpretation_id"), index=True
+    )
+    grounding_role: Mapped[str | None] = mapped_column(String, nullable=True)
+    grounded_term: Mapped[str | None] = mapped_column(Text, nullable=True)
+    grounded_curie: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    grounded_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    entity_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    grounding_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 # ---------------------------------------------------------------------------------

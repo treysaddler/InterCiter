@@ -13,6 +13,8 @@ import os
 
 import pytest
 
+from sqlalchemy import select
+
 from interciter.config import Settings
 from interciter.datasets import s2_bulk, store
 from interciter.ingestion import robokop, semantic_scholar
@@ -320,6 +322,99 @@ def test_corroborate_attaches_provenance(monkeypatch):
     assert records[0]["predicate"] == "biolink:treats"
     assert records[0]["primary_knowledge_source"] == "infores:ctd"
     assert records[0]["aggregator_knowledge_source"] == []
+
+
+# --- Phase 5: persistence + paper-level embedding prefilter ---------------------
+
+def test_cosine_and_ranking(tmp_path):
+    settings = Settings(s2_cache_dir=str(tmp_path))
+    enrichment.cache_embedding("1", [1.0, 0.0], settings=settings)
+    enrichment.cache_embedding("2", [1.0, 0.0], settings=settings)  # identical
+    enrichment.cache_embedding("3", [0.0, 1.0], settings=settings)  # orthogonal
+    assert enrichment.cosine([1.0, 0.0], [1.0, 0.0]) == 1.0
+    assert enrichment.cosine([1.0, 0.0], []) == 0.0
+    ranked = enrichment.rank_by_embedding("1", ["3", "2"], settings=settings)
+    assert ranked[0] == ("2", pytest.approx(1.0))
+    assert ranked[1][0] == "3"
+
+
+def test_rank_by_embedding_skips_missing(tmp_path):
+    settings = Settings(s2_cache_dir=str(tmp_path))
+    enrichment.cache_embedding("1", [1.0, 0.0], settings=settings)
+    # No embedding cached for "99" -> skipped, keeping token-overlap as the fallback.
+    assert enrichment.rank_by_embedding("1", ["99"], settings=settings) == []
+    assert enrichment.rank_by_embedding("absent", ["1"], settings=settings) == []
+
+
+def test_persist_reference_metadata_matches_by_identifier(session):
+    from interciter.enums import Manifestation
+
+    citing = models.PaperWork(
+        work_id="wc", availability_state=AvailabilityState.full_text_extracted
+    )
+    cited = models.PaperWork(
+        work_id="wd", doi="10.9/z", availability_state=AvailabilityState.metadata_stub
+    )
+    version = models.PaperVersion(
+        version_id="v1", work_id="wc", manifestation=Manifestation.published
+    )
+    passage = models.Passage(passage_id="p1", paper_version_id="v1", verbatim_text="…[1]…")
+    mention = models.CitationMention(
+        mention_id="m1", passage_id="p1", marker_span="[1]", cited_work_id="wd"
+    )
+    session.add_all([citing, cited, version, passage, mention])
+    session.flush()
+
+    links = [
+        {
+            "cited_corpus_id": None,
+            "cited_doi": "10.9/z",
+            "cited_pmid": None,
+            "cited_title": "Cited",
+            "contexts": ["…as in [1]…"],
+            "intents": ["result"],
+            "is_influential": True,
+        }
+    ]
+    updated = enrichment.persist_reference_metadata(session, citing, links)
+    session.flush()
+    assert updated == 1
+    assert mention.source_metadata["s2_intents"] == ["result"]
+    assert mention.source_metadata["provider"] == "s2"
+
+
+def test_persist_grounding_is_idempotent(session, monkeypatch):
+    monkeypatch.setattr(
+        grounding.robokop,
+        "ground",
+        lambda term, **k: {
+            "id": {"identifier": "CHEBI:6801", "label": "metformin"},
+            "type": ["biolink:SmallMolecule"],
+        },
+    )
+    interp = models.ClaimInterpretation(
+        interpretation_id="i9",
+        claim_occurrence_id="o9",
+        normalized_text="metformin lowers HbA1c",
+        qualifiers={"intervention": "metformin"},
+        parent_interpretation_ids=[],
+    )
+    session.add(interp)
+    session.flush()
+
+    result = grounding.ground_interpretation(session, interp)
+    assert grounding.persist_grounding(session, result) == 1
+    session.flush()
+    # Re-running replaces rather than duplicating.
+    assert grounding.persist_grounding(session, result) == 1
+    session.flush()
+    rows = session.scalars(
+        select(models.EntityGrounding).where(
+            models.EntityGrounding.interpretation_id == "i9"
+        )
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].grounded_curie == "CHEBI:6801"
 
 
 # --- Live (network-gated) -------------------------------------------------------

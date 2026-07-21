@@ -163,7 +163,12 @@ def _cmd_s2_backfill(args: argparse.Namespace) -> int:
             if work is None:
                 print(f"error: work {args.work_id} not found", file=sys.stderr)
                 return 1
-            result = enrich_work(session, work, fetch_embedding=not args.no_embedding)
+            result = enrich_work(
+                session,
+                work,
+                fetch_embedding=not args.no_embedding,
+                persist_references=args.refs,
+            )
             session.commit()
             results = [result]
 
@@ -258,9 +263,16 @@ def _cmd_ground_claim(args: argparse.Namespace) -> int:
         except RobokopError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
+        written = 0
+        if args.persist:
+            from .services.grounding import persist_grounding
+
+            written = persist_grounding(session, result)
+            session.commit()
     payload = {
         "interpretation_id": result.interpretation_id,
         "groundings": [vars(g) for g in result.groundings],
+        "persisted": written,
     }
     print(json.dumps(payload, indent=2))
     return 0
@@ -343,6 +355,10 @@ def main(argv: list[str] | None = None) -> int:
     p_bf.add_argument(
         "--no-embedding", action="store_true", help="Skip caching SPECTER2 embeddings"
     )
+    p_bf.add_argument(
+        "--refs", action="store_true",
+        help="Also fetch references and persist S2 intents/contexts onto mentions",
+    )
     p_bf.set_defaults(func=_cmd_s2_backfill)
 
     p_ds = sub.add_parser(
@@ -387,6 +403,9 @@ def main(argv: list[str] | None = None) -> int:
     p_gc.add_argument("interpretation_id", help="A ClaimInterpretation id")
     p_gc.add_argument(
         "--term", action="append", default=None, help="Extra free-text term to ground (repeatable)"
+    )
+    p_gc.add_argument(
+        "--persist", action="store_true", help="Write EntityGrounding rows to the database"
     )
     p_gc.set_defaults(func=_cmd_ground_claim)
 

@@ -25,6 +25,8 @@ website:
             text: Evaluation
           - href: api.md
             text: API
+          - href: ui-design.md
+            text: UI Design
           - href: grant-framing.md
             text: Grant Framing
       - text: Feedback
@@ -54,6 +56,8 @@ website:
             text: Evaluation
           - href: api.md
             text: API
+          - href: ui-design.md
+            text: UI Design
           - href: grant-framing.md
             text: Grant Framing
       - section: "Design Reviews"

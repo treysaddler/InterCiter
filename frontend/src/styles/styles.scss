@@ -1,0 +1,39 @@
+// USWDS 3 Sass entry point.
+//
+// `@use ... as *` both configures the theme tokens *and* brings USWDS Sass
+// functions (color, units, family, radius) into this file's scope so the custom
+// rules below resolve to USWDS — not Sass's built-in color(). Asset paths match
+// the folders copied by vite-plugin-static-copy (see vite.config.ts).
+@use "uswds-core" as * with (
+  $theme-image-path: "/img",
+  $theme-font-path: "/fonts"
+);
+
+@forward "uswds";
+
+// ---------------------------------------------------------------------------
+// InterCiter custom, token-based styles (docs/ui-design.md §4).
+// Two elements have no off-the-shelf USWDS equivalent; keep them token-driven.
+// ---------------------------------------------------------------------------
+
+// Evidence highlighter: the exact char_start..char_end span of a claim inside
+// its verbatim passage.
+.ic-evidence__highlight {
+  background-color: color("yellow-20v");
+  padding: 0 units(2px);
+  border-radius: radius("sm");
+}
+
+.ic-evidence__verbatim {
+  font-family: family("mono");
+  border-left: units("05") solid color("base-lighter");
+  padding-left: units(2);
+}
+
+// Decomposed score chips — never a single blended meter.
+.ic-score-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: units(1);
+  margin: units("2px") units(1) units("2px") 0;
+}

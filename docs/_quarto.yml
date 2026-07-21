@@ -13,17 +13,17 @@ website:
         text: Design Overview
       - text: Design Docs
         menu:
-          - href: docs/data-model.md
+          - href: data-model.md
             text: Data Model
-          - href: docs/architecture.md
+          - href: architecture.md
             text: Architecture
-          - href: docs/scoring-and-review.md
+          - href: scoring-and-review.md
             text: Scoring & Review
-          - href: docs/evaluation.md
+          - href: evaluation.md
             text: Evaluation
-          - href: docs/api.md
+          - href: api.md
             text: API
-          - href: docs/grant-framing.md
+          - href: grant-framing.md
             text: Grant Framing
       - text: Feedback
         menu:
@@ -40,17 +40,17 @@ website:
     contents:
       - section: "Design Docs"
         contents:
-          - href: docs/data-model.md
+          - href: data-model.md
             text: Data Model
-          - href: docs/architecture.md
+          - href: architecture.md
             text: Architecture
-          - href: docs/scoring-and-review.md
+          - href: scoring-and-review.md
             text: Scoring & Review
-          - href: docs/evaluation.md
+          - href: evaluation.md
             text: Evaluation
-          - href: docs/api.md
+          - href: api.md
             text: API
-          - href: docs/grant-framing.md
+          - href: grant-framing.md
             text: Grant Framing
       - section: "Design Reviews"
         contents:

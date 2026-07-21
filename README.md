@@ -10,7 +10,7 @@ cited antecedents within the traversed corpus.
 This repository holds the **design** for InterCiter: a systems-design overview,
 detailed design docs, an executable [LinkML](https://linkml.io) schema, and
 external design reviews. It is published as a [Quarto](https://quarto.org)
-website (`_site/`).
+website (`docs/_site/`).
 
 ## Design philosophy
 
@@ -25,7 +25,7 @@ extraction, selective claim alignment, and auditable lineage.
 
 ## Where to start
 
-- **Design Overview** — [interciter-systems-design.md](interciter-systems-design.md):
+- **Design Overview** — [docs/interciter-systems-design.md](docs/interciter-systems-design.md):
   summary, principles, MVP scope, key decisions, and open questions. This is the
   entry point.
 - **Detailed design** — the design docs in [docs/](docs/):
@@ -46,24 +46,26 @@ extraction, selective claim alignment, and auditable lineage.
   model as an executable, BioLink-aligned LinkML schema, with generated Pydantic
   models, SQL DDL, and JSON Schema in [schema/generated/](schema/generated/).
 - **External feedback** — supplementary design reviews:
-  [0001](feedback/0001-gpt-5.6-sol-pro-feedback.md) ·
-  [0002](feedback/0002-gemini-3.1-pro-feedback.md) ·
-  [0003](feedback/0003-claude-opus-4.8-feedback.md).
+  [0001](docs/feedback/0001-gpt-5.6-sol-pro-feedback.md) ·
+  [0002](docs/feedback/0002-gemini-3.1-pro-feedback.md) ·
+  [0003](docs/feedback/0003-claude-opus-4.8-feedback.md).
 
 ## Repository structure
 
 ```
-interciter-systems-design.md   Design overview (entry point)
-docs/                          Detailed design documents
-feedback/                      External design reviews
+docs/                          Documentation & Quarto site
+  interciter-systems-design.md Design overview (entry point)
+  data-model.md, ...           Detailed design documents
+  feedback/                    External design reviews
+  _quarto.yml                  Quarto website configuration
+  index.qmd, about.qmd         Website landing and about pages
+  styles.css                   Site styles
+  _site/                       Rendered website output (build artifact)
 schema/
   interciter.yaml              LinkML logical data model
   generated/                   Generated Pydantic / SQL DDL / JSON Schema
   requirements.txt             Schema tooling dependencies
-_quarto.yml                    Quarto website configuration
-index.qmd, about.qmd           Website landing and about pages
 Makefile                       Schema validation and code-generation tasks
-_site/                         Rendered website output (build artifact)
 ```
 
 ## Working with the schema
@@ -84,11 +86,12 @@ make clean       # Remove generated artifacts
 ## Building the website
 
 The design is published as a Quarto website. With [Quarto](https://quarto.org)
-installed:
+installed, run from the `docs/` directory:
 
 ```sh
+cd docs
 quarto preview   # Live-reloading local preview
-quarto render    # Build the static site into _site/
+quarto render    # Build the static site into docs/_site/
 ```
 
 The full design (overview plus all design docs, excluding the feedback files) is
@@ -101,5 +104,5 @@ vertical slice: given an open-access biomedical paper, identify empirical result
 claims, show their exact source passages and citation contexts, classify each
 cited relationship (function + stance) with calibrated abstention, and trace one
 hop to the cited paper or a confidently matched target claim. See the
-[design overview](interciter-systems-design.md) for MVP scope, deferred work, and
+[design overview](docs/interciter-systems-design.md) for MVP scope, deferred work, and
 open decisions.

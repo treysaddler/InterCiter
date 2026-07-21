@@ -12,14 +12,14 @@ format:
 
 {{< include interciter-systems-design.md >}}
 
-{{< include docs/data-model.md >}}
+{{< include data-model.md >}}
 
-{{< include docs/architecture.md >}}
+{{< include architecture.md >}}
 
-{{< include docs/scoring-and-review.md >}}
+{{< include scoring-and-review.md >}}
 
-{{< include docs/evaluation.md >}}
+{{< include evaluation.md >}}
 
-{{< include docs/api.md >}}
+{{< include api.md >}}
 
-{{< include docs/grant-framing.md >}}
+{{< include grant-framing.md >}}

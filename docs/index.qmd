@@ -11,12 +11,12 @@ relate to cited work.
 - **Design Overview** — [interciter-systems-design.md](interciter-systems-design.md):
   overview, principles, MVP scope, open decisions.
 - **Detailed design** — the design docs cover the
-  [data model](docs/data-model.md) ·
-  [architecture](docs/architecture.md) ·
-  [scoring & review](docs/scoring-and-review.md) ·
-  [evaluation](docs/evaluation.md) ·
-  [API](docs/api.md) ·
-  [grant framing](docs/grant-framing.md).
+  [data model](data-model.md) ·
+  [architecture](architecture.md) ·
+  [scoring & review](scoring-and-review.md) ·
+  [evaluation](evaluation.md) ·
+  [API](api.md) ·
+  [grant framing](grant-framing.md).
 - **External feedback** — supplementary feedback files
   [0001](feedback/0001-gpt-5.6-sol-pro-feedback.md) ·
   [0002](feedback/0002-gemini-3.1-pro-feedback.md) ·

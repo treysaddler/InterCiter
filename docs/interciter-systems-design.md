@@ -6,18 +6,18 @@
 
 | Document | Contents |
 |---|---|
-| [docs/data-model.md](docs/data-model.md) | The immutable logical model: papers/versions/passages, occurrences vs interpretations, revision graph, soft clustering, first-class relation assertions, BioLink mapping |
-| [docs/architecture.md](docs/architecture.md) | Layers; write model vs read projection; Semantic Scholar integration; availability states; async jobs; ingestion security |
-| [docs/scoring-and-review.md](docs/scoring-and-review.md) | Decomposed confidence signals, Assessment records, review workflow, deferred user/trust scoring |
-| [docs/evaluation.md](docs/evaluation.md) | Gold corpus, per-stage metrics, calibration and abstention, S2 intent as weak supervision |
-| [docs/api.md](docs/api.md) | The `/v1` surface: jobs/runs, evidence endpoints, revisions, bounded traversal |
-| [docs/grant-framing.md](docs/grant-framing.md) | Three hypotheses, precise claims, budget honesty, domain-scope framing |
+| [data-model.md](data-model.md) | The immutable logical model: papers/versions/passages, occurrences vs interpretations, revision graph, soft clustering, first-class relation assertions, BioLink mapping |
+| [architecture.md](architecture.md) | Layers; write model vs read projection; Semantic Scholar integration; availability states; async jobs; ingestion security |
+| [scoring-and-review.md](scoring-and-review.md) | Decomposed confidence signals, Assessment records, review workflow, deferred user/trust scoring |
+| [evaluation.md](evaluation.md) | Gold corpus, per-stage metrics, calibration and abstention, S2 intent as weak supervision |
+| [api.md](api.md) | The `/v1` surface: jobs/runs, evidence endpoints, revisions, bounded traversal |
+| [grant-framing.md](grant-framing.md) | Three hypotheses, precise claims, budget honesty, domain-scope framing |
 
 ## Summary
 
 InterCiter is a knowledge-graph system that extracts individual claims from scientific papers, **anchors each claim to its exact source passage**, and classifies how citing claims relate to cited work — separating the citation's *function* (background, method, direct evidence, comparison) from its *stance* (support, contradict, neutral). Walking these relations traces a claim to its **earlier cited antecedents within the traversed corpus**. On this core it layers semantic search, citation-network visualization, and automated reference generation, all through a single API.
 
-The design philosophy is **provenance-first**: model outputs, human corrections, cluster groupings, and review decisions coexist as distinct, immutable, traceable records. What the paper says (`ClaimOccurrence`) is never overwritten by what a model thinks it means (`ClaimInterpretation`); uncertainty is expressed by **abstaining** (`unresolved`), never by overclaiming. The system builds on established infrastructure — BioLink, RoboKop, Semantic Scholar — and its research contribution is captured in three testable hypotheses: source-grounded extraction, selective claim alignment, and auditable lineage ([docs/grant-framing.md](docs/grant-framing.md)).
+The design philosophy is **provenance-first**: model outputs, human corrections, cluster groupings, and review decisions coexist as distinct, immutable, traceable records. What the paper says (`ClaimOccurrence`) is never overwritten by what a model thinks it means (`ClaimInterpretation`); uncertainty is expressed by **abstaining** (`unresolved`), never by overclaiming. The system builds on established infrastructure — BioLink, RoboKop, Semantic Scholar — and its research contribution is captured in three testable hypotheses: source-grounded extraction, selective claim alignment, and auditable lineage ([grant-framing.md](grant-framing.md)).
 
 ## Design principles
 
@@ -34,7 +34,7 @@ The design philosophy is **provenance-first**: model outputs, human corrections,
 
 ## Architecture at a glance
 
-Three layers — **Ingestion/Extraction** (stateless, pluggable, run-recorded), **Knowledge Graph** (immutable system of record + derived projection, BioLink-aligned), **Access** (API and everything on it). The write model is normalized PostgreSQL; the read model is a periodically rebuilt graph projection that flattens occurrence/interpretation/cluster chains into traversable claim nodes, with every projected edge pointing back to its evidence-bearing `RelationAssertion`. Details and guardrails: [docs/architecture.md](docs/architecture.md).
+Three layers — **Ingestion/Extraction** (stateless, pluggable, run-recorded), **Knowledge Graph** (immutable system of record + derived projection, BioLink-aligned), **Access** (API and everything on it). The write model is normalized PostgreSQL; the read model is a periodically rebuilt graph projection that flattens occurrence/interpretation/cluster chains into traversable claim nodes, with every projected edge pointing back to its evidence-bearing `RelationAssertion`. Details and guardrails: [architecture.md](architecture.md).
 
 ## MVP — a thin, auditable vertical slice
 
@@ -62,7 +62,7 @@ Three layers — **Ingestion/Extraction** (stateless, pluggable, run-recorded), 
 
 | Defer | Reason |
 |---|---|
-| Production multi-LLM extraction | Swappability is demonstrated on the eval set instead ([docs/evaluation.md](docs/evaluation.md)) |
+| Production multi-LLM extraction | Swappability is demonstrated on the eval set instead ([evaluation.md](evaluation.md)) |
 | Blended ranking scores | Components must be validated separately first |
 | Public user scores + paper trust weighting | Identity, abuse, and bias problems; overlay design retained for later |
 | Deep multi-hop traversal | Per-hop errors compound; ships bounded (`max_depth`, `max_nodes`) when it ships |
@@ -73,7 +73,7 @@ Three layers — **Ingestion/Extraction** (stateless, pluggable, run-recorded), 
 
 ## Open decisions and known risks
 
-- **Domain scope — decided:** MVP narrows to one biomedical subdomain, with domain-agnosticism expressed as "domain-neutral architecture, pluggable vocabularies" ([docs/grant-framing.md](docs/grant-framing.md)). Revisit only if the grant's funder profile demands broader initial scope.
+- **Domain scope — decided:** MVP narrows to one biomedical subdomain, with domain-agnosticism expressed as "domain-neutral architecture, pluggable vocabularies" ([grant-framing.md](grant-framing.md)). Revisit only if the grant's funder profile demands broader initial scope.
 - **Which biomedical subdomain / paper type — open.** Choose for annotation tractability (e.g. a literature with relatively formulaic empirical claims) before corpus work begins.
 - **LLM cost at scale — open.** Cost per paper is a tracked evaluation metric; corpus-scale extrapolation belongs in the grant budget.
 - **Clustering thresholds — open by design.** Set from the gold corpus via calibration; the standing policy is prefer-fragmentation-over-pollution.

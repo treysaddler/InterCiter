@@ -17,14 +17,13 @@ relate to cited work.
   [evaluation](docs/evaluation.md) ·
   [API](docs/api.md) ·
   [grant framing](docs/grant-framing.md).
-- **Design reviews** — external feedback
+- **External feedback** — supplementary feedback files
   [0001](feedback/0001-gpt-5.6-sol-pro-feedback.md) ·
   [0002](feedback/0002-gemini-3.1-pro-feedback.md) ·
-  [0003](feedback/0003-claude-opus-4.8-feedback.md),
-  incorporated in Revision 2 of the design.
+  [0003](feedback/0003-claude-opus-4.8-feedback.md).
 
 ## For reviewers
 
-The full design (overview plus all design docs, excluding the reviews) is also
-available as a single **[Word document](interciter-design-doc.docx)** for
-offline review and comments.
+The full design (overview plus all design docs, excluding the feedback files) is
+also available as a single **[Word document](interciter-design-doc.docx)** for
+offline reading and comments.

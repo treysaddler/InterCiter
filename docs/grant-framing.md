@@ -8,20 +8,20 @@ The proposal is stronger presented as a research system testing three falsifiabl
 2. **Selective claim alignment.** Citation contexts can be linked to specific cited claims at useful precision *when the system is allowed to abstain* — the risk/coverage tradeoff is the result, not a footnote.
 3. **Auditable lineage.** Immutable, versioned relation assertions let users inspect how every step in a citation lineage was generated, reviewed, or revised.
 
-## Language corrections
+## Precise claims
 
-Two places where the original framing overstated feasibility:
+Two claims are stated carefully so the proposal does not overstate feasibility:
 
-- **"Trace claims back to their original sources" → soften.** A citation graph identifies an *earlier cited antecedent*, or the earliest source found *within the traversed corpus*. It cannot prove intellectual originality — papers omit citations, cite secondary sources, and independently derive similar findings. The honest claim is still valuable; the overstated one is attackable.
-- **"Automated deduplication is safe because merges are reversible" → replace with:**
+- **Tracing reaches an antecedent, not a proven origin.** A citation graph identifies an *earlier cited antecedent*, or the earliest source found *within the traversed corpus*. It cannot prove intellectual originality — papers omit citations, cite secondary sources, and independently derive similar findings. The honest claim is still valuable; the overstated one is attackable.
+- **Clustering is safe by construction, not merely reversible.**
 
   > Automated clustering is non-destructive, measurable, and reversible — but uncertain clusters do not become authoritative without meeting a validated threshold or receiving review.
 
-  Reversibility bounds duration of damage, not blast radius; the design change backing this wording is in [data-model.md](data-model.md).
+  Reversibility bounds duration of damage, not blast radius; the design backing this wording is in [data-model.md](data-model.md).
 
 ## Narrative
 
-Unchanged and still the strongest part: InterCiter **builds on existing infrastructure** (BioLink schema extension, RoboKop provenance plumbing, Semantic Scholar paper/citation substrate) rather than re-solving bibliographic parsing. Its novelty is precisely the three hypotheses: source-grounded claim extraction, selective alignment, and auditable lineage. The revised relation model strengthens the BioLink story — evidence-bearing `RelationAssertion`s map naturally onto BioLink's provenance-heavy association pattern.
+The strongest part of the proposal: InterCiter **builds on existing infrastructure** (BioLink schema extension, RoboKop provenance plumbing, Semantic Scholar paper/citation substrate) rather than re-solving bibliographic parsing. Its novelty is precisely the three hypotheses: source-grounded claim extraction, selective alignment, and auditable lineage. The relation model strengthens the BioLink story — evidence-bearing `RelationAssertion`s map naturally onto BioLink's provenance-heavy association pattern.
 
 ## Budget honesty
 

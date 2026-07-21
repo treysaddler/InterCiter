@@ -2,16 +2,16 @@
 
 This is the **logical** model: the immutable system of record. It is deliberately richer than what queries traverse — see [architecture.md](architecture.md) for how it is projected into a flattened graph for reading. Do not implement this 1:1 as the graph schema.
 
-## Why the original `Claim` node was replaced
+## Why claims are modeled as separate entities
 
-The original design had a single `Claim` node that simultaneously acted as:
+A claim is split into distinct entities rather than one `Claim` node, because a single node would have to act simultaneously as:
 
 1. an occurrence of text in a paper;
 2. a normalized proposition;
 3. an editable, versioned record;
 4. a canonical object produced by deduplication.
 
-Those four things have different identities and lifecycles, and conflating them was the root cause of the edit-chain ambiguity, the edge-migration complexity on merge, and the corroboration/model-agreement confusion in scoring. The revised model separates them. This is schema richness, not feature scope — most of these entities are plain relational tables behind a small feature set, and the MVP builds only the thin path through them.
+Those four roles have different identities and lifecycles. Collapsing them produces edit-chain ambiguity, edge-migration complexity on merge, and corroboration/model-agreement confusion in scoring, so the model keeps them separate. This is schema richness, not feature scope — most of these entities are plain relational tables behind a small feature set, and the MVP builds only the thin path through them.
 
 ## Entity catalog
 
@@ -101,7 +101,7 @@ ClusterMembership
   added_by / removed_by / timestamps
 ```
 
-The original design's `MergeEvent` (authoritative merge with edge copying, reversible) is **removed**. Reversibility bounds the *duration* of a bad merge's damage, not its blast radius — during the window before revert it still pollutes search, inflates confidence, and feeds downstream automated decisions. Instead:
+Equivalence uses soft clustering, never an authoritative `MergeEvent` with edge copying. Reversibility bounds the *duration* of a bad merge's damage, not its blast radius — during the window before revert it still pollutes search, inflates confidence, and feeds downstream automated decisions. Instead:
 
 - A cluster is a *statement of probable semantic equivalence*, never a replacement node. All originals remain first-class.
 - **No edge copying.** Queries resolve cluster membership at read time or via the rebuildable projection; reverting a bad grouping is just removing a membership row.
@@ -135,7 +135,7 @@ RelationAssertion
   status: proposed | accepted | rejected | unresolved | stale_pending_review
 ```
 
-The old `mention / support / dissent` vocabulary mixed axes: "mention" is a citation *function*, support/dissent are epistemic *stances*, and they are orthogonal — a citation can mention a method while supporting a result, or support part of a claim while qualifying another. The four independent dimensions above replace it.
+Function, stance, scope, and resolution are modeled as four independent dimensions rather than a single `mention / support / dissent` axis. "Mention" is a citation *function* while support/dissent are epistemic *stances*, and the two are orthogonal — a citation can mention a method while supporting a result, or support part of a claim while qualifying another. One axis cannot express that; four can.
 
 The paper-level fallback is now expressed honestly. Instead of "this claim supports that paper," it records:
 
@@ -168,7 +168,7 @@ All derived scores live in versioned, rebuildable `Assessment` records — never
 
 `UserScore` and `TrustWeight` (community/user-supplied signals) are **deferred to phase 2** but keep the same overlay pattern; their sketches live in scoring-and-review.md.
 
-## Additive-only, refined
+## Additive-only, precisely scoped
 
 "Additive-only" means **immutable scientific assertions and decisions** — not "nothing can ever be deleted." The system still needs:
 
@@ -191,9 +191,9 @@ Each projected edge carries `resolution`, `stance`, `function`, both scores, and
 
 ## Mapping onto BioLink
 
-Unchanged in spirit, and the revision fits *better*:
+The model maps cleanly onto BioLink:
 
 - `ClaimInterpretation` → subtype of BioLink `InformationContentEntity`.
-- `RelationAssertion` → a custom `Association` subclass; its evidence, publications, and confidence fields map naturally onto BioLink's provenance-heavy association pattern — a much better fit than a lightweight property-graph edge was.
+- `RelationAssertion` → a custom `Association` subclass; its evidence, publications, and confidence fields map naturally onto BioLink's provenance-heavy association pattern, a better fit than a lightweight property-graph edge.
 - `ExtractionRun` provenance → `knowledge_source` / `primary_knowledge_source` / `aggregator_knowledge_source` slots (RoboKop already has display plumbing here).
 - `PaperWork`/`PaperVersion` → BioLink `Publication`, kept close to unmodified; versioning is an additive slot.

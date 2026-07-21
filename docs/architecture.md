@@ -1,6 +1,6 @@
 # InterCiter — Architecture
 
-## Three layers (unchanged)
+## Three layers
 
 1. **Ingestion / Extraction** — paper → occurrences, interpretations, relation assertions. Stateless and pluggable; extraction models are swappable without touching storage. Every run is recorded as an `ExtractionRun`.
 2. **Knowledge Graph** — the immutable system of record plus its projections, BioLink-aligned.
@@ -8,7 +8,7 @@
 
 ## Logical model vs physical schema
 
-The single most important architectural decision added in this revision: **the rich immutable model is the system of record; queries traverse a derived projection.** Implementing the full entity catalog as the graph schema would put 5–7 hops between any two claims (`Cluster → Interpretation → Occurrence → RelationAssertion → Occurrence → Interpretation → Cluster`) — a constant-factor increase in size but a real traversal-depth problem for interactive exploration.
+The single most important architectural decision: **the rich immutable model is the system of record; queries traverse a derived projection.** Implementing the full entity catalog as the graph schema would put 5–7 hops between any two claims (`Cluster → Interpretation → Occurrence → RelationAssertion → Occurrence → Interpretation → Cluster`) — a constant-factor increase in size but a real traversal-depth problem for interactive exploration.
 
 ### Write model — system of record
 
@@ -30,10 +30,10 @@ The same principle applies one layer up: end users must not need to understand o
 
 ## Semantic Scholar integration
 
-Semantic Scholar remains the **paper + citation-graph substrate** (Datasets API, monthly snapshots + incremental diffs); InterCiter's novel layer sits on top. Revisions to the original plan:
+Semantic Scholar is the **paper + citation-graph substrate** (Datasets API, monthly snapshots + incremental diffs); InterCiter's novel layer sits on top. Design decisions:
 
-- **Resolved citation links** — still the headline inheritance: S2ORC ties bibliography entries to inline mentions, feeding `CitationMention` directly.
-- **SPECTER embeddings are paper-level and are used only for paper-level candidate narrowing.** The original plan wrongly proposed seeding claim-level dedup and target-claim alignment with them. Claim-level comparison requires a sentence/claim encoder, and confident equivalence or alignment requires a cross-encoder or entailment model on top ([data-model.md](data-model.md)).
+- **Resolved citation links** — the headline inheritance: S2ORC ties bibliography entries to inline mentions, feeding `CitationMention` directly.
+- **SPECTER embeddings are paper-level and are used only for paper-level candidate narrowing.** They are not used to seed claim-level dedup or target-claim alignment: claim-level comparison requires a sentence/claim encoder, and confident equivalence or alignment requires a cross-encoder or entailment model on top ([data-model.md](data-model.md)).
 - **Citation intent labels are weak supervision, not ground truth.** Their label set differs from InterCiter's function/stance ontology; using them requires an explicit mapping study ([evaluation.md](evaluation.md)).
 - **Identifier mappings** (`corpusId`/DOI/PMID) → `PaperWork`. A DOI or PMID does **not** guarantee accessible full text; metadata, citation context, full text, and embeddings all have different coverage and licensing, tracked per `PaperVersion`.
 
@@ -43,7 +43,7 @@ Ingest a domain slice, not the full corpus — but the slice must be **reproduci
 
 ### Paper availability states
 
-"Stub paper" was too coarse. Every paper the graph can reach carries an explicit availability state:
+A single "stub paper" state is too coarse, so every paper the graph can reach carries an explicit availability state:
 
 | State | Meaning |
 |---|---|
@@ -71,4 +71,4 @@ The pipeline processes untrusted documents and feeds them to LLMs. Minimum harde
 
 ## Auth
 
-Unchanged: hybrid role-based (minimal — `reviewer`, `admin`) + ownership-based (per-user resources, own-authored interpretations). Ownership is modeled first-class from day one because retrofitting it is painful; the role layer stays minimal. Deferring public scoring ([scoring-and-review.md](scoring-and-review.md)) removes most identity/abuse surface from the MVP.
+Hybrid role-based (minimal — `reviewer`, `admin`) + ownership-based (per-user resources, own-authored interpretations). Ownership is modeled first-class from day one because retrofitting it is painful; the role layer stays minimal. Deferring public scoring ([scoring-and-review.md](scoring-and-review.md)) removes most identity/abuse surface from the MVP.

@@ -4,7 +4,7 @@ Versioned from day one (`/v1/`). API-first: every feature, including InterCiter'
 
 ## Ingestion, jobs, and runs (MVP)
 
-One paper accumulates many jobs over time (parse, extract, re-extract, hydrate), so jobs and runs are first-class resources — the original single `GET /papers/{id}/status` was insufficient.
+One paper accumulates many jobs over time (parse, extract, re-extract, hydrate), so jobs and runs are first-class resources rather than a single `GET /papers/{id}/status`.
 
 - `POST /v1/papers` — submit by DOI/PMID or open-access XML. Returns `202 Accepted` + a job resource. Supports an **idempotency key** so retries don't double-ingest.
 - `GET /v1/jobs/{job_id}` — poll any async work (MVP notification model; webhooks on the same abstraction in phase 2).

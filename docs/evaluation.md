@@ -1,6 +1,6 @@
 # InterCiter — Evaluation Plan
 
-All three reviews agreed this was the largest gap: the original design hand-waved "Semantic Scholar citation intent gives us an evaluation story." This document makes evaluation a first-class component. For the grant, this is also the methodology section — and the annotation corpus is the **budget crux**, named as such rather than treated as a checkbox.
+Evaluation is a first-class component of the design, not a citation-intent shortcut: Semantic Scholar's labels are not InterCiter's ontology, so they cannot stand in for a real evaluation story. For the grant, this is also the methodology section — and the annotation corpus is the **budget crux**, named as such rather than treated as a checkbox.
 
 ## Gold corpus
 

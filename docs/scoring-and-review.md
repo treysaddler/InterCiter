@@ -1,8 +1,8 @@
 # InterCiter — Scoring and Human Review
 
-## The blended "global confidence" score is removed
+## Confidence signals stay decomposed
 
-The original design computed one number per claim from extraction confidence + review status + corroboration, and let an aggregate paper trust weight feed ranking. That compressed too many distinct questions into one unexplained scalar — and it conflated model agreement with literature corroboration, which are different kinds of evidence.
+Confidence is exposed as separate signals, never compressed into one global score per claim. A single blended number — extraction confidence + review status + corroboration, with an aggregate paper trust weight feeding ranking — would fold too many distinct questions into one unexplained scalar, and it would conflate model agreement with literature corroboration, which are different kinds of evidence.
 
 ## Decomposed signals
 
@@ -30,7 +30,7 @@ Any future composite ranking score is just another `Assessment` type whose input
 
 ## Deferred: user scores and paper trust weighting
 
-`UserScore` (per-user claim/paper scores, `scope: public | private`) and `TrustWeight` (per-user paper trust entries feeding a computed aggregate) are **deferred to phase 2**. The overlay pattern from the original design is retained — separate entities, never mutable fields on the target, no last-writer-wins — but shipping them in the MVP would import identity, moderation, abuse-control, and manipulation problems, and a scalar "trust" number risks encoding prestige and popularity bias. Before phase 2, "what exactly are users rating?" needs a real answer.
+`UserScore` (per-user claim/paper scores, `scope: public | private`) and `TrustWeight` (per-user paper trust entries feeding a computed aggregate) are **deferred to phase 2**. They keep the overlay pattern — separate entities, never mutable fields on the target, no last-writer-wins — but shipping them in the MVP would import identity, moderation, abuse-control, and manipulation problems, and a scalar "trust" number risks encoding prestige and popularity bias. Before phase 2, "what exactly are users rating?" needs a real answer.
 
 ```text
 UserScore  --[scores]--> ClaimInterpretation | PaperWork     (phase 2)
@@ -51,6 +51,6 @@ Every human action is additive and lands in the system of record:
 
 `ReviewDecision`s are per-dimension deliberately: a reviewer can confirm the stance while rejecting the target link, and the evaluation pipeline consumes these as adjudicated labels.
 
-### Review queue — phase 2, unchanged rationale
+### Review queue — phase 2
 
 Prioritization (lowest-confidence first, contested-first, high-value-papers first) is a query over data already stored (assessments, review statuses, stance conflicts within clusters). No schema work is needed now; only the ranking policy is deferred.

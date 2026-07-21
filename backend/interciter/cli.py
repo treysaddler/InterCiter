@@ -145,6 +145,40 @@ def _cmd_s2_enrich(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_s2_backfill(args: argparse.Namespace) -> int:
+    from . import models
+    from .services.enrichment import backfill_all, enrich_work
+
+    init_db()
+    with SessionLocal() as session:
+        if args.all:
+            results = backfill_all(
+                session, limit=args.limit, fetch_embedding=not args.no_embedding
+            )
+        else:
+            if not args.work_id:
+                print("error: provide a work id or --all", file=sys.stderr)
+                return 1
+            work = session.get(models.PaperWork, args.work_id)
+            if work is None:
+                print(f"error: work {args.work_id} not found", file=sys.stderr)
+                return 1
+            result = enrich_work(session, work, fetch_embedding=not args.no_embedding)
+            session.commit()
+            results = [result]
+
+    filled = 0
+    for r in results:
+        note = r.skipped_reason or (
+            f"corpusId={r.s2_corpus_id} filled={r.fields_filled} "
+            f"emb_dims={r.embedding_dims}"
+        )
+        print(f"{r.work_id}: {note}")
+        filled += len(r.fields_filled)
+    print(f"-- {len(results)} work(s), {filled} field(s) filled --")
+    return 0
+
+
 def _cmd_s2_datasets(args: argparse.Namespace) -> int:
     import json
 
@@ -263,6 +297,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_s2.add_argument("--no-cache", action="store_true", help="Bypass the local cache")
     p_s2.set_defaults(func=_cmd_s2_enrich)
+
+    p_bf = sub.add_parser(
+        "s2-backfill", help="Backfill s2_corpus_id + metadata gaps onto stored works"
+    )
+    p_bf.add_argument("work_id", nargs="?", default=None, help="A single PaperWork id")
+    p_bf.add_argument(
+        "--all", action="store_true", help="Enrich every work missing an s2_corpus_id"
+    )
+    p_bf.add_argument("--limit", type=int, default=None, help="Cap works processed with --all")
+    p_bf.add_argument(
+        "--no-embedding", action="store_true", help="Skip caching SPECTER2 embeddings"
+    )
+    p_bf.set_defaults(func=_cmd_s2_backfill)
 
     p_ds = sub.add_parser(
         "s2-datasets", help="Semantic Scholar bulk datasets (requires INTERCITER_S2_API_KEY)"

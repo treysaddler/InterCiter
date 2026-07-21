@@ -16,7 +16,9 @@ import pytest
 from interciter.config import Settings
 from interciter.datasets import s2_bulk, store
 from interciter.ingestion import robokop, semantic_scholar
-
+from interciter import models
+from interciter.enums import AvailabilityState
+from interciter.services import enrichment
 _NET = os.environ.get("INTERCITER_NET_TESTS") == "1"
 _netonly = pytest.mark.skipif(not _NET, reason="network test; set INTERCITER_NET_TESTS=1")
 _HAS_KEY = bool(os.environ.get("INTERCITER_S2_API_KEY"))
@@ -154,8 +156,80 @@ def test_lookup_corpusid_scans_local_shard(tmp_path):
     assert store.lookup_corpusid(123, settings=settings) is None
 
 
-# --- Live (network-gated) -------------------------------------------------------
+# --- Enrichment: non-destructive backfill onto PaperWork ------------------------
 
+_FAKE_PAPER = {
+    "externalIds": {"CorpusId": 42, "DOI": "10.1/x", "PubMed": "999"},
+    "title": "A trial",
+    "venue": "Journal",
+    "year": 2020,
+    "authors": [{"name": "Ada L."}, {"name": "Grace H."}],
+    "tldr": {"text": "It works."},
+}
+
+
+def _mk_work(**kw) -> models.PaperWork:
+    defaults = dict(work_id="w1", availability_state=AvailabilityState.metadata_stub)
+    defaults.update(kw)
+    return models.PaperWork(**defaults)
+
+
+def test_s2_id_for_work_prefers_doi_then_pmid_then_corpus():
+    assert enrichment.s2_id_for_work(_mk_work(doi="10.1/x")) == "DOI:10.1/x"
+    assert enrichment.s2_id_for_work(_mk_work(pmid="7")) == "PMID:7"
+    assert enrichment.s2_id_for_work(_mk_work(s2_corpus_id="42")) == "CorpusId:42"
+    assert enrichment.s2_id_for_work(_mk_work()) is None
+
+
+def test_enrich_work_skips_when_unidentifiable(session, tmp_path):
+    settings = Settings(s2_cache_dir=str(tmp_path))
+    work = _mk_work()
+    session.add(work)
+    session.flush()
+    result = enrichment.enrich_work(session, work, settings=settings)
+    assert result.skipped_reason
+    assert result.fields_filled == []
+
+
+def test_enrich_work_fills_only_gaps(session, tmp_path, monkeypatch):
+    settings = Settings(s2_cache_dir=str(tmp_path))
+    monkeypatch.setattr(enrichment.s2, "get_paper", lambda *a, **k: dict(_FAKE_PAPER))
+    monkeypatch.setattr(enrichment.s2, "get_embedding", lambda *a, **k: [0.1, 0.2, 0.3])
+    # Title already present -> preserved; corpusId/authors/year are gaps.
+    work = _mk_work(doi="10.1/x", title="Existing title")
+    session.add(work)
+    session.flush()
+
+    result = enrichment.enrich_work(session, work, settings=settings)
+
+    assert work.s2_corpus_id == "42"
+    assert work.title == "Existing title"  # not overwritten
+    assert work.authors == ["Ada L.", "Grace H."]
+    assert work.year == 2020
+    assert "title" not in result.fields_filled
+    assert "s2_corpus_id" in result.fields_filled
+    assert result.embedding_dims == 3
+    assert result.tldr == "It works."
+    assert enrichment.load_embedding("42", settings=settings) == [0.1, 0.2, 0.3]
+
+
+def test_reference_links_normalizes_intents(monkeypatch):
+    raw = [
+        {
+            "citedPaper": {"externalIds": {"CorpusId": 7, "DOI": "10.2/y"}, "title": "Cited"},
+            "contexts": ["…as shown by…"],
+            "intents": ["background"],
+            "isInfluential": True,
+        }
+    ]
+    monkeypatch.setattr(enrichment.s2, "get_references", lambda *a, **k: raw)
+    links = enrichment.reference_links("CorpusId:1", use_cache=False)
+    assert links[0]["cited_corpus_id"] == "7"
+    assert links[0]["intents"] == ["background"]
+    assert links[0]["is_influential"] is True
+
+
+# --- Live (network-gated) -------------------------------------------------------
 @_netonly
 def test_live_s2_identifier_mapping():
     paper = semantic_scholar.get_paper("PMID:33301246", ("externalIds", "title"))

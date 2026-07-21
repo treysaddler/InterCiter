@@ -7,3 +7,8 @@ interciter.db
 *.egg-info/
 # Fetched PMC full text — cached locally, never committed (licensing)
 .cache/
+# Local environment / secrets (e.g. INTERCITER_S2_API_KEY). Never commit real keys;
+# .env.example is the tracked, secret-free template.
+.env
+.env.*
+!.env.example

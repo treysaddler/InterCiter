@@ -2,3 +2,7 @@
 _site/
 **/*.quarto_ipynb
 /schema/generated/
+# Local environment / secrets — never commit real keys (.env.example is tracked)
+.env
+.env.*
+!.env.example

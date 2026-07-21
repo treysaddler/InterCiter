@@ -1,0 +1,794 @@
+[
+  {
+    "objectID": "interciter-systems-design.html",
+    "href": "interciter-systems-design.html",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "Last updated 2026-07-20. The design detail lives in docs/; this document is the entry point.\n\n\n\n\n\n\nDocument\nContents\n\n\n\n\ndocs/data-model.md\nThe immutable logical model: papers/versions/passages, occurrences vs interpretations, revision graph, soft clustering, first-class relation assertions, BioLink mapping\n\n\ndocs/architecture.md\nLayers; write model vs read projection; Semantic Scholar integration; availability states; async jobs; ingestion security\n\n\ndocs/scoring-and-review.md\nDecomposed confidence signals, Assessment records, review workflow, deferred user/trust scoring\n\n\ndocs/evaluation.md\nGold corpus, per-stage metrics, calibration and abstention, S2 intent as weak supervision\n\n\ndocs/api.md\nThe /v1 surface: jobs/runs, evidence endpoints, revisions, bounded traversal\n\n\ndocs/grant-framing.md\nThree hypotheses, precise claims, budget honesty, domain-scope framing\n\n\n\n\n\n\nInterCiter is a knowledge-graph system that extracts individual claims from scientific papers, anchors each claim to its exact source passage, and classifies how citing claims relate to cited work — separating the citation’s function (background, method, direct evidence, comparison) from its stance (support, contradict, neutral). Walking these relations traces a claim to its earlier cited antecedents within the traversed corpus. On this core it layers semantic search, citation-network visualization, and automated reference generation, all through a single API.\nThe design philosophy is provenance-first: model outputs, human corrections, cluster groupings, and review decisions coexist as distinct, immutable, traceable records. What the paper says (ClaimOccurrence) is never overwritten by what a model thinks it means (ClaimInterpretation); uncertainty is expressed by abstaining (unresolved), never by overclaiming. The system builds on established infrastructure — BioLink, RoboKop, Semantic Scholar — and its research contribution is captured in three testable hypotheses: source-grounded extraction, selective claim alignment, and auditable lineage (docs/grant-framing.md).\n\n\n\n\nBuild smallest to largest. The MVP is a thin, auditable vertical slice that proves the highest-risk scientific loop; everything else layers on the same foundation.\nPiggyback on existing infrastructure. Extend BioLink rather than invent an ontology; inherit Semantic Scholar’s citation graph rather than parse bibliographies; use RoboKop’s provenance plumbing.\nProvenance-first: immutable assertions, not “never delete.” Scientific assertions and decisions are append-only; tombstones, retention, and takedown handling still exist for legal and licensing reality.\nEvidence anchoring makes provenance true. Every claim points to a paper version, passage, offsets, and verbatim text. A provenance-first system that can’t show where in the paper a claim came from is internally contradictory.\nAbstention is a first-class outcome. Every uncertain stage — alignment, stance, clustering — can return unresolved with candidates and calibrated scores, rather than guessing.\nLLM as starting point, not source of truth. Extraction runs are fully recorded and swappable; human review corrects rather than gates.\nSeparate the logical model from the physical schema. The rich immutable model is the system of record (relational); queries traverse a derived, rebuildable graph projection that is never authoritative.\nSignals stay decomposed. No blended global confidence; model agreement and literature corroboration are different evidence and never summed.\nAPI-first. Every feature, including InterCiter’s own frontends, routes through the API — which serves reader-friendly composed views by default, with the audit structure behind explicit endpoints.\nMinimal, reproducible storage footprint. Domain slices with pinned corpus versions and inclusion criteria; inherit precomputed artifacts where they’re actually fit for purpose.\n\n\n\n\nThree layers — Ingestion/Extraction (stateless, pluggable, run-recorded), Knowledge Graph (immutable system of record + derived projection, BioLink-aligned), Access (API and everything on it). The write model is normalized PostgreSQL; the read model is a periodically rebuilt graph projection that flattens occurrence/interpretation/cluster chains into traversable claim nodes, with every projected edge pointing back to its evidence-bearing RelationAssertion. Details and guardrails: docs/architecture.md.\n\n\n\n\nGiven an open-access biomedical paper, identify empirical result claims, show their exact source passages and citation contexts, classify each cited relationship (function + stance) with calibrated abstention, and trace one hop to the cited paper or a confidently matched target claim.\n\nWhat counts as an MVP claim: an empirical result claim — a statement reporting a study finding with a direction of effect — in open-access full text (XML first; general PDF ingestion deferred), within one tightly defined biomedical subdomain.\n\n\n\n\n\n\n\n\n\nInclude\nRationale\n\n\n\n\nOne biomedical subdomain, open-access XML first\nBounds ontology and annotation variation; avoids PDF parsing dominating the research\n\n\nEmpirical result claims only\nA definable target, unlike “all claims”\n\n\nExact evidence anchoring (versions, passages, spans)\nRequired for trust and for evaluation\n\n\nOne reference extraction pipeline, fully run-recorded\nTests the hypothesis; preserves swappability via ExtractionRun provenance\n\n\nCitation-scope identification, then function/stance classification\nScope must precede stance\n\n\nPaper-level target + optional claim-level alignment, with abstention\nThe chain never dead-ends, and never overclaims\n\n\nOne-hop trace endpoint\nPrevents multi-hop error compounding from dominating early results\n\n\nMinimal annotation + adjudication workflow\nCreates ground truth; doubles as the review mechanism\n\n\nSoft clustering (high-precision thresholds, abstain when unsure)\nNeeded for corroboration counting; non-destructive by construction\n\n\nPolling job API; minimal roles + first-class ownership\nSimple, forecloses nothing\n\n\nIngestion hardening (sandboxed parsing, output validation, prompt-injection defenses)\nThe pipeline eats untrusted documents\n\n\n\n\n\n\n\n\n\nDefer\nReason\n\n\n\n\nProduction multi-LLM extraction\nSwappability is demonstrated on the eval set instead (docs/evaluation.md)\n\n\nBlended ranking scores\nComponents must be validated separately first\n\n\nPublic user scores + paper trust weighting\nIdentity, abuse, and bias problems; overlay design retained for later\n\n\nDeep multi-hop traversal\nPer-hop errors compound; ships bounded (max_depth, max_nodes) when it ships\n\n\nReference generation\nDepends on validated high-precision retrieval\n\n\nGeneral PDF ingestion\nAfter the structured-text pipeline is validated\n\n\nCross-domain support\nVocabularies become domain plugins later; architecture stays domain-neutral\n\n\nNetwork visualization; review-queue prioritization; webhooks\nLayers over data already stored\n\n\n\n\n\n\n\n\nDomain scope — decided: MVP narrows to one biomedical subdomain, with domain-agnosticism expressed as “domain-neutral architecture, pluggable vocabularies” (docs/grant-framing.md). Revisit only if the grant’s funder profile demands broader initial scope.\nWhich biomedical subdomain / paper type — open. Choose for annotation tractability (e.g. a literature with relatively formulaic empirical claims) before corpus work begins.\nLLM cost at scale — open. Cost per paper is a tracked evaluation metric; corpus-scale extrapolation belongs in the grant budget.\nClustering thresholds — open by design. Set from the gold corpus via calibration; the standing policy is prefer-fragmentation-over-pollution.\nPhysical graph store — deliberately last. Chosen only after the immutable logical model stabilizes; the logical model is the priority.\n\n\n\n\nThe choices that define the design, in order of importance:\n\nEvidence anchoring is mandatory. PaperVersion / Passage / CitationMention carry offsets, verbatim text, and artifact hashes. Provenance-first is internally contradictory without it.\nClaims are split into ClaimOccurrence / ClaimInterpretation / ClaimCluster plus a revision graph, because occurrence, proposition, editable record, and dedup product have different lifecycles and must not be conflated.\nRelations are first-class evidence-bearing RelationAssertions, with function / stance / scope / resolution as separate axes rather than a single mention/support/dissent axis that mixes function with stance.\nEquivalence is soft clustering, not authoritative merging. Reversibility bounds the duration of a bad merge’s damage, not its blast radius, so nothing is merged into a replacement node.\nEdit semantics use a revision graph, not a linked list; material revisions mark dependent assertions stale_pending_review rather than silently inheriting support.\nConfidence signals stay decomposed — no blended global score; model agreement and literature corroboration are different evidence; derived scores are versioned Assessment records.\nSPECTER is used for paper-level candidate narrowing only; claim-level comparison uses sentence encoders plus a cross-encoder/entailment check.\nEvaluation is a first-class component — adjudicated gold corpus, per-stage metrics, calibration/abstention reporting; S2 intent is weak supervision plus a baseline, not ground truth.\nThe logical model is separated from the physical schema — the rich model is the system of record; the graph is a derived, rebuildable, never-authoritative projection; the API abstracts the audit model away from end users.\nThe MVP is a thin one-hop vertical slice; trust weighting, public scoring, multi-model production extraction, and deep traversal are deferred.\nOperational concerns are explicit — paper availability states, reproducible slice definition, hydration retry/caching, ingestion security, tombstones/retention, and jobs/runs as first-class API resources."
+  },
+  {
+    "objectID": "interciter-systems-design.html#document-map",
+    "href": "interciter-systems-design.html#document-map",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "Document\nContents\n\n\n\n\ndocs/data-model.md\nThe immutable logical model: papers/versions/passages, occurrences vs interpretations, revision graph, soft clustering, first-class relation assertions, BioLink mapping\n\n\ndocs/architecture.md\nLayers; write model vs read projection; Semantic Scholar integration; availability states; async jobs; ingestion security\n\n\ndocs/scoring-and-review.md\nDecomposed confidence signals, Assessment records, review workflow, deferred user/trust scoring\n\n\ndocs/evaluation.md\nGold corpus, per-stage metrics, calibration and abstention, S2 intent as weak supervision\n\n\ndocs/api.md\nThe /v1 surface: jobs/runs, evidence endpoints, revisions, bounded traversal\n\n\ndocs/grant-framing.md\nThree hypotheses, precise claims, budget honesty, domain-scope framing"
+  },
+  {
+    "objectID": "interciter-systems-design.html#summary",
+    "href": "interciter-systems-design.html#summary",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "InterCiter is a knowledge-graph system that extracts individual claims from scientific papers, anchors each claim to its exact source passage, and classifies how citing claims relate to cited work — separating the citation’s function (background, method, direct evidence, comparison) from its stance (support, contradict, neutral). Walking these relations traces a claim to its earlier cited antecedents within the traversed corpus. On this core it layers semantic search, citation-network visualization, and automated reference generation, all through a single API.\nThe design philosophy is provenance-first: model outputs, human corrections, cluster groupings, and review decisions coexist as distinct, immutable, traceable records. What the paper says (ClaimOccurrence) is never overwritten by what a model thinks it means (ClaimInterpretation); uncertainty is expressed by abstaining (unresolved), never by overclaiming. The system builds on established infrastructure — BioLink, RoboKop, Semantic Scholar — and its research contribution is captured in three testable hypotheses: source-grounded extraction, selective claim alignment, and auditable lineage (docs/grant-framing.md)."
+  },
+  {
+    "objectID": "interciter-systems-design.html#design-principles",
+    "href": "interciter-systems-design.html#design-principles",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "Build smallest to largest. The MVP is a thin, auditable vertical slice that proves the highest-risk scientific loop; everything else layers on the same foundation.\nPiggyback on existing infrastructure. Extend BioLink rather than invent an ontology; inherit Semantic Scholar’s citation graph rather than parse bibliographies; use RoboKop’s provenance plumbing.\nProvenance-first: immutable assertions, not “never delete.” Scientific assertions and decisions are append-only; tombstones, retention, and takedown handling still exist for legal and licensing reality.\nEvidence anchoring makes provenance true. Every claim points to a paper version, passage, offsets, and verbatim text. A provenance-first system that can’t show where in the paper a claim came from is internally contradictory.\nAbstention is a first-class outcome. Every uncertain stage — alignment, stance, clustering — can return unresolved with candidates and calibrated scores, rather than guessing.\nLLM as starting point, not source of truth. Extraction runs are fully recorded and swappable; human review corrects rather than gates.\nSeparate the logical model from the physical schema. The rich immutable model is the system of record (relational); queries traverse a derived, rebuildable graph projection that is never authoritative.\nSignals stay decomposed. No blended global confidence; model agreement and literature corroboration are different evidence and never summed.\nAPI-first. Every feature, including InterCiter’s own frontends, routes through the API — which serves reader-friendly composed views by default, with the audit structure behind explicit endpoints.\nMinimal, reproducible storage footprint. Domain slices with pinned corpus versions and inclusion criteria; inherit precomputed artifacts where they’re actually fit for purpose."
+  },
+  {
+    "objectID": "interciter-systems-design.html#architecture-at-a-glance",
+    "href": "interciter-systems-design.html#architecture-at-a-glance",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "Three layers — Ingestion/Extraction (stateless, pluggable, run-recorded), Knowledge Graph (immutable system of record + derived projection, BioLink-aligned), Access (API and everything on it). The write model is normalized PostgreSQL; the read model is a periodically rebuilt graph projection that flattens occurrence/interpretation/cluster chains into traversable claim nodes, with every projected edge pointing back to its evidence-bearing RelationAssertion. Details and guardrails: docs/architecture.md."
+  },
+  {
+    "objectID": "interciter-systems-design.html#mvp-a-thin-auditable-vertical-slice",
+    "href": "interciter-systems-design.html#mvp-a-thin-auditable-vertical-slice",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "Given an open-access biomedical paper, identify empirical result claims, show their exact source passages and citation contexts, classify each cited relationship (function + stance) with calibrated abstention, and trace one hop to the cited paper or a confidently matched target claim.\n\nWhat counts as an MVP claim: an empirical result claim — a statement reporting a study finding with a direction of effect — in open-access full text (XML first; general PDF ingestion deferred), within one tightly defined biomedical subdomain.\n\n\n\n\n\n\n\n\n\nInclude\nRationale\n\n\n\n\nOne biomedical subdomain, open-access XML first\nBounds ontology and annotation variation; avoids PDF parsing dominating the research\n\n\nEmpirical result claims only\nA definable target, unlike “all claims”\n\n\nExact evidence anchoring (versions, passages, spans)\nRequired for trust and for evaluation\n\n\nOne reference extraction pipeline, fully run-recorded\nTests the hypothesis; preserves swappability via ExtractionRun provenance\n\n\nCitation-scope identification, then function/stance classification\nScope must precede stance\n\n\nPaper-level target + optional claim-level alignment, with abstention\nThe chain never dead-ends, and never overclaims\n\n\nOne-hop trace endpoint\nPrevents multi-hop error compounding from dominating early results\n\n\nMinimal annotation + adjudication workflow\nCreates ground truth; doubles as the review mechanism\n\n\nSoft clustering (high-precision thresholds, abstain when unsure)\nNeeded for corroboration counting; non-destructive by construction\n\n\nPolling job API; minimal roles + first-class ownership\nSimple, forecloses nothing\n\n\nIngestion hardening (sandboxed parsing, output validation, prompt-injection defenses)\nThe pipeline eats untrusted documents\n\n\n\n\n\n\n\n\n\nDefer\nReason\n\n\n\n\nProduction multi-LLM extraction\nSwappability is demonstrated on the eval set instead (docs/evaluation.md)\n\n\nBlended ranking scores\nComponents must be validated separately first\n\n\nPublic user scores + paper trust weighting\nIdentity, abuse, and bias problems; overlay design retained for later\n\n\nDeep multi-hop traversal\nPer-hop errors compound; ships bounded (max_depth, max_nodes) when it ships\n\n\nReference generation\nDepends on validated high-precision retrieval\n\n\nGeneral PDF ingestion\nAfter the structured-text pipeline is validated\n\n\nCross-domain support\nVocabularies become domain plugins later; architecture stays domain-neutral\n\n\nNetwork visualization; review-queue prioritization; webhooks\nLayers over data already stored"
+  },
+  {
+    "objectID": "interciter-systems-design.html#open-decisions-and-known-risks",
+    "href": "interciter-systems-design.html#open-decisions-and-known-risks",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "Domain scope — decided: MVP narrows to one biomedical subdomain, with domain-agnosticism expressed as “domain-neutral architecture, pluggable vocabularies” (docs/grant-framing.md). Revisit only if the grant’s funder profile demands broader initial scope.\nWhich biomedical subdomain / paper type — open. Choose for annotation tractability (e.g. a literature with relatively formulaic empirical claims) before corpus work begins.\nLLM cost at scale — open. Cost per paper is a tracked evaluation metric; corpus-scale extrapolation belongs in the grant budget.\nClustering thresholds — open by design. Set from the gold corpus via calibration; the standing policy is prefer-fragmentation-over-pollution.\nPhysical graph store — deliberately last. Chosen only after the immutable logical model stabilizes; the logical model is the priority."
+  },
+  {
+    "objectID": "interciter-systems-design.html#key-design-decisions",
+    "href": "interciter-systems-design.html#key-design-decisions",
+    "title": "InterCiter — Systems Design Overview",
+    "section": "",
+    "text": "The choices that define the design, in order of importance:\n\nEvidence anchoring is mandatory. PaperVersion / Passage / CitationMention carry offsets, verbatim text, and artifact hashes. Provenance-first is internally contradictory without it.\nClaims are split into ClaimOccurrence / ClaimInterpretation / ClaimCluster plus a revision graph, because occurrence, proposition, editable record, and dedup product have different lifecycles and must not be conflated.\nRelations are first-class evidence-bearing RelationAssertions, with function / stance / scope / resolution as separate axes rather than a single mention/support/dissent axis that mixes function with stance.\nEquivalence is soft clustering, not authoritative merging. Reversibility bounds the duration of a bad merge’s damage, not its blast radius, so nothing is merged into a replacement node.\nEdit semantics use a revision graph, not a linked list; material revisions mark dependent assertions stale_pending_review rather than silently inheriting support.\nConfidence signals stay decomposed — no blended global score; model agreement and literature corroboration are different evidence; derived scores are versioned Assessment records.\nSPECTER is used for paper-level candidate narrowing only; claim-level comparison uses sentence encoders plus a cross-encoder/entailment check.\nEvaluation is a first-class component — adjudicated gold corpus, per-stage metrics, calibration/abstention reporting; S2 intent is weak supervision plus a baseline, not ground truth.\nThe logical model is separated from the physical schema — the rich model is the system of record; the graph is a derived, rebuildable, never-authoritative projection; the API abstracts the audit model away from end users.\nThe MVP is a thin one-hop vertical slice; trust weighting, public scoring, multi-model production extraction, and deep traversal are deferred.\nOperational concerns are explicit — paper availability states, reproducible slice definition, hydration retry/caching, ingestion security, tombstones/retention, and jobs/runs as first-class API resources."
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html",
+    "title": "Executive assessment",
+    "section": "",
+    "text": "InterCiter has a strong product thesis and a coherent architectural philosophy, especially around provenance, reversibility, and infrastructure reuse. The current plan is suitable as a grant-concept document, but it is not yet implementation-ready. The largest issue is that the stated MVP contains several difficult research problems whose errors will compound: claim extraction, citation-scope resolution, target-claim alignment, stance classification, semantic deduplication, confidence calibration, and multi-hop traversal.\nMy overall recommendation is:\n\nProceed with the project, but revise the MVP and refactor the claim/provenance model before selecting the graph database or building the public API.\n\n\n\n\n\n\n\n\nDimension\nAssessment\n\n\n\n\nProduct and research vision\nStrong\n\n\nProvenance philosophy\nStrong\n\n\nArchitecture layering\nGood\n\n\nClaim and relationship model\nNeeds substantial revision\n\n\nMVP discipline\nToo broad\n\n\nEvaluation design\nMajor missing component\n\n\nOperational readiness\nEarly\n\n\nGrant narrative\nPromising, but currently overstates feasibility in a few places\n\n\n\n\n\n\n\nStoring model outputs, human corrections, merges, and opinions as separate records is much better than mutating a supposedly authoritative claim. It supports model comparison, auditability, reproducibility, and later reprocessing. The API-first and domain-scoped approach are similarly sound.\nThe key refinement is that “additive-only” should mean immutable scientific assertions and decisions, not “nothing can ever be deleted or hidden.” The implementation will still need tombstones, access revocation, retention policies, and handling for copyrighted or sensitive material.\n\n\n\nThe plan correctly notes that a resolved citation to a paper does not identify the specific claim being referenced. The paper-level fallback is better than forcing an unreliable claim-level match.\nThat willingness to abstain should become a first-class system principle, not merely a fallback. Every uncertain stage should be able to return unresolved, along with candidate matches and calibrated scores.\n\n\n\nBioLink alignment, Semantic Scholar metadata, resolved references, and precomputed artifacts can reduce duplicated work. This is a good grant narrative because InterCiter’s novelty is not bibliographic parsing; it is source-grounded claim extraction, claim alignment, relationship classification, and auditable traversal.\n\n\n\nRepresenting an out-of-slice citation as a metadata-only paper stub is a practical way to avoid a hard graph dead end. The API should, however, distinguish:\n\na known paper with extracted full text;\na known paper without licensed or available full text;\na metadata-only stub;\na paper queued for hydration;\na paper whose ingestion failed.\n\nA stub is “walkable” bibliographically, but it does not provide a validated claim-level continuation.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#what-the-plan-gets-right",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#what-the-plan-gets-right",
+    "title": "Executive assessment",
+    "section": "",
+    "text": "Storing model outputs, human corrections, merges, and opinions as separate records is much better than mutating a supposedly authoritative claim. It supports model comparison, auditability, reproducibility, and later reprocessing. The API-first and domain-scoped approach are similarly sound.\nThe key refinement is that “additive-only” should mean immutable scientific assertions and decisions, not “nothing can ever be deleted or hidden.” The implementation will still need tombstones, access revocation, retention policies, and handling for copyrighted or sensitive material.\n\n\n\nThe plan correctly notes that a resolved citation to a paper does not identify the specific claim being referenced. The paper-level fallback is better than forcing an unreliable claim-level match.\nThat willingness to abstain should become a first-class system principle, not merely a fallback. Every uncertain stage should be able to return unresolved, along with candidate matches and calibrated scores.\n\n\n\nBioLink alignment, Semantic Scholar metadata, resolved references, and precomputed artifacts can reduce duplicated work. This is a good grant narrative because InterCiter’s novelty is not bibliographic parsing; it is source-grounded claim extraction, claim alignment, relationship classification, and auditable traversal.\n\n\n\nRepresenting an out-of-slice citation as a metadata-only paper stub is a practical way to avoid a hard graph dead end. The API should, however, distinguish:\n\na known paper with extracted full text;\na known paper without licensed or available full text;\na metadata-only stub;\na paper queued for hydration;\na paper whose ingestion failed.\n\nA stub is “walkable” bibliographically, but it does not provide a validated claim-level continuation.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#claims-are-not-anchored-tightly-enough-to-source-evidence",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#claims-are-not-anchored-tightly-enough-to-source-evidence",
+    "title": "Executive assessment",
+    "section": "1. Claims are not anchored tightly enough to source evidence",
+    "text": "1. Claims are not anchored tightly enough to source evidence\nThe current Claim has text and a source paper, but no exact location within the paper. This is the most important omission in a provenance-first system.\nA claim should point to:\n\nthe exact paper version;\nthe source passage or passages;\ncharacter or token offsets in normalized source text;\npage, section, paragraph, sentence, table, or figure location where available;\nthe verbatim source text;\nthe citation markers present in that context;\na hash of the input artifact;\nthe parser and extraction run that produced it.\n\nWithout these fields, users can know that a claim “came from a paper” but cannot reliably verify how the system interpreted the paper. It also becomes impossible to distinguish two versions of a paper, such as a preprint and a corrected journal version.\nThe plan should add PaperVersion, Passage, and CitationMention entities before expanding scoring or deduplication.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-current-claim-conflates-four-different-objects",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-current-claim-conflates-four-different-objects",
+    "title": "Executive assessment",
+    "section": "2. The current Claim conflates four different objects",
+    "text": "2. The current Claim conflates four different objects\nThe proposed node simultaneously behaves as:\n\nan occurrence of text in a paper;\na normalized proposition;\nan editable, versioned record;\na canonical object produced by deduplication.\n\nThose concepts have different identities and lifecycles. Combining them is the source of much of the later edit, merge, and edge-migration complexity.\nA cleaner separation is:\n\n\n\n\n\n\n\nEntity\nMeaning\n\n\n\n\nClaimOccurrence\nA source-bound assertion found in a specific passage of a specific paper version\n\n\nClaimInterpretation\nA model’s or human’s normalized interpretation of that occurrence\n\n\nClaimCluster\nA non-destructive grouping of interpretations believed to express equivalent propositions\n\n\nClaimRevision\nA later interpretation that corrects or refines an earlier interpretation\n\n\n\nFor example, two papers may contain equivalent claims, but their claim occurrences should remain distinct because they are separate evidence events. They can belong to one ClaimCluster without being collapsed into one source-bearing claim.\nThis also preserves a crucial distinction:\n\nAgreement between two models on the same sentence is model agreement. Agreement between two independent papers is literature corroboration. They should not be represented as the same phenomenon.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#a-relationship-should-be-a-first-class-assertion-not-merely-an-edge",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#a-relationship-should-be-a-first-class-assertion-not-merely-an-edge",
+    "title": "Executive assessment",
+    "section": "3. A relationship should be a first-class assertion, not merely an edge",
+    "text": "3. A relationship should be a first-class assertion, not merely an edge\nThe current edge has a type, endpoints, extraction method, and confidence. That is not enough to explain or review the classification.\nA RelationAssertion should contain:\n\nthe local claim occurrence;\nthe citation mention that licenses the relation;\nthe exact evidence context;\nthe cited paper;\nthe proposed target claim or target candidates;\nthe relation label;\nthe full label-probability distribution;\ntarget-link confidence separately from stance confidence;\nwhether the relation applies to all or only part of the target claim;\nmodel, prompt, parser, and code versions;\nhuman review decisions;\ncurrent status: proposed, accepted, rejected, unresolved, or stale.\n\nThis is also a better fit for provenance-heavy BioLink-style associations than a lightweight property-graph edge.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#mention-support-dissent-mixes-different-semantic-dimensions",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#mention-support-dissent-mixes-different-semantic-dimensions",
+    "title": "Executive assessment",
+    "section": "4. “Mention / support / dissent” mixes different semantic dimensions",
+    "text": "4. “Mention / support / dissent” mixes different semantic dimensions\n“Mention” is a generic citation function, while “support” and “dissent” are epistemic stances. They are not necessarily mutually exclusive alternatives on one axis.\nA citation may:\n\nmention a method while supporting a result;\nsupport part of a claim while qualifying another part;\ncompare results without adopting either position;\ncite a paper as background;\nreport a failed replication rather than directly contradicting the original proposition.\n\nFor the MVP, the vocabulary can remain small, but the model should separate at least:\n\ncitation relevance/function: background, method, direct evidence, comparison, other;\nstance: support, contradict, neutral, unclear;\nscope: whole claim, partial claim, paper-level only;\nresolution: claim resolved, paper resolved, unresolved.\n\nA paper-level fallback should not assert that the citing claim “supports the paper.” Papers often contain multiple, sometimes conflicting, claims. It should instead record something like:\ncitation stance = supportive\ntarget paper = resolved\ntarget claim = unresolved",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-edit-chain-semantics-are-internally-ambiguous",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-edit-chain-semantics-are-internally-ambiguous",
+    "title": "Executive assessment",
+    "section": "5. The edit-chain semantics are internally ambiguous",
+    "text": "5. The edit-chain semantics are internally ambiguous\nThe plan says that relationships remain attached to the claim version that was evaluated, while reads resolve to the latest claim head. That leaves two unsafe possibilities:\n\nold relationships disappear from the default view because the new head has no edges; or\nold relationships are shown against the new text despite never having been evaluated against it.\n\nConsider an edit from:\n\n“Treatment A reduces mortality.”\n\nto:\n\n“Treatment A does not reduce mortality.”\n\nThe old support relationships must not silently appear as support for the revised statement.\nUse immutable revisions with explicit validity:\nClaimInterpretation\n  interpretation_id\n  logical_claim_id\n  parent_interpretation_ids\n  source_occurrence_id\n  normalized_text\n  created_by\n  created_at\nA related assertion should be marked stale_pending_review when a materially different revision becomes current. Reads may display inherited historical relationships, but they must clearly identify the version they apply to.\nA simple human_edit_of/superseded_by linked list also does not handle concurrent edits, branching revisions, or later reconciliation. Parent-version identifiers or an explicit revision graph are safer.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#reversible-automated-merging-is-not-automatically-safe",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#reversible-automated-merging-is-not-automatically-safe",
+    "title": "Executive assessment",
+    "section": "6. Reversible automated merging is not automatically safe",
+    "text": "6. Reversible automated merging is not automatically safe\nThe plan argues that fully automated deduplication is safe because merges are reversible. Reversibility prevents permanent data loss, but it does not prevent an incorrect merge from:\n\nchanging search results;\ninflating confidence;\ninheriting contradictory edges;\nmisleading users;\ninfluencing subsequent automated decisions;\nbeing propagated into generated references.\n\nFor the MVP, use soft clustering, not authoritative merging. A cluster can state that several claim interpretations are probable semantic equivalents while preserving all original nodes.\nEdge copying should also be avoided. Copying edges to a resulting claim introduces duplication, nested-merge problems, and complicated reversion behavior. Queries should resolve cluster membership at read time or through a rebuildable materialized projection.\nEquivalence should consider more than embedding similarity. Biomedical claims can differ critically by:\n\npopulation;\nintervention or exposure;\ncomparator;\noutcome;\ndosage;\ntime horizon;\ndirection of effect;\neffect size;\ncertainty or hedging;\nnegation.\n\n“Drug X lowers blood pressure” and “Drug X does not lower blood pressure in older adults” can be close in embedding space while being scientifically incompatible.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#global-confidence-combines-signals-that-should-remain-separate",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#global-confidence-combines-signals-that-should-remain-separate",
+    "title": "Executive assessment",
+    "section": "7. “Global confidence” combines signals that should remain separate",
+    "text": "7. “Global confidence” combines signals that should remain separate\nThe proposed score blends extraction confidence, human review, and corroboration. The paper trust aggregate then affects ranking. This is too much semantic compression for an early system.\nAt minimum, expose separate components:\n\n\n\n\n\n\n\nSignal\nQuestion it answers\n\n\n\n\nExtraction fidelity\nDid the system correctly capture and normalize the source passage?\n\n\nTarget-link confidence\nDid it identify the correct cited claim?\n\n\nStance confidence\nDid it correctly classify support, contradiction, or neutrality?\n\n\nReview status\nHas a reviewer accepted, rejected, or modified it?\n\n\nModel agreement\nDid multiple extraction methods produce compatible interpretations?\n\n\nLiterature evidence balance\nHow many independent sources support or contradict the proposition?\n\n\nSource-quality assessment\nWhat quality metadata or user assessments apply to the source?\n\n\n\nModel agreement should not automatically be described as corroboration. Models may share training data, prompts, architectures, or systematic errors.\nDerived scores should be stored as versioned Assessment records containing their inputs, formula version, and computation date—not as an unexplained mutable number on a claim.\nPaper trust and public community scoring should be deferred. A scalar paper-level trust value is ambiguous, vulnerable to manipulation, and likely to encode prestige or popularity biases. It also requires identity, moderation, abuse controls, and a clear definition of what users are rating.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-evaluation-plan-is-not-sufficiently-specified",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-evaluation-plan-is-not-sufficiently-specified",
+    "title": "Executive assessment",
+    "section": "8. The evaluation plan is not sufficiently specified",
+    "text": "8. The evaluation plan is not sufficiently specified\nThis is the largest grant and research-methodology gap.\nThe plan identifies Semantic Scholar citation-intent data as both a bootstrap source and an evaluation story. But because its labels are explicitly not the same as InterCiter’s ontology, it can provide weak supervision or a baseline—not final ground truth.\nThe project needs a manually adjudicated evaluation corpus and separate metrics for each stage:\n\n\n\n\n\n\n\nStage\nSuggested measurements\n\n\n\n\nDocument parsing\nCitation-marker resolution, passage-offset accuracy, section recognition\n\n\nClaim extraction\nSpan precision/recall, atomicity, factual fidelity, qualifier preservation\n\n\nCitation scope\nAccuracy linking a citation marker to the local claim it supports or discusses\n\n\nTarget-claim retrieval\nRecall@k and precision at the automatic-link threshold\n\n\nRelationship classification\nPer-class precision/recall, macro-F1, confusion matrix\n\n\nConfidence\nCalibration error and selective risk as the system abstains more\n\n\nMulti-hop tracing\nPath precision, coverage, cycle handling, and per-hop provenance completeness\n\n\nHuman review\nInter-annotator agreement, disagreement categories, adjudication rate\n\n\nOperations\nCost per paper, throughput, p95 latency, retry rate, and ingestion failure rate\n\n\n\nThe evaluation set should deliberately include difficult cases: multiple citations in one sentence, compound claims, negation, hedging, indirect citation, systematic reviews, conflicting studies, and target papers with several similar claims.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-mvp-is-still-too-large",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-mvp-is-still-too-large",
+    "title": "Executive assessment",
+    "section": "9. The MVP is still too large",
+    "text": "9. The MVP is still too large\nThe plan labels the following as MVP foundations:\n\nmulti-model extraction;\nglobal confidence;\nuser scores;\ntrust weighting;\nfully automated deduplication;\nreversible merges;\nhuman editing;\nauthorization and ownership;\nclaim alignment;\nstance classification;\nmulti-hop traversal;\ngraph storage;\nasynchronous ingestion.\n\nThat is closer to a complete platform than a minimum viable research system.\nThe highest-risk scientific loop should be proven before community scoring, trust aggregation, production multi-model support, or automated merge behavior.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-plan-understates-some-upstream-and-operational-risks",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#the-plan-understates-some-upstream-and-operational-risks",
+    "title": "Executive assessment",
+    "section": "10. The plan understates some upstream and operational risks",
+    "text": "10. The plan understates some upstream and operational risks\nSeveral dependency assumptions should become explicit validation gates:\n\nA DOI or PMID does not guarantee accessible full text.\nMetadata, citation context, full text, and embeddings may have different coverage and licensing.\nPaper-level embeddings should not be treated as claim-level embeddings. The plan calls SPECTER embeddings paper-level but also proposes using them to seed claim deduplication and target-claim alignment. At most, they can help narrow papers; claim comparison needs a claim- or sentence-level encoder and usually a cross-encoder or entailment model.\nA citation-intent label set that differs from the InterCiter ontology needs an explicit mapping study.\nA domain slice must be defined reproducibly, with a corpus release version and inclusion criteria.\nOn-demand hydration needs caching, retry behavior, rate-limit handling, and degraded states.\n\nThe extraction pipeline also processes untrusted documents. It needs file-size limits, parser sandboxing, malware checks, strict model-output validation, and defenses against prompt-like instructions embedded in paper text.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#include-in-mvp",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#include-in-mvp",
+    "title": "Executive assessment",
+    "section": "Include in MVP",
+    "text": "Include in MVP\n\n\n\n\n\n\n\nInclude\nRationale\n\n\n\n\nOne tightly defined biomedical subdomain or paper type\nReduces ontology and annotation variation\n\n\nOpen-access XML/full text first\nAvoids PDF parsing and licensing dominating the research\n\n\nEmpirical result claims only\nProvides a clearer definition than “all claims”\n\n\nExact evidence anchoring\nRequired for trust and evaluation\n\n\nOne reference extraction pipeline\nEnough to test the scientific hypothesis\n\n\nReproducible extraction-run metadata\nPreserves later model-swapping capability\n\n\nCitation-scope identification\nNecessary before stance classification\n\n\nPaper-level target plus optional claim-level alignment\nAllows abstention without blocking ingestion\n\n\nOne-hop trace endpoint\nPrevents multi-hop error amplification from dominating early results\n\n\nMinimal annotation and adjudication workflow\nCreates ground truth and supports model calibration\n\n\nPolling-based job API\nAppropriate and simple",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0001-gpt-5.6-sol-pro-feedback.html#defer",
+    "href": "feedback/0001-gpt-5.6-sol-pro-feedback.html#defer",
+    "title": "Executive assessment",
+    "section": "Defer",
+    "text": "Defer\n\n\n\n\n\n\n\nDefer\nReason\n\n\n\n\nProduction multi-LLM comparison\nUseful for evaluation, not necessary for the core product loop\n\n\nAutomated semantic merges\nHigh semantic risk and not required for one-hop traceability\n\n\nGlobal confidence score\nComponents must first be validated separately\n\n\nPublic user scores and trust weighting\nAdds abuse, bias, identity, and ranking problems\n\n\nDeep multi-hop traversal\nPer-hop errors compound rapidly\n\n\nReference generation\nDepends on high-precision retrieval and relationship evidence\n\n\nGeneral PDF ingestion\nAdd after the structured-text pipeline is validated\n\n\nBroad cross-domain support\nClaim semantics and entity vocabularies differ substantially\n\n\nInstitution/author network visualization\nDoes not prove the core research contribution\n\n\n\nA second model can still be run on the evaluation set to demonstrate swappability and compare errors. That does not require making production multi-model extraction an MVP feature.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0001 · GPT Sol"
+    ]
+  },
+  {
+    "objectID": "feedback/0002-gemini-3.1-pro-feedback.html",
+    "href": "feedback/0002-gemini-3.1-pro-feedback.html",
+    "title": "InterCiter",
+    "section": "",
+    "text": "Here is an evaluation and critique focused strictly on the revised data model and architecture proposed in the GPT Sol feedback.\nWhile the feedback successfully identifies critical flaws in the original design and proposes a highly rigorous, epistemologically sound alternative, its proposed solution introduces severe system complexity, performance bottlenecks, and implementation risks that must be addressed.\n\n1. The Merits: What the Revised Model Gets Right\nThe revised model prioritizes extreme scientific accuracy and provenance. By breaking apart the monolithic Claim entity, it prevents data corruption. * Epistemological Rigor: Separating ClaimOccurrence (what the text actually says) from ClaimInterpretation (what the AI thinks it means) is a masterclass in defensive AI design. It ensures that hallucinations or poor normalizations do not overwrite the ground truth. * Safe Scaling: Using ClaimCluster for “soft clustering” instead of destructive semantic merging guarantees that erroneous AI deduplications can be rolled back simply by removing an edge, rather than attempting to reconstruct merged nodes.\n\n\n\n2. Critiques & Vulnerabilities of the Revised Model\nDespite its rigor, the GPT Sol proposal swings the pendulum so far toward academic purity that it jeopardizes the system’s engineering feasibility and performance.\n\nA. Graph Bloat and Query Latency\n\nThe Flaw: By exploding a single Claim node into PaperVersion, Passage, ClaimOccurrence, ClaimInterpretation, and ClaimCluster, the graph size increases exponentially.\nThe Impact: A simple one-hop query (e.g., “Find claims that support Claim X”) now requires traversing a massive chain: ClaimCluster \\(\\rightarrow\\) ClaimInterpretation \\(\\rightarrow\\) ClaimOccurrence \\(\\rightarrow\\) RelationAssertion \\(\\rightarrow\\) ClaimOccurrence \\(\\rightarrow\\) ClaimInterpretation \\(\\rightarrow\\) ClaimCluster. In a graph database like Neo4j, traversing this many hops for millions of papers will result in severe query latency, making real-time user exploration nearly impossible without heavy pre-computation.\n\n\n\nB. The Brittleness of “Exact Anchoring”\n\nThe Flaw: The feedback insists on anchoring claims to exact token offsets or specific Passage nodes within a PaperVersion.\nThe Impact: Scientific papers are notoriously difficult to parse consistently (PDFs vs. HTML vs. XML). If the system’s PDF parser is updated, the token offsets for a PaperVersion might shift. If offsets break, the entire ClaimOccurrence is suddenly disconnected from its source text. The model relies on a level of parsing stability that does not exist in standard biomedical literature ingestion pipelines.\n\n\n\nC. The “Soft Clustering” Cold Start Problem\n\nThe Flaw: Replacing automated merging with ClaimCluster assumes that the system can reliably group similar ClaimInterpretations without destroying data.\nThe Impact: While non-destructive, grouping claims into clusters is still a fundamentally hard NLP problem. If the clustering threshold is too strict, the graph becomes fragmented, rendering the knowledge graph useless for discovering consensus. If the threshold is too loose, unrelated claims are clustered together, polluting the user’s view. The feedback punted on how to calculate this clustering effectively.\n\n\n\nD. UX Translation Complexity\n\nThe Flaw: The data model is designed for a machine to audit, not for a human to read.\nThe Impact: Exposing the difference between a ClaimOccurrence and a ClaimInterpretation to an end-user (e.g., a biomedical researcher) will cause massive cognitive overload. The frontend engineering effort required to abstract this complex graph back into a simple, readable interface was entirely overlooked in the critique.\n\n\n\n\n\n3. Key Takeaway & Recommendation\nThe GPT Sol feedback provides an excellent conceptual data model, but a dangerous physical database schema.\nRecommended Action: Do not implement the GPT Sol model 1:1 in your primary transactional database. Instead, use a hybrid approach: 1. Flatten for Querying: Maintain the complex, multi-entity model (Occurrences, Interpretations, Passages) in a cold-storage relational database (like PostgreSQL) to preserve strict provenance and audibility. 2. Materialize for the Graph: Periodically project a flattened, simplified version of the graph into your Graph DB (e.g., Neo4j) where a single node represents the “Current Best Consensus Claim.” This gives you the speed of the original design with the safety and auditability of the revised critique.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0002 · Gemini"
+    ]
+  },
+  {
+    "objectID": "docs/evaluation.html",
+    "href": "docs/evaluation.html",
+    "title": "InterCiter — Evaluation Plan",
+    "section": "",
+    "text": "Evaluation is a first-class component of the design, not a citation-intent shortcut: Semantic Scholar’s labels are not InterCiter’s ontology, so they cannot stand in for a real evaluation story. For the grant, this is also the methodology section — and the annotation corpus is the budget crux, named as such rather than treated as a checkbox.\n\n\nA manually adjudicated evaluation corpus over the MVP domain slice:\n\nAnnotation protocol with written guidelines per task (claim spans, citation scope, function, stance, target alignment), piloted and revised before full annotation.\nInter-annotator agreement reported per task (e.g. Krippendorff’s α / Cohen’s κ), with disagreement categories analyzed — disagreements are signal about ontology weaknesses, not just noise.\nAdjudication of disagreements by a senior annotator; adjudication rate reported.\nReviewDecision records double as ongoing annotation: the production review workflow and the evaluation pipeline share one data structure (scoring-and-review.md).\n\nThe corpus deliberately includes hard cases: multiple citations in one sentence, compound claims, negation, hedging, indirect citation, systematic reviews, conflicting studies, and target papers containing several similar claims.\n\n\n\nErrors compound across the pipeline, so every stage is measured separately:\n\n\n\n\n\n\n\nStage\nMeasurements\n\n\n\n\nDocument parsing\nCitation-marker resolution, passage-offset accuracy, section recognition\n\n\nClaim extraction\nSpan precision/recall, atomicity, factual fidelity, qualifier preservation\n\n\nCitation scope\nAccuracy linking a citation marker to the local claim it belongs to\n\n\nTarget-claim retrieval\nRecall@k; precision at the automatic-link threshold\n\n\nRelationship classification\nPer-class precision/recall, macro-F1, confusion matrix (function and stance separately)\n\n\nConfidence\nCalibration error (ECE); selective risk / coverage curves as abstention increases\n\n\nClustering\nPair precision/recall against adjudicated equivalence judgments\n\n\nMulti-hop tracing (phase 2)\nPath precision, coverage, cycle handling, per-hop provenance completeness\n\n\nHuman review\nInter-annotator agreement, disagreement categories, adjudication rate\n\n\nOperations\nCost per paper (LLM + compute), throughput, p95 latency, retry rate, ingestion failure rate\n\n\n\nCost per paper is a reported metric, not an afterthought: LLM extraction cost at corpus scale directly shapes the feasibility story and interacts with any multi-model comparison.\n\n\n\nEvery uncertain stage can return unresolved (data-model.md). Evaluation therefore reports selective performance: precision at the thresholds actually used in production, and the risk/coverage tradeoff as thresholds move. The claim being tested is not “the system is always right” but “the system is right at useful precision when it chooses to answer, and honest when it doesn’t.”\n\n\n\nS2’s citation-intent labels use a different label set from InterCiter’s function/stance ontology. They are used as:\n\nweak supervision to bootstrap classifiers, via an explicit mapping study (how S2 labels distribute over InterCiter’s ontology, measured on the gold corpus);\na baseline to beat, giving the grant a comparative evaluation.\n\nThey are never the final ground truth.\n\n\n\nProduction multi-model extraction is deferred (../interciter-systems-design.md), but swappability is still demonstrated: run a second extraction model on the evaluation set only, compare per-stage metrics and error categories. ExtractionRun provenance makes this a query, not a feature. This preserves the multi-model story for the grant without making it an MVP production feature.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Evaluation"
+    ]
+  },
+  {
+    "objectID": "docs/evaluation.html#gold-corpus",
+    "href": "docs/evaluation.html#gold-corpus",
+    "title": "InterCiter — Evaluation Plan",
+    "section": "",
+    "text": "A manually adjudicated evaluation corpus over the MVP domain slice:\n\nAnnotation protocol with written guidelines per task (claim spans, citation scope, function, stance, target alignment), piloted and revised before full annotation.\nInter-annotator agreement reported per task (e.g. Krippendorff’s α / Cohen’s κ), with disagreement categories analyzed — disagreements are signal about ontology weaknesses, not just noise.\nAdjudication of disagreements by a senior annotator; adjudication rate reported.\nReviewDecision records double as ongoing annotation: the production review workflow and the evaluation pipeline share one data structure (scoring-and-review.md).\n\nThe corpus deliberately includes hard cases: multiple citations in one sentence, compound claims, negation, hedging, indirect citation, systematic reviews, conflicting studies, and target papers containing several similar claims.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Evaluation"
+    ]
+  },
+  {
+    "objectID": "docs/evaluation.html#per-stage-metrics",
+    "href": "docs/evaluation.html#per-stage-metrics",
+    "title": "InterCiter — Evaluation Plan",
+    "section": "",
+    "text": "Errors compound across the pipeline, so every stage is measured separately:\n\n\n\n\n\n\n\nStage\nMeasurements\n\n\n\n\nDocument parsing\nCitation-marker resolution, passage-offset accuracy, section recognition\n\n\nClaim extraction\nSpan precision/recall, atomicity, factual fidelity, qualifier preservation\n\n\nCitation scope\nAccuracy linking a citation marker to the local claim it belongs to\n\n\nTarget-claim retrieval\nRecall@k; precision at the automatic-link threshold\n\n\nRelationship classification\nPer-class precision/recall, macro-F1, confusion matrix (function and stance separately)\n\n\nConfidence\nCalibration error (ECE); selective risk / coverage curves as abstention increases\n\n\nClustering\nPair precision/recall against adjudicated equivalence judgments\n\n\nMulti-hop tracing (phase 2)\nPath precision, coverage, cycle handling, per-hop provenance completeness\n\n\nHuman review\nInter-annotator agreement, disagreement categories, adjudication rate\n\n\nOperations\nCost per paper (LLM + compute), throughput, p95 latency, retry rate, ingestion failure rate\n\n\n\nCost per paper is a reported metric, not an afterthought: LLM extraction cost at corpus scale directly shapes the feasibility story and interacts with any multi-model comparison.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Evaluation"
+    ]
+  },
+  {
+    "objectID": "docs/evaluation.html#abstention-as-a-measured-behavior",
+    "href": "docs/evaluation.html#abstention-as-a-measured-behavior",
+    "title": "InterCiter — Evaluation Plan",
+    "section": "",
+    "text": "Every uncertain stage can return unresolved (data-model.md). Evaluation therefore reports selective performance: precision at the thresholds actually used in production, and the risk/coverage tradeoff as thresholds move. The claim being tested is not “the system is always right” but “the system is right at useful precision when it chooses to answer, and honest when it doesn’t.”",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Evaluation"
+    ]
+  },
+  {
+    "objectID": "docs/evaluation.html#semantic-scholar-citation-intent-weak-supervision-baseline-not-ground-truth",
+    "href": "docs/evaluation.html#semantic-scholar-citation-intent-weak-supervision-baseline-not-ground-truth",
+    "title": "InterCiter — Evaluation Plan",
+    "section": "",
+    "text": "S2’s citation-intent labels use a different label set from InterCiter’s function/stance ontology. They are used as:\n\nweak supervision to bootstrap classifiers, via an explicit mapping study (how S2 labels distribute over InterCiter’s ontology, measured on the gold corpus);\na baseline to beat, giving the grant a comparative evaluation.\n\nThey are never the final ground truth.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Evaluation"
+    ]
+  },
+  {
+    "objectID": "docs/evaluation.html#model-swappability-demonstrated-cheaply",
+    "href": "docs/evaluation.html#model-swappability-demonstrated-cheaply",
+    "title": "InterCiter — Evaluation Plan",
+    "section": "",
+    "text": "Production multi-model extraction is deferred (../interciter-systems-design.md), but swappability is still demonstrated: run a second extraction model on the evaluation set only, compare per-stage metrics and error categories. ExtractionRun provenance makes this a query, not a feature. This preserves the multi-model story for the grant without making it an MVP production feature.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Evaluation"
+    ]
+  },
+  {
+    "objectID": "docs/grant-framing.html",
+    "href": "docs/grant-framing.html",
+    "title": "InterCiter — Grant Framing",
+    "section": "",
+    "text": "The proposal is stronger presented as a research system testing three falsifiable hypotheses, each with its own metrics (evaluation.md):\n\nSource-grounded extraction. Scientific claim interpretations can be generated while preserving exact, inspectable evidence anchors (passage, offsets, verbatim text, paper version).\nSelective claim alignment. Citation contexts can be linked to specific cited claims at useful precision when the system is allowed to abstain — the risk/coverage tradeoff is the result, not a footnote.\nAuditable lineage. Immutable, versioned relation assertions let users inspect how every step in a citation lineage was generated, reviewed, or revised.\n\n\n\n\nTwo claims are stated carefully so the proposal does not overstate feasibility:\n\nTracing reaches an antecedent, not a proven origin. A citation graph identifies an earlier cited antecedent, or the earliest source found within the traversed corpus. It cannot prove intellectual originality — papers omit citations, cite secondary sources, and independently derive similar findings. The honest claim is still valuable; the overstated one is attackable.\nClustering is safe by construction, not merely reversible.\n\nAutomated clustering is non-destructive, measurable, and reversible — but uncertain clusters do not become authoritative without meeting a validated threshold or receiving review.\n\nReversibility bounds duration of damage, not blast radius; the design backing this wording is in data-model.md.\n\n\n\n\nThe strongest part of the proposal: InterCiter builds on existing infrastructure (BioLink schema extension, RoboKop provenance plumbing, Semantic Scholar paper/citation substrate) rather than re-solving bibliographic parsing. Its novelty is precisely the three hypotheses: source-grounded claim extraction, selective alignment, and auditable lineage. The relation model strengthens the BioLink story — evidence-bearing RelationAssertions map naturally onto BioLink’s provenance-heavy association pattern.\n\n\n\nTwo costs are named up front rather than discovered later:\n\nThe adjudicated annotation corpus is the budget crux. Guideline development, multi-annotator labeling, agreement analysis, and adjudication are the largest non-engineering line item — and a legitimate thing to request funding for, since the corpus is itself a reusable contribution.\nLLM extraction cost at corpus scale is a reported evaluation metric (cost per paper) and a feasibility parameter, interacting with model choice and any multi-model comparison.\n\n\n\n\nThe MVP narrows to empirical result claims in one open-access biomedical subdomain (see ../interciter-systems-design.md). Domain-agnostic remains the stated long-term direction, framed as: the architecture (evidence anchoring, assertion model, abstention) is domain-neutral; the vocabularies (entity categories, qualifier sets) are domain plugins, with BioLink as the first. This turns the narrowing into a design statement rather than a retreat.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Grant Framing"
+    ]
+  },
+  {
+    "objectID": "docs/grant-framing.html#three-explicit-hypotheses",
+    "href": "docs/grant-framing.html#three-explicit-hypotheses",
+    "title": "InterCiter — Grant Framing",
+    "section": "",
+    "text": "The proposal is stronger presented as a research system testing three falsifiable hypotheses, each with its own metrics (evaluation.md):\n\nSource-grounded extraction. Scientific claim interpretations can be generated while preserving exact, inspectable evidence anchors (passage, offsets, verbatim text, paper version).\nSelective claim alignment. Citation contexts can be linked to specific cited claims at useful precision when the system is allowed to abstain — the risk/coverage tradeoff is the result, not a footnote.\nAuditable lineage. Immutable, versioned relation assertions let users inspect how every step in a citation lineage was generated, reviewed, or revised.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Grant Framing"
+    ]
+  },
+  {
+    "objectID": "docs/grant-framing.html#precise-claims",
+    "href": "docs/grant-framing.html#precise-claims",
+    "title": "InterCiter — Grant Framing",
+    "section": "",
+    "text": "Two claims are stated carefully so the proposal does not overstate feasibility:\n\nTracing reaches an antecedent, not a proven origin. A citation graph identifies an earlier cited antecedent, or the earliest source found within the traversed corpus. It cannot prove intellectual originality — papers omit citations, cite secondary sources, and independently derive similar findings. The honest claim is still valuable; the overstated one is attackable.\nClustering is safe by construction, not merely reversible.\n\nAutomated clustering is non-destructive, measurable, and reversible — but uncertain clusters do not become authoritative without meeting a validated threshold or receiving review.\n\nReversibility bounds duration of damage, not blast radius; the design backing this wording is in data-model.md.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Grant Framing"
+    ]
+  },
+  {
+    "objectID": "docs/grant-framing.html#narrative",
+    "href": "docs/grant-framing.html#narrative",
+    "title": "InterCiter — Grant Framing",
+    "section": "",
+    "text": "The strongest part of the proposal: InterCiter builds on existing infrastructure (BioLink schema extension, RoboKop provenance plumbing, Semantic Scholar paper/citation substrate) rather than re-solving bibliographic parsing. Its novelty is precisely the three hypotheses: source-grounded claim extraction, selective alignment, and auditable lineage. The relation model strengthens the BioLink story — evidence-bearing RelationAssertions map naturally onto BioLink’s provenance-heavy association pattern.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Grant Framing"
+    ]
+  },
+  {
+    "objectID": "docs/grant-framing.html#budget-honesty",
+    "href": "docs/grant-framing.html#budget-honesty",
+    "title": "InterCiter — Grant Framing",
+    "section": "",
+    "text": "Two costs are named up front rather than discovered later:\n\nThe adjudicated annotation corpus is the budget crux. Guideline development, multi-annotator labeling, agreement analysis, and adjudication are the largest non-engineering line item — and a legitimate thing to request funding for, since the corpus is itself a reusable contribution.\nLLM extraction cost at corpus scale is a reported evaluation metric (cost per paper) and a feasibility parameter, interacting with model choice and any multi-model comparison.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Grant Framing"
+    ]
+  },
+  {
+    "objectID": "docs/grant-framing.html#domain-scope-decided-deliberately",
+    "href": "docs/grant-framing.html#domain-scope-decided-deliberately",
+    "title": "InterCiter — Grant Framing",
+    "section": "",
+    "text": "The MVP narrows to empirical result claims in one open-access biomedical subdomain (see ../interciter-systems-design.md). Domain-agnostic remains the stated long-term direction, framed as: the architecture (evidence anchoring, assertion model, abstention) is domain-neutral; the vocabularies (entity categories, qualifier sets) are domain plugins, with BioLink as the first. This turns the narrowing into a design statement rather than a retreat.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Grant Framing"
+    ]
+  },
+  {
+    "objectID": "docs/api.html",
+    "href": "docs/api.html",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "Versioned from day one (/v1/). API-first: every feature, including InterCiter’s own frontends, routes through it. Resources are immutable-by-default, matching the system of record; the default read representations are the composed, reader-friendly views described in architecture.md, with the full audit structure behind explicit evidence endpoints.\n\n\nOne paper accumulates many jobs over time (parse, extract, re-extract, hydrate), so jobs and runs are first-class resources rather than a single GET /papers/{id}/status.\n\nPOST /v1/papers — submit by DOI/PMID or open-access XML. Returns 202 Accepted + a job resource. Supports an idempotency key so retries don’t double-ingest.\nGET /v1/jobs/{job_id} — poll any async work (MVP notification model; webhooks on the same abstraction in phase 2).\nGET /v1/papers/{paper_id} — work-level metadata + availability state (full_text_extracted … ingestion_failed, see architecture.md).\nGET /v1/papers/{paper_id}/versions — the paper’s PaperVersions (preprint vs published vs correction).\nGET /v1/extraction-runs/{run_id} — full run provenance (model, prompt version, parameters, code revision).\nPOST /v1/papers/{paper_id}/extractions — trigger a re-extraction with a specified model (evaluation workflows; not a production multi-model feature in MVP).\n\n\n\n\n\nGET /v1/claims/{id} — the composed default view: normalized text, source snippet, paper, provenance link, per-component scores. (“Claim” here is the projected read-side object; the audit trail sits behind it.)\nGET /v1/papers/{id}/claims — claims for a paper.\nGET /v1/claim-occurrences/{id} — exact span, passage, extraction run.\nGET /v1/claim-interpretations/{id} — normalized proposition, qualifiers, revision parents.\nGET /v1/passages/{id} — verbatim source text + locators.\nPOST /v1/claims — human-authored claim (creates occurrence + interpretation as appropriate).\n\nEvery claim and relation response embeds or links its evidence. There is no representation of a claim that can’t be traced to a passage in one request.\n\n\n\nRevising is creating, so it’s a POST, not a PATCH:\n\nPOST /v1/claim-interpretations/{id}/revisions — creates a new interpretation with the old as parent. The response identifies both versions and lists any RelationAssertions that became stale_pending_review. Restricted to the original author or reviewer/admin.\n\n\n\n\n\nGET /v1/relation-assertions/{id} — the full evidence-bearing record: function, stance, scope, resolution, both scores, stance distribution, evidence passage, run, review state.\nGET /v1/claims/{id}/relationships — one-hop relations for a claim, filterable by stance/function/resolution/status.\n\nDeep traversal (phase 2) is bounded, never free-depth — a bare depth parameter invites explosive queries and hides uncertainty:\nGET /v1/traces\n  ?root_claim_id=...\n  &max_depth=2          (required)\n  &max_nodes=100        (required)\n  &min_target_link_score=...\n  &min_stance_score=...\n  &include_unresolved=true\n  &cursor=...\nThe response reports cycles, truncated branches, evidence for every hop, and separate confidence components per hop — and it never presents a paper_resolved hop as a claim-level continuation.\n\n\n\n\nGET /v1/clusters/{id} — memberships with method + confidence; conflicting stances within a cluster surfaced explicitly.\nDELETE /v1/clusters/{cluster_id}/members/{interpretation_id} — reviewer removes a bad membership (sets status: removed; nothing is destroyed).\nPOST /v1/review-decisions — per-dimension review of an occurrence / interpretation / assertion / membership, with rationale.\n\n\n\n\n\nGET /v1/claims/{id}/scores — the decomposed signal set (scoring-and-review.md) as separate named components with Assessment provenance. No blended scalar.\nUser scores and paper trust endpoints — phase 2, retaining the overlay pattern (POST adds one user’s entry; aggregates are computed and read-only).\n\n\n\n\n\nPOST /v1/search — semantic query; ranking inputs are explicit, component-level, and documented.\nPOST /v1/references — draft text → relevant claims/papers as citations (depends on validated high-precision retrieval).\nGET /v1/networks — visualization data (nodes + edges) by granularity; rendering is the frontend’s job.\nWebhooks on the existing job abstraction.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#ingestion-jobs-and-runs-mvp",
+    "href": "docs/api.html#ingestion-jobs-and-runs-mvp",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "One paper accumulates many jobs over time (parse, extract, re-extract, hydrate), so jobs and runs are first-class resources rather than a single GET /papers/{id}/status.\n\nPOST /v1/papers — submit by DOI/PMID or open-access XML. Returns 202 Accepted + a job resource. Supports an idempotency key so retries don’t double-ingest.\nGET /v1/jobs/{job_id} — poll any async work (MVP notification model; webhooks on the same abstraction in phase 2).\nGET /v1/papers/{paper_id} — work-level metadata + availability state (full_text_extracted … ingestion_failed, see architecture.md).\nGET /v1/papers/{paper_id}/versions — the paper’s PaperVersions (preprint vs published vs correction).\nGET /v1/extraction-runs/{run_id} — full run provenance (model, prompt version, parameters, code revision).\nPOST /v1/papers/{paper_id}/extractions — trigger a re-extraction with a specified model (evaluation workflows; not a production multi-model feature in MVP).",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#claims-and-evidence-mvp-core",
+    "href": "docs/api.html#claims-and-evidence-mvp-core",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "GET /v1/claims/{id} — the composed default view: normalized text, source snippet, paper, provenance link, per-component scores. (“Claim” here is the projected read-side object; the audit trail sits behind it.)\nGET /v1/papers/{id}/claims — claims for a paper.\nGET /v1/claim-occurrences/{id} — exact span, passage, extraction run.\nGET /v1/claim-interpretations/{id} — normalized proposition, qualifiers, revision parents.\nGET /v1/passages/{id} — verbatim source text + locators.\nPOST /v1/claims — human-authored claim (creates occurrence + interpretation as appropriate).\n\nEvery claim and relation response embeds or links its evidence. There is no representation of a claim that can’t be traced to a passage in one request.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#revisions-mvp",
+    "href": "docs/api.html#revisions-mvp",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "Revising is creating, so it’s a POST, not a PATCH:\n\nPOST /v1/claim-interpretations/{id}/revisions — creates a new interpretation with the old as parent. The response identifies both versions and lists any RelationAssertions that became stale_pending_review. Restricted to the original author or reviewer/admin.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#relations-and-traversal-mvp-one-hop",
+    "href": "docs/api.html#relations-and-traversal-mvp-one-hop",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "GET /v1/relation-assertions/{id} — the full evidence-bearing record: function, stance, scope, resolution, both scores, stance distribution, evidence passage, run, review state.\nGET /v1/claims/{id}/relationships — one-hop relations for a claim, filterable by stance/function/resolution/status.\n\nDeep traversal (phase 2) is bounded, never free-depth — a bare depth parameter invites explosive queries and hides uncertainty:\nGET /v1/traces\n  ?root_claim_id=...\n  &max_depth=2          (required)\n  &max_nodes=100        (required)\n  &min_target_link_score=...\n  &min_stance_score=...\n  &include_unresolved=true\n  &cursor=...\nThe response reports cycles, truncated branches, evidence for every hop, and separate confidence components per hop — and it never presents a paper_resolved hop as a claim-level continuation.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#clusters-and-review-mvp",
+    "href": "docs/api.html#clusters-and-review-mvp",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "GET /v1/clusters/{id} — memberships with method + confidence; conflicting stances within a cluster surfaced explicitly.\nDELETE /v1/clusters/{cluster_id}/members/{interpretation_id} — reviewer removes a bad membership (sets status: removed; nothing is destroyed).\nPOST /v1/review-decisions — per-dimension review of an occurrence / interpretation / assertion / membership, with rationale.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#scores",
+    "href": "docs/api.html#scores",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "GET /v1/claims/{id}/scores — the decomposed signal set (scoring-and-review.md) as separate named components with Assessment provenance. No blended scalar.\nUser scores and paper trust endpoints — phase 2, retaining the overlay pattern (POST adds one user’s entry; aggregates are computed and read-only).",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/api.html#phase-2",
+    "href": "docs/api.html#phase-2",
+    "title": "InterCiter — API Surface",
+    "section": "",
+    "text": "POST /v1/search — semantic query; ranking inputs are explicit, component-level, and documented.\nPOST /v1/references — draft text → relevant claims/papers as citations (depends on validated high-precision retrieval).\nGET /v1/networks — visualization data (nodes + edges) by granularity; rendering is the frontend’s job.\nWebhooks on the existing job abstraction.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "API"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html",
+    "href": "docs/architecture.html",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "Ingestion / Extraction — paper → occurrences, interpretations, relation assertions. Stateless and pluggable; extraction models are swappable without touching storage. Every run is recorded as an ExtractionRun.\nKnowledge Graph — the immutable system of record plus its projections, BioLink-aligned.\nAccess — the API and everything on it. Frontend-agnostic; visualization endpoints return data, not images.\n\n\n\n\nThe single most important architectural decision: the rich immutable model is the system of record; queries traverse a derived projection. Implementing the full entity catalog as the graph schema would put 5–7 hops between any two claims (Cluster → Interpretation → Occurrence → RelationAssertion → Occurrence → Interpretation → Cluster) — a constant-factor increase in size but a real traversal-depth problem for interactive exploration.\n\n\nA normalized relational store (PostgreSQL) holding every entity in data-model.md, append-only in semantics: occurrences, interpretations, revision graphs, relation assertions, cluster memberships, review decisions, assessments. This is where provenance and auditability live. Nothing here is ever silently rewritten.\n\n\n\nA periodically rebuilt projection into the graph database (e.g. Neo4j) flattens the chain for traversal: one projected Claim node per current interpretation head (or cluster representative), with relation assertions projected as typed edges carrying stance, function, resolution, and both confidence scores.\nGuardrails, so the projection never reintroduces the conflation the logical model exists to prevent:\n\nThe projection is derived, versioned, and rebuildable from the system of record at any time. It is a cache, not a source of truth.\nA projected “consensus claim” node carries its cluster provenance — which memberships and which interpretation heads produced it — and every edge links back to its RelationAssertion id. Users (and downstream code) can always drill to evidence.\nNothing writes to the projection except the projector. Human review, revisions, and scores land in the system of record and flow forward on rebuild.\n\n\n\n\nThe same principle applies one layer up: end users must not need to understand occurrence-vs-interpretation to read a result. The API serves composed, reader-friendly views (claim text + source snippet + provenance link) as the default representation, with the full audit structure available behind explicit endpoints (api.md). The audit model is for machines and reviewers; the default read path is for researchers. This is acknowledged frontend/API design work, not an afterthought.\n\n\n\n\nSemantic Scholar is the paper + citation-graph substrate (Datasets API, monthly snapshots + incremental diffs); InterCiter’s novel layer sits on top. Design decisions:\n\nResolved citation links — the headline inheritance: S2ORC ties bibliography entries to inline mentions, feeding CitationMention directly.\nSPECTER embeddings are paper-level and are used only for paper-level candidate narrowing. They are not used to seed claim-level dedup or target-claim alignment: claim-level comparison requires a sentence/claim encoder, and confident equivalence or alignment requires a cross-encoder or entailment model on top (data-model.md).\nCitation intent labels are weak supervision, not ground truth. Their label set differs from InterCiter’s function/stance ontology; using them requires an explicit mapping study (evaluation.md).\nIdentifier mappings (corpusId/DOI/PMID) → PaperWork. A DOI or PMID does not guarantee accessible full text; metadata, citation context, full text, and embeddings all have different coverage and licensing, tracked per PaperVersion.\n\n\n\nIngest a domain slice, not the full corpus — but the slice must be reproducible: pinned corpus release version + explicit inclusion criteria, recorded so the corpus can be reconstructed and cited in the evaluation.\n\n\n\nA single “stub paper” state is too coarse, so every paper the graph can reach carries an explicit availability state:\n\n\n\n\n\n\n\nState\nMeaning\n\n\n\n\nfull_text_extracted\nParsed full text; claims extracted or extractable\n\n\nfull_text_unavailable\nKnown paper, no licensed/accessible full text\n\n\nmetadata_stub\nOut-of-slice; identifiers + minimal metadata only\n\n\nhydration_queued\nStub queued for on-demand full ingestion\n\n\ningestion_failed\nAttempted and failed; error retained\n\n\n\nA stub is walkable bibliographically but provides no validated claim-level continuation, and the API says so rather than letting a paper-level hop masquerade as a claim-level one. On-demand hydration (user drills into a stub) gets caching, retry/backoff, rate-limit handling, and degraded states — it calls an external API on a user-facing path.\n\n\n\n\n\nInternal: message queue (SQS / RabbitMQ / Redis) with worker pull — required for bulk ingestion regardless.\nExternal: polling on a job resource for the MVP; webhooks on the same abstraction in phase 2. One paper can have many jobs over time (parse, extract, re-extract, hydrate), so jobs are first-class resources, not a single per-paper status field (api.md).\n\n\n\n\nThe pipeline processes untrusted documents and feeds them to LLMs. Minimum hardening, in-scope for the MVP:\n\nfile-size limits and format validation before parsing;\nparser sandboxing and malware scanning;\nstrict schema validation of all model output (an extraction that doesn’t parse is rejected, not patched);\nprompt-injection defenses: paper text is data, never instructions — extraction prompts must be robust to instruction-like content embedded in papers.\n\n\n\n\nHybrid role-based (minimal — reviewer, admin) + ownership-based (per-user resources, own-authored interpretations). Ownership is modeled first-class from day one because retrofitting it is painful; the role layer stays minimal. Deferring public scoring (scoring-and-review.md) removes most identity/abuse surface from the MVP.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html#three-layers",
+    "href": "docs/architecture.html#three-layers",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "Ingestion / Extraction — paper → occurrences, interpretations, relation assertions. Stateless and pluggable; extraction models are swappable without touching storage. Every run is recorded as an ExtractionRun.\nKnowledge Graph — the immutable system of record plus its projections, BioLink-aligned.\nAccess — the API and everything on it. Frontend-agnostic; visualization endpoints return data, not images.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html#logical-model-vs-physical-schema",
+    "href": "docs/architecture.html#logical-model-vs-physical-schema",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "The single most important architectural decision: the rich immutable model is the system of record; queries traverse a derived projection. Implementing the full entity catalog as the graph schema would put 5–7 hops between any two claims (Cluster → Interpretation → Occurrence → RelationAssertion → Occurrence → Interpretation → Cluster) — a constant-factor increase in size but a real traversal-depth problem for interactive exploration.\n\n\nA normalized relational store (PostgreSQL) holding every entity in data-model.md, append-only in semantics: occurrences, interpretations, revision graphs, relation assertions, cluster memberships, review decisions, assessments. This is where provenance and auditability live. Nothing here is ever silently rewritten.\n\n\n\nA periodically rebuilt projection into the graph database (e.g. Neo4j) flattens the chain for traversal: one projected Claim node per current interpretation head (or cluster representative), with relation assertions projected as typed edges carrying stance, function, resolution, and both confidence scores.\nGuardrails, so the projection never reintroduces the conflation the logical model exists to prevent:\n\nThe projection is derived, versioned, and rebuildable from the system of record at any time. It is a cache, not a source of truth.\nA projected “consensus claim” node carries its cluster provenance — which memberships and which interpretation heads produced it — and every edge links back to its RelationAssertion id. Users (and downstream code) can always drill to evidence.\nNothing writes to the projection except the projector. Human review, revisions, and scores land in the system of record and flow forward on rebuild.\n\n\n\n\nThe same principle applies one layer up: end users must not need to understand occurrence-vs-interpretation to read a result. The API serves composed, reader-friendly views (claim text + source snippet + provenance link) as the default representation, with the full audit structure available behind explicit endpoints (api.md). The audit model is for machines and reviewers; the default read path is for researchers. This is acknowledged frontend/API design work, not an afterthought.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html#semantic-scholar-integration",
+    "href": "docs/architecture.html#semantic-scholar-integration",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "Semantic Scholar is the paper + citation-graph substrate (Datasets API, monthly snapshots + incremental diffs); InterCiter’s novel layer sits on top. Design decisions:\n\nResolved citation links — the headline inheritance: S2ORC ties bibliography entries to inline mentions, feeding CitationMention directly.\nSPECTER embeddings are paper-level and are used only for paper-level candidate narrowing. They are not used to seed claim-level dedup or target-claim alignment: claim-level comparison requires a sentence/claim encoder, and confident equivalence or alignment requires a cross-encoder or entailment model on top (data-model.md).\nCitation intent labels are weak supervision, not ground truth. Their label set differs from InterCiter’s function/stance ontology; using them requires an explicit mapping study (evaluation.md).\nIdentifier mappings (corpusId/DOI/PMID) → PaperWork. A DOI or PMID does not guarantee accessible full text; metadata, citation context, full text, and embeddings all have different coverage and licensing, tracked per PaperVersion.\n\n\n\nIngest a domain slice, not the full corpus — but the slice must be reproducible: pinned corpus release version + explicit inclusion criteria, recorded so the corpus can be reconstructed and cited in the evaluation.\n\n\n\nA single “stub paper” state is too coarse, so every paper the graph can reach carries an explicit availability state:\n\n\n\n\n\n\n\nState\nMeaning\n\n\n\n\nfull_text_extracted\nParsed full text; claims extracted or extractable\n\n\nfull_text_unavailable\nKnown paper, no licensed/accessible full text\n\n\nmetadata_stub\nOut-of-slice; identifiers + minimal metadata only\n\n\nhydration_queued\nStub queued for on-demand full ingestion\n\n\ningestion_failed\nAttempted and failed; error retained\n\n\n\nA stub is walkable bibliographically but provides no validated claim-level continuation, and the API says so rather than letting a paper-level hop masquerade as a claim-level one. On-demand hydration (user drills into a stub) gets caching, retry/backoff, rate-limit handling, and degraded states — it calls an external API on a user-facing path.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html#async-execution-and-jobs",
+    "href": "docs/architecture.html#async-execution-and-jobs",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "Internal: message queue (SQS / RabbitMQ / Redis) with worker pull — required for bulk ingestion regardless.\nExternal: polling on a job resource for the MVP; webhooks on the same abstraction in phase 2. One paper can have many jobs over time (parse, extract, re-extract, hydrate), so jobs are first-class resources, not a single per-paper status field (api.md).",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html#ingestion-security",
+    "href": "docs/architecture.html#ingestion-security",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "The pipeline processes untrusted documents and feeds them to LLMs. Minimum hardening, in-scope for the MVP:\n\nfile-size limits and format validation before parsing;\nparser sandboxing and malware scanning;\nstrict schema validation of all model output (an extraction that doesn’t parse is rejected, not patched);\nprompt-injection defenses: paper text is data, never instructions — extraction prompts must be robust to instruction-like content embedded in papers.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/architecture.html#auth",
+    "href": "docs/architecture.html#auth",
+    "title": "InterCiter — Architecture",
+    "section": "",
+    "text": "Hybrid role-based (minimal — reviewer, admin) + ownership-based (per-user resources, own-authored interpretations). Ownership is modeled first-class from day one because retrofitting it is painful; the role layer stays minimal. Deferring public scoring (scoring-and-review.md) removes most identity/abuse surface from the MVP.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Architecture"
+    ]
+  },
+  {
+    "objectID": "docs/scoring-and-review.html",
+    "href": "docs/scoring-and-review.html",
+    "title": "InterCiter — Scoring and Human Review",
+    "section": "",
+    "text": "Confidence is exposed as separate signals, never compressed into one global score per claim. A single blended number — extraction confidence + review status + corroboration, with an aggregate paper trust weight feeding ranking — would fold too many distinct questions into one unexplained scalar, and it would conflate model agreement with literature corroboration, which are different kinds of evidence.\n\n\n\nEach signal is stored and exposed separately:\n\n\n\n\n\n\n\nSignal\nQuestion it answers\n\n\n\n\nExtraction fidelity\nDid the system correctly capture and normalize the source passage?\n\n\nTarget-link confidence\nDid it identify the correct cited claim?\n\n\nStance confidence\nDid it correctly classify support / contradict / neutral?\n\n\nReview status\nHas a reviewer accepted, rejected, or modified it?\n\n\nModel agreement\nDid multiple extraction methods produce compatible interpretations of the same occurrence?\n\n\nLiterature evidence balance\nHow many independent papers support or contradict the proposition (via cluster membership)?\n\n\nSource-quality assessment\nWhat quality metadata applies to the source paper?\n\n\n\nThe model-agreement / corroboration split is the load-bearing one:\n\nTwo models agreeing on one sentence may reflect shared training data and correlated errors. Two independent papers making the same finding is literature corroboration. They are never summed into one number.\n\n\n\n\nEvery derived score is a versioned Assessment record — subject, assessment type, component inputs, algorithm version, computed value, timestamp — rebuildable and explainable, never a mutable field on a claim. If a formula changes, old assessments remain inspectable and new ones are computed alongside.\nAny future composite ranking score is just another Assessment type whose inputs are the components above, introduced only after the components are individually validated (evaluation.md).\n\n\n\nUserScore (per-user claim/paper scores, scope: public | private) and TrustWeight (per-user paper trust entries feeding a computed aggregate) are deferred to phase 2. They keep the overlay pattern — separate entities, never mutable fields on the target, no last-writer-wins — but shipping them in the MVP would import identity, moderation, abuse-control, and manipulation problems, and a scalar “trust” number risks encoding prestige and popularity bias. Before phase 2, “what exactly are users rating?” needs a real answer.\nUserScore  --[scores]--&gt; ClaimInterpretation | PaperWork     (phase 2)\nTrustWeight --[weighs]--&gt; PaperWork                          (phase 2)\n  user_id, value, scope: private | public, created_at\n\n\n\nEvery human action is additive and lands in the system of record:\n\n\n\nOperation\nBehavior\n\n\n\n\nRevise an interpretation\nNew ClaimInterpretation with parent_interpretation_ids; original untouched. Materially different revisions mark dependent RelationAssertions stale_pending_review (data-model.md). Restricted to original author or reviewer/admin.\n\n\nCreate a claim\nHuman-authored ClaimOccurrence + ClaimInterpretation (or interpretation-only, attached to an existing occurrence).\n\n\nReview an assertion\nReviewDecision on a specific dimension (extraction fidelity, stance, target link) with rationale; flips the assertion’s status to accepted / rejected.\n\n\nFix a bad cluster\nSet the offending ClusterMembership to removed. No node reconstruction, no edge un-copying — memberships are the only thing that changes.\n\n\n\nReviewDecisions are per-dimension deliberately: a reviewer can confirm the stance while rejecting the target link, and the evaluation pipeline consumes these as adjudicated labels.\n\n\nPrioritization (lowest-confidence first, contested-first, high-value-papers first) is a query over data already stored (assessments, review statuses, stance conflicts within clusters). No schema work is needed now; only the ranking policy is deferred.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Scoring & Review"
+    ]
+  },
+  {
+    "objectID": "docs/scoring-and-review.html#confidence-signals-stay-decomposed",
+    "href": "docs/scoring-and-review.html#confidence-signals-stay-decomposed",
+    "title": "InterCiter — Scoring and Human Review",
+    "section": "",
+    "text": "Confidence is exposed as separate signals, never compressed into one global score per claim. A single blended number — extraction confidence + review status + corroboration, with an aggregate paper trust weight feeding ranking — would fold too many distinct questions into one unexplained scalar, and it would conflate model agreement with literature corroboration, which are different kinds of evidence.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Scoring & Review"
+    ]
+  },
+  {
+    "objectID": "docs/scoring-and-review.html#decomposed-signals",
+    "href": "docs/scoring-and-review.html#decomposed-signals",
+    "title": "InterCiter — Scoring and Human Review",
+    "section": "",
+    "text": "Each signal is stored and exposed separately:\n\n\n\n\n\n\n\nSignal\nQuestion it answers\n\n\n\n\nExtraction fidelity\nDid the system correctly capture and normalize the source passage?\n\n\nTarget-link confidence\nDid it identify the correct cited claim?\n\n\nStance confidence\nDid it correctly classify support / contradict / neutral?\n\n\nReview status\nHas a reviewer accepted, rejected, or modified it?\n\n\nModel agreement\nDid multiple extraction methods produce compatible interpretations of the same occurrence?\n\n\nLiterature evidence balance\nHow many independent papers support or contradict the proposition (via cluster membership)?\n\n\nSource-quality assessment\nWhat quality metadata applies to the source paper?\n\n\n\nThe model-agreement / corroboration split is the load-bearing one:\n\nTwo models agreeing on one sentence may reflect shared training data and correlated errors. Two independent papers making the same finding is literature corroboration. They are never summed into one number.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Scoring & Review"
+    ]
+  },
+  {
+    "objectID": "docs/scoring-and-review.html#assessment-records",
+    "href": "docs/scoring-and-review.html#assessment-records",
+    "title": "InterCiter — Scoring and Human Review",
+    "section": "",
+    "text": "Every derived score is a versioned Assessment record — subject, assessment type, component inputs, algorithm version, computed value, timestamp — rebuildable and explainable, never a mutable field on a claim. If a formula changes, old assessments remain inspectable and new ones are computed alongside.\nAny future composite ranking score is just another Assessment type whose inputs are the components above, introduced only after the components are individually validated (evaluation.md).",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Scoring & Review"
+    ]
+  },
+  {
+    "objectID": "docs/scoring-and-review.html#deferred-user-scores-and-paper-trust-weighting",
+    "href": "docs/scoring-and-review.html#deferred-user-scores-and-paper-trust-weighting",
+    "title": "InterCiter — Scoring and Human Review",
+    "section": "",
+    "text": "UserScore (per-user claim/paper scores, scope: public | private) and TrustWeight (per-user paper trust entries feeding a computed aggregate) are deferred to phase 2. They keep the overlay pattern — separate entities, never mutable fields on the target, no last-writer-wins — but shipping them in the MVP would import identity, moderation, abuse-control, and manipulation problems, and a scalar “trust” number risks encoding prestige and popularity bias. Before phase 2, “what exactly are users rating?” needs a real answer.\nUserScore  --[scores]--&gt; ClaimInterpretation | PaperWork     (phase 2)\nTrustWeight --[weighs]--&gt; PaperWork                          (phase 2)\n  user_id, value, scope: private | public, created_at",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Scoring & Review"
+    ]
+  },
+  {
+    "objectID": "docs/scoring-and-review.html#human-review-workflow",
+    "href": "docs/scoring-and-review.html#human-review-workflow",
+    "title": "InterCiter — Scoring and Human Review",
+    "section": "",
+    "text": "Every human action is additive and lands in the system of record:\n\n\n\nOperation\nBehavior\n\n\n\n\nRevise an interpretation\nNew ClaimInterpretation with parent_interpretation_ids; original untouched. Materially different revisions mark dependent RelationAssertions stale_pending_review (data-model.md). Restricted to original author or reviewer/admin.\n\n\nCreate a claim\nHuman-authored ClaimOccurrence + ClaimInterpretation (or interpretation-only, attached to an existing occurrence).\n\n\nReview an assertion\nReviewDecision on a specific dimension (extraction fidelity, stance, target link) with rationale; flips the assertion’s status to accepted / rejected.\n\n\nFix a bad cluster\nSet the offending ClusterMembership to removed. No node reconstruction, no edge un-copying — memberships are the only thing that changes.\n\n\n\nReviewDecisions are per-dimension deliberately: a reviewer can confirm the stance while rejecting the target link, and the evaluation pipeline consumes these as adjudicated labels.\n\n\nPrioritization (lowest-confidence first, contested-first, high-value-papers first) is a query over data already stored (assessments, review statuses, stance conflicts within clusters). No schema work is needed now; only the ranking policy is deferred.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Scoring & Review"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html",
+    "href": "docs/data-model.html",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "This is the logical model: the immutable system of record. It is deliberately richer than what queries traverse — see architecture.md for how it is projected into a flattened graph for reading. Do not implement this 1:1 as the graph schema.\n\n\nA claim is split into distinct entities rather than one Claim node, because a single node would have to act simultaneously as:\n\nan occurrence of text in a paper;\na normalized proposition;\nan editable, versioned record;\na canonical object produced by deduplication.\n\nThose four roles have different identities and lifecycles. Collapsing them produces edit-chain ambiguity, edge-migration complexity on merge, and corroboration/model-agreement confusion in scoring, so the model keeps them separate. This is schema richness, not feature scope — most of these entities are plain relational tables behind a small feature set, and the MVP builds only the thin path through them.\n\n\n\n\n\nPaperWork\n  work_id\n  canonical bibliographic identity (title, authors, venue, year)\n  DOI / PMID / S2 corpusId mappings\n\nPaperVersion\n  version_id, work_id\n  manifestation: preprint | published | correction | retraction-notice\n  artifact_hash              (hash of the ingested file)\n  full-text availability + license status   (see availability states in architecture.md)\n  parser_name / parser_version / parse_status\n\nPassage\n  passage_id, paper_version_id\n  section / page / paragraph / sentence locators (where available)\n  normalized character offsets\n  verbatim_text              (the exact source text — see anchoring note below)\n\nCitationMention\n  mention_id, passage_id\n  marker span within the passage (e.g. \"[12]\", \"(Smith 2019)\")\n  cited_work_id\n  bibliographic_resolution_confidence\nPaperWork vs PaperVersion matters in biomedicine: effect directions can change between a preprint and the corrected journal version. Claims anchor to a version, never just a work.\nAnchoring is layered, not offset-only. Offsets are relative to a specific PaperVersion with a recorded artifact_hash and parser version — a re-parse or parser upgrade produces a new PaperVersion rather than silently shifting old offsets. The stored verbatim_text provides a second, parser-independent anchor that allows fuzzy re-anchoring of old passages onto new versions. This addresses the parser-brittleness concern without giving up exact evidence.\n\n\n\nExtractionRun\n  run_id\n  model / provider / model_version\n  prompt_template_version\n  parser_version, code_revision\n  inference parameters\n  timestamp\n\nClaimOccurrence\n  occurrence_id, passage_id\n  exact source span within the passage\n  occurrence_type (e.g. reported-result, background-assertion)\n  extraction_run_id\n\nClaimInterpretation\n  interpretation_id\n  claim_occurrence_id\n  normalized_text            (the proposition, as normalized)\n  structured qualifiers      (population, intervention/exposure, comparator,\n                              outcome, dosage, time horizon, effect direction,\n                              effect size, hedging/certainty, negation)\n  extraction_run_id — or — human author_id\n  parent_interpretation_ids  (revision graph, see below)\n  created_by / created_at\nThe occurrence/interpretation split is the core defensive move: ClaimOccurrence is what the paper says (source-bound, verifiable), ClaimInterpretation is what a model or human thinks it means. A bad normalization can never overwrite the ground truth, and multiple models (or a human) can attach competing interpretations to the same occurrence.\n\n\n\nRevisions form a graph via parent_interpretation_ids, not a superseded_by linked list — the linked list could not represent concurrent edits, branches, or reconciliation. “Current head” is derived (computed at read time or materialized in the projection), never a mutable flag on the record.\nThe critical rule: relation assertions never silently transfer across a material revision. If “Treatment A reduces mortality” is revised to “Treatment A does not reduce mortality,” the old support assertions must not appear as support for the new text. When a materially different revision becomes current, existing RelationAssertions against the old interpretation are marked stale_pending_review. Reads may display inherited historical relationships, but always labeled with the exact version they were evaluated against.\nRevisions are created only by the interpretation’s original author or a reviewer/admin — an edit is a correction claim about someone else’s work and is gated accordingly.\n\n\n\nClaimCluster\n  cluster_id\n  clustering method + threshold version\n\nClusterMembership\n  cluster_id, interpretation_id\n  method: automated | human\n  membership_confidence\n  status: active | removed\n  added_by / removed_by / timestamps\nEquivalence uses soft clustering, never an authoritative MergeEvent with edge copying. Reversibility bounds the duration of a bad merge’s damage, not its blast radius — during the window before revert it still pollutes search, inflates confidence, and feeds downstream automated decisions. Instead:\n\nA cluster is a statement of probable semantic equivalence, never a replacement node. All originals remain first-class.\nNo edge copying. Queries resolve cluster membership at read time or via the rebuildable projection; reverting a bad grouping is just removing a membership row.\nEquivalence is not embedding distance alone. “Drug X lowers blood pressure” and “Drug X does not lower blood pressure in older adults” sit close in embedding space while being scientifically incompatible. Candidate pairs come from embeddings (paper-level embeddings narrow which papers to compare; claim-level comparison uses a sentence/claim encoder — see architecture.md), but membership requires a cross-encoder / entailment check plus compatibility of structured qualifiers (negation, population, direction of effect, etc.).\nThreshold policy for the MVP: prefer fragmentation over pollution. Clusters are additive and can grow later; a polluted cluster misleads immediately. Uncertain pairs simply stay unclustered (abstention is a first-class outcome). Thresholds are set and validated against the gold evaluation set (evaluation.md).\n\nCorroboration vs model agreement — the two must never be conflated:\n\nMultiple interpretations of the same occurrence agreeing is model agreement (models may share training data and correlated errors). Distinct occurrences from independent papers landing in one cluster is literature corroboration. They are counted as separate signals (scoring-and-review.md).\n\n\n\n\nA relationship is an evidence-bearing record, not a lightweight edge:\nRelationAssertion\n  assertion_id\n  citing_occurrence_id        (the local claim making the citation)\n  citation_mention_id         (the marker that licenses the relation)\n  evidence_passage_id         (exact context)\n  cited_work_id\n  target_interpretation_id    (nullable — resolved target claim)\n  target_candidates           (ranked candidates + scores when unresolved)\n  function:   background | method | direct-evidence | comparison | other\n  stance:     support | contradict | neutral | unclear\n  scope:      whole-claim | partial-claim | paper-level-only\n  resolution: claim_resolved | paper_resolved | unresolved\n  target_link_score           (separate from stance confidence)\n  stance_distribution         (full label-probability distribution)\n  extraction_run_id\n  status: proposed | accepted | rejected | unresolved | stale_pending_review\nFunction, stance, scope, and resolution are modeled as four independent dimensions rather than a single mention / support / dissent axis. “Mention” is a citation function while support/dissent are epistemic stances, and the two are orthogonal — a citation can mention a method while supporting a result, or support part of a claim while qualifying another. One axis cannot express that; four can.\nThe paper-level fallback is now expressed honestly. Instead of “this claim supports that paper,” it records:\nstance = support, resolution = paper_resolved, target claim = unresolved\nstill walkable for chain tracing, upgradeable to claim_resolved later (when the target’s claims are extracted, or on review), and never overstating precision. An unresolved outcome with ranked candidates is a legitimate result at every uncertain stage, not a failure.\n\n\n\nReviewDecision\n  subject_type + subject_id   (occurrence, interpretation, assertion, membership)\n  reviewer_id\n  decision dimension          (e.g. extraction fidelity, stance, target link)\n  label / value\n  rationale\n  timestamp\n\nAssessment\n  subject_id, assessment_type\n  component inputs            (the raw signals used)\n  algorithm_version\n  computed_value\n  computed_at\nAll derived scores live in versioned, rebuildable Assessment records — never as an unexplained mutable number on a claim. See scoring-and-review.md for the signal decomposition.\nUserScore and TrustWeight (community/user-supplied signals) are deferred to phase 2 but keep the same overlay pattern; their sketches live in scoring-and-review.md.\n\n\n\n\n“Additive-only” means immutable scientific assertions and decisions — not “nothing can ever be deleted.” The system still needs:\n\nTombstones for takedowns/redactions: preserve that a record existed and why it was removed, without the content;\naccess revocation and license-driven retention for full text;\nhandling for copyrighted or sensitive material.\n\n\n\n\nWhat queries actually traverse, after projection (architecture.md):\nPaper --[has_claim]--&gt; Claim ==[RelationAssertion: stance+function]==&gt; Claim   (claim_resolved)\n                         |                                          \\=&gt; Paper  (paper_resolved fallback)\n                         --[member_of]--&gt; Cluster\n                         --[anchored_to]--&gt; Passage --&gt; PaperVersion\nEach projected edge carries resolution, stance, function, both scores, and a pointer back to its RelationAssertion in the system of record.\n\n\n\nThe model maps cleanly onto BioLink:\n\nClaimInterpretation → subtype of BioLink InformationContentEntity.\nRelationAssertion → a custom Association subclass; its evidence, publications, and confidence fields map naturally onto BioLink’s provenance-heavy association pattern, a better fit than a lightweight property-graph edge.\nExtractionRun provenance → knowledge_source / primary_knowledge_source / aggregator_knowledge_source slots (RoboKop already has display plumbing here).\nPaperWork/PaperVersion → BioLink Publication, kept close to unmodified; versioning is an additive slot.\n\n\n\n\nThis logical model is encoded as an executable LinkML schema at schema/interciter.yaml. LinkML is the natural choice because BioLink itself is authored in LinkML, so the mappings above are expressed as first-class exact_mappings rather than prose, and a single source can generate the multiple physical shapes this design already calls for — SQL DDL for the PostgreSQL system of record, Pydantic models for strict validation of extraction output, plus JSON Schema, GraphQL, and RDF/OWL.\nThe schema is the entity/constraint contract only. Derived behavior — “current head” resolution, stale_pending_review propagation, read-time cluster resolution, and the flattened read-side projection (architecture.md) — remains application logic and is deliberately not modeled there.\nWorking with it (LinkML is pinned in schema/requirements.txt):\nuv tool run --from linkml linkml-lint schema/interciter.yaml   # validate\nuv tool run --from linkml gen-pydantic schema/interciter.yaml   # Pydantic models\nuv tool run --from linkml gen-sqlddl   schema/interciter.yaml   # SQL DDL",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html#why-claims-are-modeled-as-separate-entities",
+    "href": "docs/data-model.html#why-claims-are-modeled-as-separate-entities",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "A claim is split into distinct entities rather than one Claim node, because a single node would have to act simultaneously as:\n\nan occurrence of text in a paper;\na normalized proposition;\nan editable, versioned record;\na canonical object produced by deduplication.\n\nThose four roles have different identities and lifecycles. Collapsing them produces edit-chain ambiguity, edge-migration complexity on merge, and corroboration/model-agreement confusion in scoring, so the model keeps them separate. This is schema richness, not feature scope — most of these entities are plain relational tables behind a small feature set, and the MVP builds only the thin path through them.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html#entity-catalog",
+    "href": "docs/data-model.html#entity-catalog",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "PaperWork\n  work_id\n  canonical bibliographic identity (title, authors, venue, year)\n  DOI / PMID / S2 corpusId mappings\n\nPaperVersion\n  version_id, work_id\n  manifestation: preprint | published | correction | retraction-notice\n  artifact_hash              (hash of the ingested file)\n  full-text availability + license status   (see availability states in architecture.md)\n  parser_name / parser_version / parse_status\n\nPassage\n  passage_id, paper_version_id\n  section / page / paragraph / sentence locators (where available)\n  normalized character offsets\n  verbatim_text              (the exact source text — see anchoring note below)\n\nCitationMention\n  mention_id, passage_id\n  marker span within the passage (e.g. \"[12]\", \"(Smith 2019)\")\n  cited_work_id\n  bibliographic_resolution_confidence\nPaperWork vs PaperVersion matters in biomedicine: effect directions can change between a preprint and the corrected journal version. Claims anchor to a version, never just a work.\nAnchoring is layered, not offset-only. Offsets are relative to a specific PaperVersion with a recorded artifact_hash and parser version — a re-parse or parser upgrade produces a new PaperVersion rather than silently shifting old offsets. The stored verbatim_text provides a second, parser-independent anchor that allows fuzzy re-anchoring of old passages onto new versions. This addresses the parser-brittleness concern without giving up exact evidence.\n\n\n\nExtractionRun\n  run_id\n  model / provider / model_version\n  prompt_template_version\n  parser_version, code_revision\n  inference parameters\n  timestamp\n\nClaimOccurrence\n  occurrence_id, passage_id\n  exact source span within the passage\n  occurrence_type (e.g. reported-result, background-assertion)\n  extraction_run_id\n\nClaimInterpretation\n  interpretation_id\n  claim_occurrence_id\n  normalized_text            (the proposition, as normalized)\n  structured qualifiers      (population, intervention/exposure, comparator,\n                              outcome, dosage, time horizon, effect direction,\n                              effect size, hedging/certainty, negation)\n  extraction_run_id — or — human author_id\n  parent_interpretation_ids  (revision graph, see below)\n  created_by / created_at\nThe occurrence/interpretation split is the core defensive move: ClaimOccurrence is what the paper says (source-bound, verifiable), ClaimInterpretation is what a model or human thinks it means. A bad normalization can never overwrite the ground truth, and multiple models (or a human) can attach competing interpretations to the same occurrence.\n\n\n\nRevisions form a graph via parent_interpretation_ids, not a superseded_by linked list — the linked list could not represent concurrent edits, branches, or reconciliation. “Current head” is derived (computed at read time or materialized in the projection), never a mutable flag on the record.\nThe critical rule: relation assertions never silently transfer across a material revision. If “Treatment A reduces mortality” is revised to “Treatment A does not reduce mortality,” the old support assertions must not appear as support for the new text. When a materially different revision becomes current, existing RelationAssertions against the old interpretation are marked stale_pending_review. Reads may display inherited historical relationships, but always labeled with the exact version they were evaluated against.\nRevisions are created only by the interpretation’s original author or a reviewer/admin — an edit is a correction claim about someone else’s work and is gated accordingly.\n\n\n\nClaimCluster\n  cluster_id\n  clustering method + threshold version\n\nClusterMembership\n  cluster_id, interpretation_id\n  method: automated | human\n  membership_confidence\n  status: active | removed\n  added_by / removed_by / timestamps\nEquivalence uses soft clustering, never an authoritative MergeEvent with edge copying. Reversibility bounds the duration of a bad merge’s damage, not its blast radius — during the window before revert it still pollutes search, inflates confidence, and feeds downstream automated decisions. Instead:\n\nA cluster is a statement of probable semantic equivalence, never a replacement node. All originals remain first-class.\nNo edge copying. Queries resolve cluster membership at read time or via the rebuildable projection; reverting a bad grouping is just removing a membership row.\nEquivalence is not embedding distance alone. “Drug X lowers blood pressure” and “Drug X does not lower blood pressure in older adults” sit close in embedding space while being scientifically incompatible. Candidate pairs come from embeddings (paper-level embeddings narrow which papers to compare; claim-level comparison uses a sentence/claim encoder — see architecture.md), but membership requires a cross-encoder / entailment check plus compatibility of structured qualifiers (negation, population, direction of effect, etc.).\nThreshold policy for the MVP: prefer fragmentation over pollution. Clusters are additive and can grow later; a polluted cluster misleads immediately. Uncertain pairs simply stay unclustered (abstention is a first-class outcome). Thresholds are set and validated against the gold evaluation set (evaluation.md).\n\nCorroboration vs model agreement — the two must never be conflated:\n\nMultiple interpretations of the same occurrence agreeing is model agreement (models may share training data and correlated errors). Distinct occurrences from independent papers landing in one cluster is literature corroboration. They are counted as separate signals (scoring-and-review.md).\n\n\n\n\nA relationship is an evidence-bearing record, not a lightweight edge:\nRelationAssertion\n  assertion_id\n  citing_occurrence_id        (the local claim making the citation)\n  citation_mention_id         (the marker that licenses the relation)\n  evidence_passage_id         (exact context)\n  cited_work_id\n  target_interpretation_id    (nullable — resolved target claim)\n  target_candidates           (ranked candidates + scores when unresolved)\n  function:   background | method | direct-evidence | comparison | other\n  stance:     support | contradict | neutral | unclear\n  scope:      whole-claim | partial-claim | paper-level-only\n  resolution: claim_resolved | paper_resolved | unresolved\n  target_link_score           (separate from stance confidence)\n  stance_distribution         (full label-probability distribution)\n  extraction_run_id\n  status: proposed | accepted | rejected | unresolved | stale_pending_review\nFunction, stance, scope, and resolution are modeled as four independent dimensions rather than a single mention / support / dissent axis. “Mention” is a citation function while support/dissent are epistemic stances, and the two are orthogonal — a citation can mention a method while supporting a result, or support part of a claim while qualifying another. One axis cannot express that; four can.\nThe paper-level fallback is now expressed honestly. Instead of “this claim supports that paper,” it records:\nstance = support, resolution = paper_resolved, target claim = unresolved\nstill walkable for chain tracing, upgradeable to claim_resolved later (when the target’s claims are extracted, or on review), and never overstating precision. An unresolved outcome with ranked candidates is a legitimate result at every uncertain stage, not a failure.\n\n\n\nReviewDecision\n  subject_type + subject_id   (occurrence, interpretation, assertion, membership)\n  reviewer_id\n  decision dimension          (e.g. extraction fidelity, stance, target link)\n  label / value\n  rationale\n  timestamp\n\nAssessment\n  subject_id, assessment_type\n  component inputs            (the raw signals used)\n  algorithm_version\n  computed_value\n  computed_at\nAll derived scores live in versioned, rebuildable Assessment records — never as an unexplained mutable number on a claim. See scoring-and-review.md for the signal decomposition.\nUserScore and TrustWeight (community/user-supplied signals) are deferred to phase 2 but keep the same overlay pattern; their sketches live in scoring-and-review.md.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html#additive-only-precisely-scoped",
+    "href": "docs/data-model.html#additive-only-precisely-scoped",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "“Additive-only” means immutable scientific assertions and decisions — not “nothing can ever be deleted.” The system still needs:\n\nTombstones for takedowns/redactions: preserve that a record existed and why it was removed, without the content;\naccess revocation and license-driven retention for full text;\nhandling for copyrighted or sensitive material.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html#graph-shape-projection-view",
+    "href": "docs/data-model.html#graph-shape-projection-view",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "What queries actually traverse, after projection (architecture.md):\nPaper --[has_claim]--&gt; Claim ==[RelationAssertion: stance+function]==&gt; Claim   (claim_resolved)\n                         |                                          \\=&gt; Paper  (paper_resolved fallback)\n                         --[member_of]--&gt; Cluster\n                         --[anchored_to]--&gt; Passage --&gt; PaperVersion\nEach projected edge carries resolution, stance, function, both scores, and a pointer back to its RelationAssertion in the system of record.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html#mapping-onto-biolink",
+    "href": "docs/data-model.html#mapping-onto-biolink",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "The model maps cleanly onto BioLink:\n\nClaimInterpretation → subtype of BioLink InformationContentEntity.\nRelationAssertion → a custom Association subclass; its evidence, publications, and confidence fields map naturally onto BioLink’s provenance-heavy association pattern, a better fit than a lightweight property-graph edge.\nExtractionRun provenance → knowledge_source / primary_knowledge_source / aggregator_knowledge_source slots (RoboKop already has display plumbing here).\nPaperWork/PaperVersion → BioLink Publication, kept close to unmodified; versioning is an additive slot.",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "docs/data-model.html#machine-readable-schema-linkml",
+    "href": "docs/data-model.html#machine-readable-schema-linkml",
+    "title": "InterCiter — Logical Data Model",
+    "section": "",
+    "text": "This logical model is encoded as an executable LinkML schema at schema/interciter.yaml. LinkML is the natural choice because BioLink itself is authored in LinkML, so the mappings above are expressed as first-class exact_mappings rather than prose, and a single source can generate the multiple physical shapes this design already calls for — SQL DDL for the PostgreSQL system of record, Pydantic models for strict validation of extraction output, plus JSON Schema, GraphQL, and RDF/OWL.\nThe schema is the entity/constraint contract only. Derived behavior — “current head” resolution, stale_pending_review propagation, read-time cluster resolution, and the flattened read-side projection (architecture.md) — remains application logic and is deliberately not modeled there.\nWorking with it (LinkML is pinned in schema/requirements.txt):\nuv tool run --from linkml linkml-lint schema/interciter.yaml   # validate\nuv tool run --from linkml gen-pydantic schema/interciter.yaml   # Pydantic models\nuv tool run --from linkml gen-sqlddl   schema/interciter.yaml   # SQL DDL",
+    "crumbs": [
+      "Home",
+      "Design Docs",
+      "Data Model"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "InterCiter",
+    "section": "",
+    "text": "A provenance-first knowledge-graph system that extracts claims from scientific papers, anchors them to exact source passages, and classifies how citing claims relate to cited work."
+  },
+  {
+    "objectID": "index.html#where-to-start",
+    "href": "index.html#where-to-start",
+    "title": "InterCiter",
+    "section": "Where to start",
+    "text": "Where to start\n\nDesign Overview — interciter-systems-design.md: overview, principles, MVP scope, open decisions.\nDetailed design — the design docs cover the data model · architecture · scoring & review · evaluation · API · grant framing.\nExternal feedback — supplementary feedback files 0001 · 0002 · 0003."
+  },
+  {
+    "objectID": "index.html#for-reviewers",
+    "href": "index.html#for-reviewers",
+    "title": "InterCiter",
+    "section": "For reviewers",
+    "text": "For reviewers\nThe full design (overview plus all design docs, excluding the feedback files) is also available as a single Word document for offline reading and comments."
+  },
+  {
+    "objectID": "feedback/0003-claude-opus-4.8-feedback.html",
+    "href": "feedback/0003-claude-opus-4.8-feedback.html",
+    "title": "InterCiter",
+    "section": "",
+    "text": "Both reviews are worth taking seriously, and they’re more complementary than they appear — but they’re not equally strong, and Gemini in particular argues against a few positions the GPT Sol review didn’t actually take. Here’s my assessment.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0003 · Opus"
+    ]
+  },
+  {
+    "objectID": "feedback/0003-claude-opus-4.8-feedback.html#the-gpt-sol-review-is-mostly-right-and-several-of-its-points-correct-real-errors-in-our-design",
+    "href": "feedback/0003-claude-opus-4.8-feedback.html#the-gpt-sol-review-is-mostly-right-and-several-of-its-points-correct-real-errors-in-our-design",
+    "title": "InterCiter",
+    "section": "The GPT Sol review is mostly right, and several of its points correct real errors in our design",
+    "text": "The GPT Sol review is mostly right, and several of its points correct real errors in our design\nThe strongest criticisms are correct and I’d accept them:\nEvidence anchoring (its issue 1) is the single best catch. A system whose whole pitch is “provenance-first” that can’t point to where in the paper a claim came from is internally contradictory. We had source_paper_id and nothing finer. Adding passage/offset/verbatim-text/version anchoring isn’t gold-plating; it’s the thing that makes the rest of the provenance story true. The preprint-vs-corrected-journal-version distinction it raises is not hypothetical in biomedicine — effect directions change between versions.\n“Reversibility ≠ safety” (issue 6) directly refutes something we asserted. We claimed automated dedup was safe because merges were reversible. The review is correct that reversibility bounds the duration of damage, not its blast radius: a bad merge still pollutes search, inflates confidence, and propagates into downstream automated decisions during the window before anyone reverts it. Soft clustering instead of authoritative merging is the right correction, and the biomedical example — “Drug X lowers blood pressure” vs “Drug X does not lower blood pressure in older adults” sitting close in embedding space while being scientifically incompatible — is a genuinely sharp argument.\nThe model-agreement-vs-corroboration distinction is the most intellectually valuable point in either document. Our design treated “two independent extractions landed on the same claim” as a confidence boost. The review correctly separates two models agreeing on one sentence (which may just reflect shared training data and correlated errors) from two independent papers making the same finding (real literature corroboration). We collapsed these, and they are not the same evidence.\nThe mention/support/dissent critique (issue 4) is correct. “Mention” is a citation function; support/dissent are stances. They’re orthogonal axes, not three points on one axis — a paper can mention a method while supporting a result. Splitting into function / stance / scope / resolution is more faithful to how citations actually work, and it matches where scite-style ontologies landed after early versions.\nThe SPECTER point (issue 10) is a concrete technical error it caught in our plan. We proposed seeding both claim-level dedup and target-claim alignment with SPECTER embeddings, but those are document-level embeddings built from title+abstract. They can narrow which papers to compare; they can’t do claim-level equivalence, which needs sentence/claim encoders and probably a cross-encoder or entailment model. That’s a real fix.\nThe evaluation section is the most useful part for grant purposes. We hand-waved “S2 citation intent gives us an evaluation story.” The review is right that S2’s labels aren’t our ontology, so they’re weak supervision at best, and that a fundable research proposal needs a manually adjudicated gold set with per-stage metrics and a calibration/selective-risk story. This is the biggest gap it identifies and it’s correct.\nWhere the GPT Sol review is open to criticism: there’s a tension between “your MVP is too large” (issue 9) and the much heavier data model it proposes. These are reconcilable — schema richness and feature scope are different axes, and you can have an immutable seven-entity model behind a tiny feature set — but the review doesn’t say so, and a naive reading would have you building PaperWork / PaperVersion / Passage / CitationMention / ExtractionRun / ClaimOccurrence / ClaimInterpretation / ClaimCluster / RelationAssertion / ReviewDecision / Assessment for an MVP, which is its own kind of scope explosion. It also treats a manually adjudicated corpus as a requirement without engaging with its cost — which for a grant is arguably fine (that’s what you’re asking money for), but it should be named as the budget crux rather than a checkbox. And its “narrow to one biomedical subdomain” recommendation quietly contradicts our domain-agnostic goal; that’s a real decision to make, not a free simplification.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0003 · Opus"
+    ]
+  },
+  {
+    "objectID": "feedback/0003-claude-opus-4.8-feedback.html#the-gemini-review-is-a-useful-corrective-wrapped-around-several-mistakes",
+    "href": "feedback/0003-claude-opus-4.8-feedback.html#the-gemini-review-is-a-useful-corrective-wrapped-around-several-mistakes",
+    "title": "InterCiter",
+    "section": "The Gemini review is a useful corrective wrapped around several mistakes",
+    "text": "The Gemini review is a useful corrective wrapped around several mistakes\nIts central move — separating the logical model from the physical schema — is sound and its hybrid recommendation (normalized immutable system-of-record plus a materialized read projection for the graph) is a standard, sensible write-model/read-model split. That’s the right architecture. But the review has problems:\n“The graph size increases exponentially” is simply wrong. Exploding one node into ~5 related nodes is a constant-factor (linear) increase, not exponential. This matters because the alarm (“real-time exploration nearly impossible”) is calibrated to the wrong growth curve. The traversal-depth concern is real — the Cluster → Interpretation → Occurrence → RelationAssertion → … chain does add hops — but the fix is the materialized projection Gemini itself recommends, so it’s raising a solved problem and then solving it.\nThe parser-brittleness critique (its point B) is its best point but overstated, because it partly misses what the GPT Sol model already does. Offsets are anchored to a specific PaperVersion with an artifact hash and parser version, and the model also stores verbatim source text. So a re-parse produces a new version rather than silently breaking old offsets, and verbatim text lets you re-anchor fuzzily. GPT Sol’s versioning is designed for exactly the failure Gemini describes. The residual valid point — don’t treat raw offsets as your only anchor — is real, but GPT Sol already didn’t.\nThe soft-clustering cold-start critique (point C) actually argues for GPT Sol, not against it. The threshold problem (too strict fragments, too loose pollutes) is identical for clustering and for the merging our original design proposed — it’s a property of the NLP task, not of the soft-clustering choice. And soft clustering is strictly safer at the same threshold because it’s non-destructive. Gemini frames a general hard-problem observation as a weakness specific to GPT Sol’s recommendation, which it isn’t. It also says GPT Sol “punted on how to cluster,” but GPT Sol did give the start of an answer (equivalence must consider population, comparator, dosage, direction, negation — not just embedding distance).\nGemini’s own “Current Best Consensus Claim” materialized node risks reintroducing the exact conflation GPT Sol was trying to kill. A single consensus node bakes a clustering decision into the read model; if users treat it as authoritative, you’re back to the merge-pollution failure. Gemini’s proposal is fine if the projection is clearly derived, rebuildable, and never treated as ground truth — but it doesn’t carry over GPT Sol’s guardrails, and it should.\nGemini’s genuinely unique contribution is point D, the UX/cognitive-load argument, which GPT Sol entirely missed. The GPT Sol model is built for machine audit and says nothing about how a working researcher is supposed to read occurrence-vs-interpretation without drowning. That’s a real gap — though it’s a presentation concern more than a data-model one (our API-first split already means the user need not see the raw graph), so it argues for frontend investment rather than against the model.",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0003 · Opus"
+    ]
+  },
+  {
+    "objectID": "feedback/0003-claude-opus-4.8-feedback.html#what-id-actually-take-from-all-this",
+    "href": "feedback/0003-claude-opus-4.8-feedback.html#what-id-actually-take-from-all-this",
+    "title": "InterCiter",
+    "section": "What I’d actually take from all this",
+    "text": "What I’d actually take from all this\nThe two reviews reconcile cleanly: GPT Sol fixes the logical model; Gemini says don’t deploy that logical model as your physical schema. Those aren’t in conflict, and GPT Sol even gestured at Gemini’s answer (it mentions read-time resolution or a “rebuildable materialized projection” for cluster membership). The synthesis is to adopt GPT Sol’s immutable model as the system of record, adopt Gemini’s read projection for query speed and UX, and keep GPT Sol’s guardrail that the projection is derived and never authoritative.\nThe changes I’d treat as non-negotiable, because they correct actual errors rather than adding polish: evidence anchoring, separating stance from citation-function, replacing authoritative merges with soft clustering, un-blending global confidence (especially model-agreement vs corroboration), fixing the SPECTER misuse, and building a real per-stage evaluation plan. The stale-edge problem from the mortality example also has to be fixed regardless of how heavy the revision model gets — old “support” edges silently applying to a negated revision is a correctness bug, not a nicety.\nTwo things neither review surfaced that matter for the grant: the dollar cost of LLM extraction at corpus scale (which interacts with the multi-model comparison story), and the unresolved tension between “domain-agnostic” as a stated goal and “biomedical subdomain first” as the recommended MVP. That second one is a decision you should make deliberately rather than let the reviews make for you by default.\nWant me to fold the accepted changes into a revised version of the systems-design doc — and if so, should I hold the line on domain-agnostic or narrow the MVP to biomedical the way both reviews implicitly assume?",
+    "crumbs": [
+      "Home",
+      "Design Reviews",
+      "0003 · Opus"
+    ]
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "InterCiter is a knowledge-graph system that extracts individual claims from scientific papers, anchors each claim to its exact source passage, and classifies how citing claims relate to cited work — separating a citation’s function (background, method, direct evidence, comparison) from its stance (support, contradict, neutral).\nThe design philosophy is provenance-first: model outputs, human corrections, cluster groupings, and review decisions coexist as distinct, immutable, traceable records. Read the full design overview for principles, MVP scope, and open decisions."
+  }
+]

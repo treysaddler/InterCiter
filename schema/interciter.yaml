@@ -1,0 +1,744 @@
+id: https://w3id.org/interciter/schema
+name: interciter
+title: InterCiter Logical Data Model
+description: >-
+  LinkML schema for InterCiter's provenance-first knowledge graph. This encodes the
+  **logical** system of record described in docs/data-model.md — the immutable, richer-than-
+  the-query-graph model. It is deliberately not the flattened read-side projection
+  (see docs/architecture.md); the projection is derived from these entities and is not
+  modeled here.
+
+  Design invariants preserved by this schema:
+    * ClaimOccurrence (what the paper says) is kept distinct from ClaimInterpretation
+      (what a model/human thinks it means) so a bad normalization can never overwrite
+      ground truth.
+    * Revisions form a graph via parent_interpretation_ids, never a superseded_by list.
+      "Current head" is derived, not a mutable flag.
+    * Equivalence is soft clustering (ClusterMembership rows), never an authoritative
+      merge with edge copying.
+    * A RelationAssertion is a first-class evidence-bearing record with four independent
+      dimensions (function, stance, scope, resolution), not a lightweight edge.
+    * All derived numbers live in versioned, rebuildable Assessment records.
+
+license: https://creativecommons.org/licenses/by/4.0/
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  interciter: https://w3id.org/interciter/schema/
+  biolink: https://w3id.org/biolink/vocab/
+  xsd: http://www.w3.org/2001/XMLSchema#
+  dcterms: http://purl.org/dc/terms/
+
+default_prefix: interciter
+default_range: string
+
+imports:
+  - linkml:types
+
+# =====================================================================================
+# Types
+# =====================================================================================
+
+types:
+  ArtifactHash:
+    typeof: string
+    base: str
+    uri: xsd:string
+    description: Content hash of an ingested artifact (e.g. sha256 hex digest).
+
+  CharOffset:
+    typeof: integer
+    base: int
+    uri: xsd:integer
+    minimum_value: 0
+    description: A normalized character offset relative to a specific PaperVersion.
+
+  Confidence:
+    typeof: float
+    base: float
+    uri: xsd:float
+    minimum_value: 0.0
+    maximum_value: 1.0
+    description: A confidence/probability score in the closed unit interval.
+
+# =====================================================================================
+# Enums
+# =====================================================================================
+
+enums:
+
+  Manifestation:
+    description: The manifestation a PaperVersion represents.
+    permissible_values:
+      preprint:
+      published:
+      correction:
+      retraction_notice:
+
+  ParseStatus:
+    description: Outcome of parsing a PaperVersion artifact.
+    permissible_values:
+      parsed:
+      partial:
+      failed:
+
+  AvailabilityState:
+    description: >-
+      Explicit availability of a paper the graph can reach (docs/architecture.md).
+      A stub is walkable bibliographically but yields no validated claim-level continuation.
+    permissible_values:
+      full_text_extracted:
+        description: Parsed full text; claims extracted or extractable.
+      full_text_unavailable:
+        description: Known paper, no licensed/accessible full text.
+      metadata_stub:
+        description: Out-of-slice; identifiers + minimal metadata only.
+      hydration_queued:
+        description: Stub queued for on-demand full ingestion.
+      ingestion_failed:
+        description: Attempted and failed; error retained.
+
+  OccurrenceType:
+    description: The rhetorical role of a claim occurrence in the source text.
+    permissible_values:
+      reported_result:
+      background_assertion:
+      method_description:
+      hypothesis:
+      other:
+
+  EffectDirection:
+    description: Direction of effect asserted by a claim interpretation qualifier.
+    permissible_values:
+      increase:
+      decrease:
+      no_effect:
+      mixed:
+      unclear:
+
+  Certainty:
+    description: Hedging / certainty level of a normalized claim.
+    permissible_values:
+      definite:
+      probable:
+      possible:
+      speculative:
+
+  ClusteringMethod:
+    description: How a cluster membership was established.
+    permissible_values:
+      automated:
+      human:
+
+  MembershipStatus:
+    description: Lifecycle of a cluster membership (removal is soft; nothing is destroyed).
+    permissible_values:
+      active:
+      removed:
+
+  RelationFunction:
+    description: >-
+      Citation *function* — why the citing claim points at the cited work.
+      Orthogonal to stance.
+    permissible_values:
+      background:
+      method:
+      direct_evidence:
+      comparison:
+      other:
+
+  RelationStance:
+    description: Epistemic *stance* of the citing claim toward the target. Orthogonal to function.
+    permissible_values:
+      support:
+      contradict:
+      neutral:
+      unclear:
+
+  RelationScope:
+    description: How much of the claim the relation applies to.
+    permissible_values:
+      whole_claim:
+      partial_claim:
+      paper_level_only:
+
+  RelationResolution:
+    description: >-
+      How precisely the relation's target was resolved. paper_resolved is an honest
+      fallback (target claim unresolved), upgradeable to claim_resolved later.
+    permissible_values:
+      claim_resolved:
+      paper_resolved:
+      unresolved:
+
+  AssertionStatus:
+    description: Review/derivation lifecycle of a RelationAssertion.
+    permissible_values:
+      proposed:
+      accepted:
+      rejected:
+      unresolved:
+      stale_pending_review:
+        description: >-
+          Marked when a materially different revision of the target interpretation
+          becomes current; the old assertion must not silently transfer.
+
+  ReviewSubjectType:
+    description: The kind of record a ReviewDecision is about.
+    permissible_values:
+      claim_occurrence:
+      claim_interpretation:
+      relation_assertion:
+      cluster_membership:
+
+# =====================================================================================
+# Classes
+# =====================================================================================
+
+classes:
+
+  # ---------------------------------------------------------------------------------
+  # Bibliographic layer
+  # ---------------------------------------------------------------------------------
+
+  PaperWork:
+    description: >-
+      Canonical bibliographic identity across manifestations. Maps closely onto
+      biolink:Publication; versioning is added by PaperVersion.
+    exact_mappings:
+      - biolink:Publication
+    slots:
+      - work_id
+      - title
+      - authors
+      - venue
+      - year
+      - doi
+      - pmid
+      - s2_corpus_id
+      - availability_state
+
+  PaperVersion:
+    description: >-
+      A specific manifestation of a PaperWork. Claims anchor to a version, never just a
+      work, because effect directions can change between preprint and corrected version.
+      A re-parse or parser upgrade produces a *new* PaperVersion rather than shifting old offsets.
+    exact_mappings:
+      - biolink:Publication
+    slots:
+      - version_id
+      - work_id
+      - manifestation
+      - artifact_hash
+      - full_text_available
+      - license_status
+      - parser_name
+      - parser_version
+      - parse_status
+    slot_usage:
+      work_id:
+        identifier: false
+        range: PaperWork
+        required: true
+        description: The PaperWork this version is a manifestation of.
+
+  Passage:
+    description: A located span of source text within a PaperVersion.
+    slots:
+      - passage_id
+      - paper_version_id
+      - section
+      - page
+      - paragraph
+      - sentence
+      - char_start
+      - char_end
+      - verbatim_text
+    slot_usage:
+      verbatim_text:
+        description: >-
+          The exact source text — a second, parser-independent anchor that allows fuzzy
+          re-anchoring of old passages onto new versions.
+        required: true
+
+  CitationMention:
+    description: A citation marker span within a passage, resolved to a cited work.
+    slots:
+      - mention_id
+      - passage_id
+      - marker_span
+      - cited_work_id
+      - bibliographic_resolution_confidence
+    slot_usage:
+      passage_id:
+        identifier: false
+        range: Passage
+        required: true
+        description: The passage containing the citation marker.
+
+  # ---------------------------------------------------------------------------------
+  # Extraction layer
+  # ---------------------------------------------------------------------------------
+
+  ExtractionRun:
+    description: >-
+      Full provenance of one extraction pass. Maps onto BioLink knowledge_source slots.
+      Every occurrence, interpretation, and assertion points back to a run.
+    slots:
+      - run_id
+      - model
+      - provider
+      - model_version
+      - prompt_template_version
+      - parser_version
+      - code_revision
+      - inference_parameters
+      - timestamp
+
+  ClaimOccurrence:
+    description: >-
+      What the paper *says* — source-bound and verifiable. The immutable ground truth
+      that no normalization may overwrite.
+    slots:
+      - occurrence_id
+      - passage_id
+      - span_start
+      - span_end
+      - occurrence_type
+      - extraction_run_id
+    slot_usage:
+      passage_id:
+        identifier: false
+        range: Passage
+        required: true
+        description: The passage this occurrence is anchored to.
+
+  ClaimQualifiers:
+    description: >-
+      Structured qualifiers of a normalized claim. Inlined into ClaimInterpretation.
+    slots:
+      - population
+      - intervention
+      - comparator
+      - outcome
+      - dosage
+      - time_horizon
+      - effect_direction
+      - effect_size
+      - certainty
+      - negated
+
+  ClaimInterpretation:
+    description: >-
+      What a model or human *thinks the occurrence means* — the normalized proposition.
+      Multiple interpretations (competing models or a human) can attach to one occurrence.
+      Revisions form a graph via parent_interpretation_ids; the current head is derived,
+      never a mutable flag.
+    exact_mappings:
+      - biolink:InformationContentEntity
+    slots:
+      - interpretation_id
+      - claim_occurrence_id
+      - normalized_text
+      - qualifiers
+      - extraction_run_id
+      - author_id
+      - parent_interpretation_ids
+      - created_by
+      - created_at
+    slot_usage:
+      extraction_run_id:
+        description: Set when the interpretation was produced by a model. Mutually exclusive with author_id.
+        required: false
+      author_id:
+        description: Set when a human authored the interpretation. Mutually exclusive with extraction_run_id.
+        required: false
+
+  # ---------------------------------------------------------------------------------
+  # Equivalence layer — soft clustering, not merging
+  # ---------------------------------------------------------------------------------
+
+  ClaimCluster:
+    description: >-
+      A statement of probable semantic equivalence — never a replacement node. All
+      original interpretations remain first-class; queries resolve membership at read time.
+    slots:
+      - cluster_id
+      - clustering_method
+      - threshold_version
+
+  ClusterMembership:
+    description: >-
+      One interpretation's membership in a cluster. Removal is soft (status: removed);
+      reverting a bad grouping is just deactivating a row. No edges are copied.
+    slots:
+      - cluster_id
+      - interpretation_id
+      - method
+      - membership_confidence
+      - status
+      - added_by
+      - removed_by
+      - added_at
+      - removed_at
+    slot_usage:
+      cluster_id:
+        identifier: false
+        range: ClaimCluster
+        required: true
+        description: The cluster this membership belongs to.
+      interpretation_id:
+        identifier: false
+        range: ClaimInterpretation
+        required: true
+        description: The interpretation that is a member of the cluster.
+
+  # ---------------------------------------------------------------------------------
+  # Relationship layer — first-class assertions
+  # ---------------------------------------------------------------------------------
+
+  RelationAssertion:
+    description: >-
+      An evidence-bearing record of how a citing claim relates to cited work. Modeled as
+      a biolink:Association subclass rather than a lightweight edge. Function, stance,
+      scope, and resolution are four independent dimensions.
+    exact_mappings:
+      - biolink:Association
+    slots:
+      - assertion_id
+      - citing_occurrence_id
+      - citation_mention_id
+      - evidence_passage_id
+      - cited_work_id
+      - target_interpretation_id
+      - target_candidates
+      - function
+      - stance
+      - scope
+      - resolution
+      - target_link_score
+      - stance_distribution
+      - extraction_run_id
+      - status
+    slot_usage:
+      target_interpretation_id:
+        description: The resolved target claim. Null when resolution is paper_resolved or unresolved.
+        required: false
+
+  # ---------------------------------------------------------------------------------
+  # Review and assessment layer
+  # ---------------------------------------------------------------------------------
+
+  ReviewDecision:
+    description: A human review of one dimension of a subject record, with rationale.
+    slots:
+      - review_id
+      - subject_type
+      - subject_id
+      - reviewer_id
+      - decision_dimension
+      - label
+      - rationale
+      - timestamp
+
+  Assessment:
+    description: >-
+      A derived score. All computed values live in versioned, rebuildable Assessment
+      records — never as an unexplained mutable number on a claim.
+    slots:
+      - assessment_id
+      - subject_id
+      - assessment_type
+      - component_inputs
+      - algorithm_version
+      - computed_value
+      - computed_at
+
+# =====================================================================================
+# Slots
+# =====================================================================================
+
+slots:
+
+  # --- identifiers ---
+  work_id:
+    identifier: true
+    description: Stable identifier for a PaperWork.
+  version_id:
+    identifier: true
+    description: Stable identifier for a PaperVersion.
+  passage_id:
+    identifier: true
+    description: Stable identifier for a Passage.
+  mention_id:
+    identifier: true
+    description: Stable identifier for a CitationMention.
+  run_id:
+    identifier: true
+    description: Stable identifier for an ExtractionRun.
+  occurrence_id:
+    identifier: true
+    description: Stable identifier for a ClaimOccurrence.
+  interpretation_id:
+    identifier: true
+    description: Stable identifier for a ClaimInterpretation.
+  cluster_id:
+    identifier: true
+    description: Stable identifier for a ClaimCluster.
+  assertion_id:
+    identifier: true
+    description: Stable identifier for a RelationAssertion.
+  review_id:
+    identifier: true
+    description: Stable identifier for a ReviewDecision.
+  assessment_id:
+    identifier: true
+    description: Stable identifier for an Assessment.
+
+  # --- PaperWork ---
+  title:
+    description: Canonical title.
+  authors:
+    description: Ordered author list.
+    multivalued: true
+  venue:
+    description: Publication venue (journal, conference, or repository).
+  year:
+    range: integer
+    description: Publication year of the work.
+  doi:
+    description: Digital Object Identifier mapping.
+  pmid:
+    description: PubMed identifier mapping.
+  s2_corpus_id:
+    description: Semantic Scholar corpusId mapping.
+  availability_state:
+    range: AvailabilityState
+    description: Explicit availability state of the paper.
+
+  # --- PaperVersion ---
+  manifestation:
+    range: Manifestation
+    required: true
+    description: Which manifestation this version represents.
+  artifact_hash:
+    range: ArtifactHash
+    description: Hash of the ingested file.
+  full_text_available:
+    range: boolean
+    description: Whether licensed/accessible full text exists for this version.
+  license_status:
+    description: License/rights status governing retention and access to the full text.
+  parser_name:
+    description: Name of the parser that produced this version's text.
+  parser_version:
+    description: Version of the parser that produced this version's text.
+  parse_status:
+    range: ParseStatus
+    description: Outcome of parsing this version's artifact.
+
+  # --- Passage ---
+  paper_version_id:
+    range: PaperVersion
+    required: true
+    description: The PaperVersion this passage belongs to.
+  section:
+    description: Section locator of the passage, where available.
+  page:
+    range: integer
+    description: Page locator of the passage, where available.
+  paragraph:
+    range: integer
+    description: Paragraph locator of the passage, where available.
+  sentence:
+    range: integer
+    description: Sentence locator of the passage, where available.
+  char_start:
+    range: CharOffset
+    description: Normalized start offset of the passage within the version.
+  char_end:
+    range: CharOffset
+    description: Normalized end offset of the passage within the version.
+  verbatim_text:
+    description: The exact source text of the passage.
+
+  # --- CitationMention ---
+  marker_span:
+    description: The literal marker text within the passage (e.g. "[12]", "(Smith 2019)").
+  cited_work_id:
+    range: PaperWork
+    description: The work the mention resolves to.
+  bibliographic_resolution_confidence:
+    range: Confidence
+    description: Confidence that the mention was resolved to the correct cited work.
+
+  # --- ExtractionRun ---
+  model:
+    description: Name of the extraction model used in the run.
+  provider:
+    description: Provider hosting the extraction model.
+  model_version:
+    description: Version identifier of the extraction model.
+  prompt_template_version:
+    description: Version of the prompt template used for the run.
+  code_revision:
+    description: Code revision (e.g. git commit) of the pipeline at run time.
+  inference_parameters:
+    description: Serialized inference parameters (e.g. temperature, top_p).
+  timestamp:
+    range: datetime
+    description: When the extraction run executed.
+
+  # --- ClaimOccurrence ---
+  span_start:
+    range: CharOffset
+    description: Exact source span start within the passage.
+  span_end:
+    range: CharOffset
+    description: Exact source span end within the passage.
+  occurrence_type:
+    range: OccurrenceType
+    description: The rhetorical role of the occurrence in the source text.
+  extraction_run_id:
+    range: ExtractionRun
+    description: The extraction run that produced this record.
+
+  # --- ClaimQualifiers ---
+  population:
+    description: The population the claim applies to.
+  intervention:
+    description: Intervention or exposure.
+  comparator:
+    description: The comparator or control condition.
+  outcome:
+    description: The outcome measured or asserted.
+  dosage:
+    description: Dosage associated with the intervention, where stated.
+  time_horizon:
+    description: Time horizon over which the effect is asserted.
+  effect_direction:
+    range: EffectDirection
+    description: Direction of the asserted effect.
+  effect_size:
+    description: Reported effect size (as stated).
+  certainty:
+    range: Certainty
+    description: Hedging/certainty level of the normalized claim.
+  negated:
+    range: boolean
+    description: Whether the claim is negated.
+
+  # --- ClaimInterpretation ---
+  claim_occurrence_id:
+    range: ClaimOccurrence
+    required: true
+    description: The occurrence this interpretation normalizes.
+  normalized_text:
+    description: The proposition, as normalized.
+    required: true
+  qualifiers:
+    range: ClaimQualifiers
+    inlined: true
+    description: Structured qualifiers for the normalized claim.
+  author_id:
+    description: Human author of the interpretation, when human-authored.
+  parent_interpretation_ids:
+    range: ClaimInterpretation
+    multivalued: true
+    description: Revision graph parents. Multiple parents express reconciliation of branches.
+  created_by:
+    description: Identity (model run or human) that created the record.
+  created_at:
+    range: datetime
+    description: When the interpretation was created.
+
+  # --- ClaimCluster ---
+  clustering_method:
+    description: Clustering method used.
+  threshold_version:
+    description: Version of the threshold policy applied.
+
+  # --- ClusterMembership ---
+  method:
+    range: ClusteringMethod
+    description: How this membership was established.
+  membership_confidence:
+    range: Confidence
+    description: Confidence that the interpretation belongs to the cluster.
+  status:
+    range: MembershipStatus
+    description: Lifecycle status of the membership (removal is soft).
+  added_by:
+    description: Identity that added the membership.
+  removed_by:
+    description: Identity that removed the membership, when removed.
+  added_at:
+    range: datetime
+    description: When the membership was added.
+  removed_at:
+    range: datetime
+    description: When the membership was removed, when removed.
+
+  # --- RelationAssertion ---
+  citing_occurrence_id:
+    range: ClaimOccurrence
+    required: true
+    description: The local claim making the citation.
+  citation_mention_id:
+    range: CitationMention
+    description: The marker that licenses the relation.
+  evidence_passage_id:
+    range: Passage
+    description: Exact context passage.
+  target_interpretation_id:
+    range: ClaimInterpretation
+    description: The resolved target claim, when resolution is claim_resolved.
+  target_candidates:
+    multivalued: true
+    description: Ranked candidate targets (with scores) when unresolved.
+  function:
+    range: RelationFunction
+    description: Citation function of the relation (orthogonal to stance).
+  stance:
+    range: RelationStance
+    description: Epistemic stance of the relation (orthogonal to function).
+  scope:
+    range: RelationScope
+    description: How much of the claim the relation applies to.
+  resolution:
+    range: RelationResolution
+    description: How precisely the relation's target was resolved.
+  target_link_score:
+    range: Confidence
+    description: Target-resolution confidence, kept separate from stance confidence.
+  stance_distribution:
+    description: Full stance label-probability distribution (serialized).
+
+  # --- ReviewDecision ---
+  subject_type:
+    range: ReviewSubjectType
+    description: The kind of record this decision is about.
+  subject_id:
+    description: Identifier of the reviewed/assessed subject record.
+  reviewer_id:
+    description: Identity of the reviewer who made the decision.
+  decision_dimension:
+    description: The dimension reviewed (e.g. extraction fidelity, stance, target link).
+  label:
+    description: The label or value assigned.
+  rationale:
+    description: Free-text rationale for the decision.
+
+  # --- Assessment ---
+  assessment_type:
+    description: The type of derived assessment computed.
+  component_inputs:
+    description: The raw signals used to compute the value.
+    multivalued: true
+  algorithm_version:
+    description: Version of the algorithm that produced the value.
+  computed_value:
+    description: The computed assessment value.
+  computed_at:
+    range: datetime
+    description: When the assessment was computed.

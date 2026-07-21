@@ -1,0 +1,6 @@
+# Pinned tooling for the InterCiter LinkML schema.
+# Install into an isolated environment, e.g.:
+#   uv venv && uv pip install -r schema/requirements.txt
+# or run ad hoc without installing:
+#   uv tool run --from linkml==1.11.1 linkml-lint schema/interciter.yaml
+linkml==1.11.1

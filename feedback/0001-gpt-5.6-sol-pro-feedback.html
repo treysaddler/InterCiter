@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>gpt-5.6-sol-pro-feedback – InterCiter</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-1b8143a5af30aa0587ead8c64582f750.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">InterCiter</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../interciter-systems-design.html"> 
+<span class="menu-text">Design Overview</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-design-docs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Design Docs</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-design-docs">    
+        <li>
+    <a class="dropdown-item" href="../docs/data-model.html">
+ <span class="dropdown-text">Data Model</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/architecture.html">
+ <span class="dropdown-text">Architecture</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/scoring-and-review.html">
+ <span class="dropdown-text">Scoring &amp; Review</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/evaluation.html">
+ <span class="dropdown-text">Evaluation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/api.html">
+ <span class="dropdown-text">API</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/grant-framing.html">
+ <span class="dropdown-text">Grant Framing</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-feedback" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Feedback</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-feedback">    
+        <li>
+    <a class="dropdown-item" href="../feedback/0001-gpt-5.6-sol-pro-feedback.html">
+ <span class="dropdown-text">0001 · GPT Sol</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../feedback/0002-gemini-3.1-pro-feedback.html">
+ <span class="dropdown-text">0002 · Gemini</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../feedback/0003-claude-opus-4.8-feedback.html">
+ <span class="dropdown-text">0003 · Opus</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../feedback/0001-gpt-5.6-sol-pro-feedback.html">Design Reviews</a></li><li class="breadcrumb-item"><a href="../feedback/0001-gpt-5.6-sol-pro-feedback.html">0001 · GPT Sol</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Design Docs</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/data-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Data Model</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Architecture</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/scoring-and-review.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Scoring &amp; Review</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Evaluation</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/api.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">API</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/grant-framing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Grant Framing</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Design Reviews</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../feedback/0001-gpt-5.6-sol-pro-feedback.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">0001 · GPT Sol</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../feedback/0002-gemini-3.1-pro-feedback.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">0002 · Gemini</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../feedback/0003-claude-opus-4.8-feedback.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">0003 · Opus</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#executive-assessment" id="toc-executive-assessment" class="nav-link active" data-scroll-target="#executive-assessment">Executive assessment</a>
+  <ul class="collapse">
+  <li><a href="#what-the-plan-gets-right" id="toc-what-the-plan-gets-right" class="nav-link" data-scroll-target="#what-the-plan-gets-right">What the plan gets right</a>
+  <ul class="collapse">
+  <li><a href="#provenance-first-is-the-correct-foundation" id="toc-provenance-first-is-the-correct-foundation" class="nav-link" data-scroll-target="#provenance-first-is-the-correct-foundation">Provenance-first is the correct foundation</a></li>
+  <li><a href="#the-design-recognizes-the-hardest-alignment-gap" id="toc-the-design-recognizes-the-hardest-alignment-gap" class="nav-link" data-scroll-target="#the-design-recognizes-the-hardest-alignment-gap">The design recognizes the hardest alignment gap</a></li>
+  <li><a href="#the-infrastructure-reuse-narrative-is-persuasive" id="toc-the-infrastructure-reuse-narrative-is-persuasive" class="nav-link" data-scroll-target="#the-infrastructure-reuse-narrative-is-persuasive">The infrastructure-reuse narrative is persuasive</a></li>
+  <li><a href="#the-slice-boundary-strategy-is-sensible" id="toc-the-slice-boundary-strategy-is-sensible" class="nav-link" data-scroll-target="#the-slice-boundary-strategy-is-sensible">The slice-boundary strategy is sensible</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#critical-design-issues" id="toc-critical-design-issues" class="nav-link" data-scroll-target="#critical-design-issues">Critical design issues</a>
+  <ul class="collapse">
+  <li><a href="#claims-are-not-anchored-tightly-enough-to-source-evidence" id="toc-claims-are-not-anchored-tightly-enough-to-source-evidence" class="nav-link" data-scroll-target="#claims-are-not-anchored-tightly-enough-to-source-evidence">1. Claims are not anchored tightly enough to source evidence</a></li>
+  <li><a href="#the-current-claim-conflates-four-different-objects" id="toc-the-current-claim-conflates-four-different-objects" class="nav-link" data-scroll-target="#the-current-claim-conflates-four-different-objects">2. The current <code>Claim</code> conflates four different objects</a></li>
+  <li><a href="#a-relationship-should-be-a-first-class-assertion-not-merely-an-edge" id="toc-a-relationship-should-be-a-first-class-assertion-not-merely-an-edge" class="nav-link" data-scroll-target="#a-relationship-should-be-a-first-class-assertion-not-merely-an-edge">3. A relationship should be a first-class assertion, not merely an edge</a></li>
+  <li><a href="#mention-support-dissent-mixes-different-semantic-dimensions" id="toc-mention-support-dissent-mixes-different-semantic-dimensions" class="nav-link" data-scroll-target="#mention-support-dissent-mixes-different-semantic-dimensions">4. “Mention / support / dissent” mixes different semantic dimensions</a></li>
+  <li><a href="#the-edit-chain-semantics-are-internally-ambiguous" id="toc-the-edit-chain-semantics-are-internally-ambiguous" class="nav-link" data-scroll-target="#the-edit-chain-semantics-are-internally-ambiguous">5. The edit-chain semantics are internally ambiguous</a></li>
+  <li><a href="#reversible-automated-merging-is-not-automatically-safe" id="toc-reversible-automated-merging-is-not-automatically-safe" class="nav-link" data-scroll-target="#reversible-automated-merging-is-not-automatically-safe">6. Reversible automated merging is not automatically safe</a></li>
+  <li><a href="#global-confidence-combines-signals-that-should-remain-separate" id="toc-global-confidence-combines-signals-that-should-remain-separate" class="nav-link" data-scroll-target="#global-confidence-combines-signals-that-should-remain-separate">7. “Global confidence” combines signals that should remain separate</a></li>
+  <li><a href="#the-evaluation-plan-is-not-sufficiently-specified" id="toc-the-evaluation-plan-is-not-sufficiently-specified" class="nav-link" data-scroll-target="#the-evaluation-plan-is-not-sufficiently-specified">8. The evaluation plan is not sufficiently specified</a></li>
+  <li><a href="#the-mvp-is-still-too-large" id="toc-the-mvp-is-still-too-large" class="nav-link" data-scroll-target="#the-mvp-is-still-too-large">9. The MVP is still too large</a></li>
+  <li><a href="#the-plan-understates-some-upstream-and-operational-risks" id="toc-the-plan-understates-some-upstream-and-operational-risks" class="nav-link" data-scroll-target="#the-plan-understates-some-upstream-and-operational-risks">10. The plan understates some upstream and operational risks</a></li>
+  </ul></li>
+  <li><a href="#recommended-revised-data-model" id="toc-recommended-revised-data-model" class="nav-link" data-scroll-target="#recommended-revised-data-model">Recommended revised data model</a></li>
+  <li><a href="#recommended-mvp" id="toc-recommended-mvp" class="nav-link" data-scroll-target="#recommended-mvp">Recommended MVP</a>
+  <ul class="collapse">
+  <li><a href="#include-in-mvp" id="toc-include-in-mvp" class="nav-link" data-scroll-target="#include-in-mvp">Include in MVP</a></li>
+  <li><a href="#defer" id="toc-defer" class="nav-link" data-scroll-target="#defer">Defer</a></li>
+  </ul></li>
+  <li><a href="#api-changes" id="toc-api-changes" class="nav-link" data-scroll-target="#api-changes">API changes</a>
+  <ul class="collapse">
+  <li><a href="#jobs-and-runs" id="toc-jobs-and-runs" class="nav-link" data-scroll-target="#jobs-and-runs">Jobs and runs</a></li>
+  <li><a href="#revisions" id="toc-revisions" class="nav-link" data-scroll-target="#revisions">Revisions</a></li>
+  <li><a href="#evidence-retrieval" id="toc-evidence-retrieval" class="nav-link" data-scroll-target="#evidence-retrieval">Evidence retrieval</a></li>
+  <li><a href="#bounded-traversal" id="toc-bounded-traversal" class="nav-link" data-scroll-target="#bounded-traversal">Bounded traversal</a></li>
+  </ul></li>
+  <li><a href="#grant-framing" id="toc-grant-framing" class="nav-link" data-scroll-target="#grant-framing">Grant framing</a></li>
+  <li><a href="#priority-order-before-implementation" id="toc-priority-order-before-implementation" class="nav-link" data-scroll-target="#priority-order-before-implementation">Priority order before implementation</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../feedback/0001-gpt-5.6-sol-pro-feedback.html">Design Reviews</a></li><li class="breadcrumb-item"><a href="../feedback/0001-gpt-5.6-sol-pro-feedback.html">0001 · GPT Sol</a></li></ol></nav></header>
+
+
+
+
+<section id="executive-assessment" class="level1">
+<h1>Executive assessment</h1>
+<p>InterCiter has a <strong>strong product thesis and a coherent architectural philosophy</strong>, especially around provenance, reversibility, and infrastructure reuse. The current plan is suitable as a grant-concept document, but it is <strong>not yet implementation-ready</strong>. The largest issue is that the stated MVP contains several difficult research problems whose errors will compound: claim extraction, citation-scope resolution, target-claim alignment, stance classification, semantic deduplication, confidence calibration, and multi-hop traversal.</p>
+<p>My overall recommendation is:</p>
+<blockquote class="blockquote">
+<p><strong>Proceed with the project, but revise the MVP and refactor the claim/provenance model before selecting the graph database or building the public API.</strong></p>
+</blockquote>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 69%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dimension</th>
+<th style="text-align: right;">Assessment</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Product and research vision</td>
+<td style="text-align: right;">Strong</td>
+</tr>
+<tr class="even">
+<td>Provenance philosophy</td>
+<td style="text-align: right;">Strong</td>
+</tr>
+<tr class="odd">
+<td>Architecture layering</td>
+<td style="text-align: right;">Good</td>
+</tr>
+<tr class="even">
+<td>Claim and relationship model</td>
+<td style="text-align: right;">Needs substantial revision</td>
+</tr>
+<tr class="odd">
+<td>MVP discipline</td>
+<td style="text-align: right;">Too broad</td>
+</tr>
+<tr class="even">
+<td>Evaluation design</td>
+<td style="text-align: right;">Major missing component</td>
+</tr>
+<tr class="odd">
+<td>Operational readiness</td>
+<td style="text-align: right;">Early</td>
+</tr>
+<tr class="even">
+<td>Grant narrative</td>
+<td style="text-align: right;">Promising, but currently overstates feasibility in a few places</td>
+</tr>
+</tbody>
+</table>
+<section id="what-the-plan-gets-right" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-plan-gets-right">What the plan gets right</h2>
+<section id="provenance-first-is-the-correct-foundation" class="level3">
+<h3 class="anchored" data-anchor-id="provenance-first-is-the-correct-foundation">Provenance-first is the correct foundation</h3>
+<p>Storing model outputs, human corrections, merges, and opinions as separate records is much better than mutating a supposedly authoritative claim. It supports model comparison, auditability, reproducibility, and later reprocessing. The API-first and domain-scoped approach are similarly sound.</p>
+<p>The key refinement is that “additive-only” should mean <strong>immutable scientific assertions and decisions</strong>, not “nothing can ever be deleted or hidden.” The implementation will still need tombstones, access revocation, retention policies, and handling for copyrighted or sensitive material.</p>
+</section>
+<section id="the-design-recognizes-the-hardest-alignment-gap" class="level3">
+<h3 class="anchored" data-anchor-id="the-design-recognizes-the-hardest-alignment-gap">The design recognizes the hardest alignment gap</h3>
+<p>The plan correctly notes that a resolved citation to a paper does not identify the specific claim being referenced. The paper-level fallback is better than forcing an unreliable claim-level match.</p>
+<p>That willingness to abstain should become a first-class system principle, not merely a fallback. Every uncertain stage should be able to return <code>unresolved</code>, along with candidate matches and calibrated scores.</p>
+</section>
+<section id="the-infrastructure-reuse-narrative-is-persuasive" class="level3">
+<h3 class="anchored" data-anchor-id="the-infrastructure-reuse-narrative-is-persuasive">The infrastructure-reuse narrative is persuasive</h3>
+<p>BioLink alignment, Semantic Scholar metadata, resolved references, and precomputed artifacts can reduce duplicated work. This is a good grant narrative because InterCiter’s novelty is not bibliographic parsing; it is source-grounded claim extraction, claim alignment, relationship classification, and auditable traversal.</p>
+</section>
+<section id="the-slice-boundary-strategy-is-sensible" class="level3">
+<h3 class="anchored" data-anchor-id="the-slice-boundary-strategy-is-sensible">The slice-boundary strategy is sensible</h3>
+<p>Representing an out-of-slice citation as a metadata-only paper stub is a practical way to avoid a hard graph dead end. The API should, however, distinguish:</p>
+<ul>
+<li>a known paper with extracted full text;</li>
+<li>a known paper without licensed or available full text;</li>
+<li>a metadata-only stub;</li>
+<li>a paper queued for hydration;</li>
+<li>a paper whose ingestion failed.</li>
+</ul>
+<p>A stub is “walkable” bibliographically, but it does not provide a validated claim-level continuation.</p>
+<hr>
+</section>
+</section>
+</section>
+<section id="critical-design-issues" class="level1">
+<h1>Critical design issues</h1>
+<section id="claims-are-not-anchored-tightly-enough-to-source-evidence" class="level2">
+<h2 class="anchored" data-anchor-id="claims-are-not-anchored-tightly-enough-to-source-evidence">1. Claims are not anchored tightly enough to source evidence</h2>
+<p>The current <code>Claim</code> has text and a source paper, but no exact location within the paper. This is the most important omission in a provenance-first system.</p>
+<p>A claim should point to:</p>
+<ul>
+<li>the exact paper version;</li>
+<li>the source passage or passages;</li>
+<li>character or token offsets in normalized source text;</li>
+<li>page, section, paragraph, sentence, table, or figure location where available;</li>
+<li>the verbatim source text;</li>
+<li>the citation markers present in that context;</li>
+<li>a hash of the input artifact;</li>
+<li>the parser and extraction run that produced it.</li>
+</ul>
+<p>Without these fields, users can know that a claim “came from a paper” but cannot reliably verify how the system interpreted the paper. It also becomes impossible to distinguish two versions of a paper, such as a preprint and a corrected journal version.</p>
+<p>The plan should add <code>PaperVersion</code>, <code>Passage</code>, and <code>CitationMention</code> entities before expanding scoring or deduplication.</p>
+</section>
+<section id="the-current-claim-conflates-four-different-objects" class="level2">
+<h2 class="anchored" data-anchor-id="the-current-claim-conflates-four-different-objects">2. The current <code>Claim</code> conflates four different objects</h2>
+<p>The proposed node simultaneously behaves as:</p>
+<ol type="1">
+<li>an occurrence of text in a paper;</li>
+<li>a normalized proposition;</li>
+<li>an editable, versioned record;</li>
+<li>a canonical object produced by deduplication.</li>
+</ol>
+<p>Those concepts have different identities and lifecycles. Combining them is the source of much of the later edit, merge, and edge-migration complexity.</p>
+<p>A cleaner separation is:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Entity</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ClaimOccurrence</code></td>
+<td>A source-bound assertion found in a specific passage of a specific paper version</td>
+</tr>
+<tr class="even">
+<td><code>ClaimInterpretation</code></td>
+<td>A model’s or human’s normalized interpretation of that occurrence</td>
+</tr>
+<tr class="odd">
+<td><code>ClaimCluster</code></td>
+<td>A non-destructive grouping of interpretations believed to express equivalent propositions</td>
+</tr>
+<tr class="even">
+<td><code>ClaimRevision</code></td>
+<td>A later interpretation that corrects or refines an earlier interpretation</td>
+</tr>
+</tbody>
+</table>
+<p>For example, two papers may contain equivalent claims, but their claim occurrences should remain distinct because they are separate evidence events. They can belong to one <code>ClaimCluster</code> without being collapsed into one source-bearing claim.</p>
+<p>This also preserves a crucial distinction:</p>
+<blockquote class="blockquote">
+<p>Agreement between two models on the same sentence is model agreement. Agreement between two independent papers is literature corroboration. They should not be represented as the same phenomenon.</p>
+</blockquote>
+</section>
+<section id="a-relationship-should-be-a-first-class-assertion-not-merely-an-edge" class="level2">
+<h2 class="anchored" data-anchor-id="a-relationship-should-be-a-first-class-assertion-not-merely-an-edge">3. A relationship should be a first-class assertion, not merely an edge</h2>
+<p>The current edge has a type, endpoints, extraction method, and confidence. That is not enough to explain or review the classification.</p>
+<p>A <code>RelationAssertion</code> should contain:</p>
+<ul>
+<li>the local claim occurrence;</li>
+<li>the citation mention that licenses the relation;</li>
+<li>the exact evidence context;</li>
+<li>the cited paper;</li>
+<li>the proposed target claim or target candidates;</li>
+<li>the relation label;</li>
+<li>the full label-probability distribution;</li>
+<li>target-link confidence separately from stance confidence;</li>
+<li>whether the relation applies to all or only part of the target claim;</li>
+<li>model, prompt, parser, and code versions;</li>
+<li>human review decisions;</li>
+<li>current status: <code>proposed</code>, <code>accepted</code>, <code>rejected</code>, <code>unresolved</code>, or <code>stale</code>.</li>
+</ul>
+<p>This is also a better fit for provenance-heavy BioLink-style associations than a lightweight property-graph edge.</p>
+</section>
+<section id="mention-support-dissent-mixes-different-semantic-dimensions" class="level2">
+<h2 class="anchored" data-anchor-id="mention-support-dissent-mixes-different-semantic-dimensions">4. “Mention / support / dissent” mixes different semantic dimensions</h2>
+<p>“Mention” is a generic citation function, while “support” and “dissent” are epistemic stances. They are not necessarily mutually exclusive alternatives on one axis.</p>
+<p>A citation may:</p>
+<ul>
+<li>mention a method while supporting a result;</li>
+<li>support part of a claim while qualifying another part;</li>
+<li>compare results without adopting either position;</li>
+<li>cite a paper as background;</li>
+<li>report a failed replication rather than directly contradicting the original proposition.</li>
+</ul>
+<p>For the MVP, the vocabulary can remain small, but the model should separate at least:</p>
+<ul>
+<li><strong>citation relevance/function:</strong> background, method, direct evidence, comparison, other;</li>
+<li><strong>stance:</strong> support, contradict, neutral, unclear;</li>
+<li><strong>scope:</strong> whole claim, partial claim, paper-level only;</li>
+<li><strong>resolution:</strong> claim resolved, paper resolved, unresolved.</li>
+</ul>
+<p>A paper-level fallback should not assert that the citing claim “supports the paper.” Papers often contain multiple, sometimes conflicting, claims. It should instead record something like:</p>
+<pre class="text"><code>citation stance = supportive
+target paper = resolved
+target claim = unresolved</code></pre>
+</section>
+<section id="the-edit-chain-semantics-are-internally-ambiguous" class="level2">
+<h2 class="anchored" data-anchor-id="the-edit-chain-semantics-are-internally-ambiguous">5. The edit-chain semantics are internally ambiguous</h2>
+<p>The plan says that relationships remain attached to the claim version that was evaluated, while reads resolve to the latest claim head. That leaves two unsafe possibilities:</p>
+<ul>
+<li>old relationships disappear from the default view because the new head has no edges; or</li>
+<li>old relationships are shown against the new text despite never having been evaluated against it.</li>
+</ul>
+<p>Consider an edit from:</p>
+<blockquote class="blockquote">
+<p>“Treatment A reduces mortality.”</p>
+</blockquote>
+<p>to:</p>
+<blockquote class="blockquote">
+<p>“Treatment A does not reduce mortality.”</p>
+</blockquote>
+<p>The old support relationships must not silently appear as support for the revised statement.</p>
+<p>Use immutable revisions with explicit validity:</p>
+<pre class="text"><code>ClaimInterpretation
+  interpretation_id
+  logical_claim_id
+  parent_interpretation_ids
+  source_occurrence_id
+  normalized_text
+  created_by
+  created_at</code></pre>
+<p>A related assertion should be marked <code>stale_pending_review</code> when a materially different revision becomes current. Reads may display inherited historical relationships, but they must clearly identify the version they apply to.</p>
+<p>A simple <code>human_edit_of</code>/<code>superseded_by</code> linked list also does not handle concurrent edits, branching revisions, or later reconciliation. Parent-version identifiers or an explicit revision graph are safer.</p>
+</section>
+<section id="reversible-automated-merging-is-not-automatically-safe" class="level2">
+<h2 class="anchored" data-anchor-id="reversible-automated-merging-is-not-automatically-safe">6. Reversible automated merging is not automatically safe</h2>
+<p>The plan argues that fully automated deduplication is safe because merges are reversible. Reversibility prevents permanent data loss, but it does not prevent an incorrect merge from:</p>
+<ul>
+<li>changing search results;</li>
+<li>inflating confidence;</li>
+<li>inheriting contradictory edges;</li>
+<li>misleading users;</li>
+<li>influencing subsequent automated decisions;</li>
+<li>being propagated into generated references.</li>
+</ul>
+<p>For the MVP, use <strong>soft clustering</strong>, not authoritative merging. A cluster can state that several claim interpretations are probable semantic equivalents while preserving all original nodes.</p>
+<p>Edge copying should also be avoided. Copying edges to a resulting claim introduces duplication, nested-merge problems, and complicated reversion behavior. Queries should resolve cluster membership at read time or through a rebuildable materialized projection.</p>
+<p>Equivalence should consider more than embedding similarity. Biomedical claims can differ critically by:</p>
+<ul>
+<li>population;</li>
+<li>intervention or exposure;</li>
+<li>comparator;</li>
+<li>outcome;</li>
+<li>dosage;</li>
+<li>time horizon;</li>
+<li>direction of effect;</li>
+<li>effect size;</li>
+<li>certainty or hedging;</li>
+<li>negation.</li>
+</ul>
+<p>“Drug X lowers blood pressure” and “Drug X does not lower blood pressure in older adults” can be close in embedding space while being scientifically incompatible.</p>
+</section>
+<section id="global-confidence-combines-signals-that-should-remain-separate" class="level2">
+<h2 class="anchored" data-anchor-id="global-confidence-combines-signals-that-should-remain-separate">7. “Global confidence” combines signals that should remain separate</h2>
+<p>The proposed score blends extraction confidence, human review, and corroboration. The paper trust aggregate then affects ranking. This is too much semantic compression for an early system.</p>
+<p>At minimum, expose separate components:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 71%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signal</th>
+<th>Question it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Extraction fidelity</td>
+<td>Did the system correctly capture and normalize the source passage?</td>
+</tr>
+<tr class="even">
+<td>Target-link confidence</td>
+<td>Did it identify the correct cited claim?</td>
+</tr>
+<tr class="odd">
+<td>Stance confidence</td>
+<td>Did it correctly classify support, contradiction, or neutrality?</td>
+</tr>
+<tr class="even">
+<td>Review status</td>
+<td>Has a reviewer accepted, rejected, or modified it?</td>
+</tr>
+<tr class="odd">
+<td>Model agreement</td>
+<td>Did multiple extraction methods produce compatible interpretations?</td>
+</tr>
+<tr class="even">
+<td>Literature evidence balance</td>
+<td>How many independent sources support or contradict the proposition?</td>
+</tr>
+<tr class="odd">
+<td>Source-quality assessment</td>
+<td>What quality metadata or user assessments apply to the source?</td>
+</tr>
+</tbody>
+</table>
+<p>Model agreement should not automatically be described as corroboration. Models may share training data, prompts, architectures, or systematic errors.</p>
+<p>Derived scores should be stored as versioned <code>Assessment</code> records containing their inputs, formula version, and computation date—not as an unexplained mutable number on a claim.</p>
+<p>Paper trust and public community scoring should be deferred. A scalar paper-level trust value is ambiguous, vulnerable to manipulation, and likely to encode prestige or popularity biases. It also requires identity, moderation, abuse controls, and a clear definition of what users are rating.</p>
+</section>
+<section id="the-evaluation-plan-is-not-sufficiently-specified" class="level2">
+<h2 class="anchored" data-anchor-id="the-evaluation-plan-is-not-sufficiently-specified">8. The evaluation plan is not sufficiently specified</h2>
+<p>This is the largest grant and research-methodology gap.</p>
+<p>The plan identifies Semantic Scholar citation-intent data as both a bootstrap source and an evaluation story. But because its labels are explicitly not the same as InterCiter’s ontology, it can provide weak supervision or a baseline—not final ground truth.</p>
+<p>The project needs a manually adjudicated evaluation corpus and separate metrics for each stage:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 74%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Suggested measurements</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Document parsing</td>
+<td>Citation-marker resolution, passage-offset accuracy, section recognition</td>
+</tr>
+<tr class="even">
+<td>Claim extraction</td>
+<td>Span precision/recall, atomicity, factual fidelity, qualifier preservation</td>
+</tr>
+<tr class="odd">
+<td>Citation scope</td>
+<td>Accuracy linking a citation marker to the local claim it supports or discusses</td>
+</tr>
+<tr class="even">
+<td>Target-claim retrieval</td>
+<td>Recall@k and precision at the automatic-link threshold</td>
+</tr>
+<tr class="odd">
+<td>Relationship classification</td>
+<td>Per-class precision/recall, macro-F1, confusion matrix</td>
+</tr>
+<tr class="even">
+<td>Confidence</td>
+<td>Calibration error and selective risk as the system abstains more</td>
+</tr>
+<tr class="odd">
+<td>Multi-hop tracing</td>
+<td>Path precision, coverage, cycle handling, and per-hop provenance completeness</td>
+</tr>
+<tr class="even">
+<td>Human review</td>
+<td>Inter-annotator agreement, disagreement categories, adjudication rate</td>
+</tr>
+<tr class="odd">
+<td>Operations</td>
+<td>Cost per paper, throughput, p95 latency, retry rate, and ingestion failure rate</td>
+</tr>
+</tbody>
+</table>
+<p>The evaluation set should deliberately include difficult cases: multiple citations in one sentence, compound claims, negation, hedging, indirect citation, systematic reviews, conflicting studies, and target papers with several similar claims.</p>
+</section>
+<section id="the-mvp-is-still-too-large" class="level2">
+<h2 class="anchored" data-anchor-id="the-mvp-is-still-too-large">9. The MVP is still too large</h2>
+<p>The plan labels the following as MVP foundations:</p>
+<ul>
+<li>multi-model extraction;</li>
+<li>global confidence;</li>
+<li>user scores;</li>
+<li>trust weighting;</li>
+<li>fully automated deduplication;</li>
+<li>reversible merges;</li>
+<li>human editing;</li>
+<li>authorization and ownership;</li>
+<li>claim alignment;</li>
+<li>stance classification;</li>
+<li>multi-hop traversal;</li>
+<li>graph storage;</li>
+<li>asynchronous ingestion.</li>
+</ul>
+<p>That is closer to a complete platform than a minimum viable research system.</p>
+<p>The highest-risk scientific loop should be proven before community scoring, trust aggregation, production multi-model support, or automated merge behavior.</p>
+</section>
+<section id="the-plan-understates-some-upstream-and-operational-risks" class="level2">
+<h2 class="anchored" data-anchor-id="the-plan-understates-some-upstream-and-operational-risks">10. The plan understates some upstream and operational risks</h2>
+<p>Several dependency assumptions should become explicit validation gates:</p>
+<ul>
+<li>A DOI or PMID does not guarantee accessible full text.</li>
+<li>Metadata, citation context, full text, and embeddings may have different coverage and licensing.</li>
+<li>Paper-level embeddings should not be treated as claim-level embeddings. The plan calls SPECTER embeddings paper-level but also proposes using them to seed claim deduplication and target-claim alignment. At most, they can help narrow papers; claim comparison needs a claim- or sentence-level encoder and usually a cross-encoder or entailment model.</li>
+<li>A citation-intent label set that differs from the InterCiter ontology needs an explicit mapping study.</li>
+<li>A domain slice must be defined reproducibly, with a corpus release version and inclusion criteria.</li>
+<li>On-demand hydration needs caching, retry behavior, rate-limit handling, and degraded states.</li>
+</ul>
+<p>The extraction pipeline also processes untrusted documents. It needs file-size limits, parser sandboxing, malware checks, strict model-output validation, and defenses against prompt-like instructions embedded in paper text.</p>
+<hr>
+</section>
+</section>
+<section id="recommended-revised-data-model" class="level1">
+<h1>Recommended revised data model</h1>
+<p>A smaller, more stable core would look like this:</p>
+<pre class="text"><code>PaperWork
+  canonical bibliographic identity
+  DOI / PMID / corpus identifiers
+
+PaperVersion
+  exact version or manifestation
+  artifact hash
+  publication/preprint/correction status
+  full-text availability and license
+  parser status
+
+Passage
+  paper_version_id
+  section / page / paragraph / sentence
+  normalized offsets
+  verbatim text
+
+CitationMention
+  passage_id
+  marker span
+  cited_paper_work_id
+  bibliographic-resolution confidence
+
+ExtractionRun
+  model/provider/version
+  prompt-template version
+  parser version
+  code revision
+  inference parameters
+  timestamp
+
+ClaimOccurrence
+  passage_id
+  exact source span
+  occurrence type
+  extraction_run_id
+
+ClaimInterpretation
+  claim_occurrence_id
+  normalized proposition
+  structured qualifiers
+  extraction_run_id or human author
+  parent interpretation/version
+
+ClaimCluster
+  probable semantic-equivalence grouping
+  membership assertions
+  clustering method and confidence
+
+RelationAssertion
+  local claim occurrence
+  citation mention
+  target paper
+  optional target claim interpretation/cluster
+  citation function
+  stance
+  scope
+  target-link score
+  stance score
+  evidence passage
+  extraction run
+  review state
+
+ReviewDecision
+  subject type and ID
+  reviewer
+  decision dimension
+  label/value
+  rationale
+  timestamp
+
+Assessment
+  subject ID
+  assessment type
+  component inputs
+  algorithm version
+  computed value
+  computed_at</code></pre>
+<p>This model stays provenance-first while avoiding destructive merges and ambiguous edit chains.</p>
+<hr>
+</section>
+<section id="recommended-mvp" class="level1">
+<h1>Recommended MVP</h1>
+<p>The MVP should prove a <strong>thin, auditable vertical slice</strong>:</p>
+<blockquote class="blockquote">
+<p>Given an open-access biomedical paper, identify selected empirical claims, show their exact source passages and citation contexts, classify the cited relationship with calibrated abstention, and trace one hop to the cited paper or a confidently matched target claim.</p>
+</blockquote>
+<section id="include-in-mvp" class="level2">
+<h2 class="anchored" data-anchor-id="include-in-mvp">Include in MVP</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 44%">
+<col style="width: 55%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Include</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>One tightly defined biomedical subdomain or paper type</td>
+<td>Reduces ontology and annotation variation</td>
+</tr>
+<tr class="even">
+<td>Open-access XML/full text first</td>
+<td>Avoids PDF parsing and licensing dominating the research</td>
+</tr>
+<tr class="odd">
+<td>Empirical result claims only</td>
+<td>Provides a clearer definition than “all claims”</td>
+</tr>
+<tr class="even">
+<td>Exact evidence anchoring</td>
+<td>Required for trust and evaluation</td>
+</tr>
+<tr class="odd">
+<td>One reference extraction pipeline</td>
+<td>Enough to test the scientific hypothesis</td>
+</tr>
+<tr class="even">
+<td>Reproducible extraction-run metadata</td>
+<td>Preserves later model-swapping capability</td>
+</tr>
+<tr class="odd">
+<td>Citation-scope identification</td>
+<td>Necessary before stance classification</td>
+</tr>
+<tr class="even">
+<td>Paper-level target plus optional claim-level alignment</td>
+<td>Allows abstention without blocking ingestion</td>
+</tr>
+<tr class="odd">
+<td>One-hop trace endpoint</td>
+<td>Prevents multi-hop error amplification from dominating early results</td>
+</tr>
+<tr class="even">
+<td>Minimal annotation and adjudication workflow</td>
+<td>Creates ground truth and supports model calibration</td>
+</tr>
+<tr class="odd">
+<td>Polling-based job API</td>
+<td>Appropriate and simple</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="defer" class="level2">
+<h2 class="anchored" data-anchor-id="defer">Defer</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 60%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Defer</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Production multi-LLM comparison</td>
+<td>Useful for evaluation, not necessary for the core product loop</td>
+</tr>
+<tr class="even">
+<td>Automated semantic merges</td>
+<td>High semantic risk and not required for one-hop traceability</td>
+</tr>
+<tr class="odd">
+<td>Global confidence score</td>
+<td>Components must first be validated separately</td>
+</tr>
+<tr class="even">
+<td>Public user scores and trust weighting</td>
+<td>Adds abuse, bias, identity, and ranking problems</td>
+</tr>
+<tr class="odd">
+<td>Deep multi-hop traversal</td>
+<td>Per-hop errors compound rapidly</td>
+</tr>
+<tr class="even">
+<td>Reference generation</td>
+<td>Depends on high-precision retrieval and relationship evidence</td>
+</tr>
+<tr class="odd">
+<td>General PDF ingestion</td>
+<td>Add after the structured-text pipeline is validated</td>
+</tr>
+<tr class="even">
+<td>Broad cross-domain support</td>
+<td>Claim semantics and entity vocabularies differ substantially</td>
+</tr>
+<tr class="odd">
+<td>Institution/author network visualization</td>
+<td>Does not prove the core research contribution</td>
+</tr>
+</tbody>
+</table>
+<p>A second model can still be run on the evaluation set to demonstrate swappability and compare errors. That does not require making production multi-model extraction an MVP feature.</p>
+<hr>
+</section>
+</section>
+<section id="api-changes" class="level1">
+<h1>API changes</h1>
+<p>The current API is directionally good but should reflect immutable resources and asynchronous runs more directly.</p>
+<section id="jobs-and-runs" class="level3">
+<h3 class="anchored" data-anchor-id="jobs-and-runs">Jobs and runs</h3>
+<p><code>POST /v1/papers</code> should return <code>202 Accepted</code>, a job resource, and an idempotency mechanism. Use:</p>
+<pre class="text"><code>GET /v1/jobs/{job_id}
+GET /v1/extraction-runs/{run_id}
+GET /v1/papers/{paper_id}/versions</code></pre>
+<p><code>GET /papers/{id}/status</code> is insufficient when one paper can have multiple parsing, extraction, hydration, and re-extraction jobs.</p>
+</section>
+<section id="revisions" class="level3">
+<h3 class="anchored" data-anchor-id="revisions">Revisions</h3>
+<p>Instead of presenting an immutable revision as an ordinary <code>PATCH</code>, use:</p>
+<pre class="text"><code>POST /v1/claim-interpretations/{id}/revisions</code></pre>
+<p>The response should identify both the old and new versions and whether existing relation assertions became stale.</p>
+</section>
+<section id="evidence-retrieval" class="level3">
+<h3 class="anchored" data-anchor-id="evidence-retrieval">Evidence retrieval</h3>
+<p>Every claim and relation response should embed or link to its evidence:</p>
+<pre class="text"><code>GET /v1/claim-occurrences/{id}
+GET /v1/relation-assertions/{id}
+GET /v1/passages/{id}</code></pre>
+</section>
+<section id="bounded-traversal" class="level3">
+<h3 class="anchored" data-anchor-id="bounded-traversal">Bounded traversal</h3>
+<p>A free-form <code>depth</code> parameter can create explosive queries and obscure uncertainty. A trace endpoint should require limits:</p>
+<pre class="text"><code>GET /v1/traces
+  ?root_claim_id=...
+  &amp;max_depth=2
+  &amp;max_nodes=100
+  &amp;min_target_link_score=...
+  &amp;min_stance_score=...
+  &amp;include_unresolved=true
+  &amp;cursor=...</code></pre>
+<p>The response should include cycles, truncated branches, evidence for every hop, and separate confidence components. It should never imply that a paper-level unresolved edge is equivalent to a claim-level continuation.</p>
+<hr>
+</section>
+</section>
+<section id="grant-framing" class="level1">
+<h1>Grant framing</h1>
+<p>The proposal will be stronger if it presents InterCiter as testing three explicit hypotheses:</p>
+<ol type="1">
+<li><strong>Source-grounded extraction:</strong> scientific claim interpretations can be generated while preserving exact, inspectable evidence anchors.</li>
+<li><strong>Selective claim alignment:</strong> citation contexts can be linked to specific cited claims at useful precision when the system is allowed to abstain.</li>
+<li><strong>Auditable lineage:</strong> immutable, versioned relation assertions let users inspect how each step in a citation lineage was generated, reviewed, or revised.</li>
+</ol>
+<p>The wording “trace claims back to their original sources” should be softened. A citation graph can identify an earlier cited antecedent or the earliest source found within the traversed corpus. It cannot necessarily prove intellectual originality, because papers may omit citations, cite secondary sources, or independently derive similar findings.</p>
+<p>Similarly, replace the claim that automated deduplication is “safe” with:</p>
+<blockquote class="blockquote">
+<p>Automated clustering is non-destructive, measurable, and reversible, but uncertain clusters do not become authoritative without meeting a validated threshold or receiving review.</p>
+</blockquote>
+</section>
+<section id="priority-order-before-implementation" class="level1">
+<h1>Priority order before implementation</h1>
+<p>The next design revision should resolve these decisions in order:</p>
+<ol type="1">
+<li>Define exactly what counts as an MVP claim.</li>
+<li>Add document versions, passages, citation mentions, and exact evidence spans.</li>
+<li>Separate claim occurrences, interpretations, revisions, and equivalence clusters.</li>
+<li>Make relation assertions first-class, evidence-bearing records.</li>
+<li>Define the gold dataset, annotation protocol, metrics, and abstention policy.</li>
+<li>Remove deduplication, aggregate trust, and public scoring from the MVP.</li>
+<li>Choose the physical storage stack only after the immutable logical model is stable.</li>
+</ol>
+<p>The project’s core idea is strong. The present risk is not that the architecture lacks sophistication; it is that it builds sophisticated versioning, scoring, and graph machinery around a scientifically ambiguous <code>Claim</code> object. Fixing that identity model and narrowing the first experiment would materially improve feasibility, auditability, and the grant case.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

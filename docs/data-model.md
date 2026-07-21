@@ -197,3 +197,17 @@ The model maps cleanly onto BioLink:
 - `RelationAssertion` → a custom `Association` subclass; its evidence, publications, and confidence fields map naturally onto BioLink's provenance-heavy association pattern, a better fit than a lightweight property-graph edge.
 - `ExtractionRun` provenance → `knowledge_source` / `primary_knowledge_source` / `aggregator_knowledge_source` slots (RoboKop already has display plumbing here).
 - `PaperWork`/`PaperVersion` → BioLink `Publication`, kept close to unmodified; versioning is an additive slot.
+
+## Machine-readable schema (LinkML)
+
+This logical model is encoded as an executable [LinkML](https://linkml.io) schema at [`schema/interciter.yaml`](../schema/interciter.yaml). LinkML is the natural choice because BioLink itself is authored in LinkML, so the mappings above are expressed as first-class `exact_mappings` rather than prose, and a single source can generate the multiple physical shapes this design already calls for — SQL DDL for the PostgreSQL system of record, Pydantic models for strict validation of extraction output, plus JSON Schema, GraphQL, and RDF/OWL.
+
+The schema is the entity/constraint contract only. Derived behavior — "current head" resolution, `stale_pending_review` propagation, read-time cluster resolution, and the flattened read-side projection ([architecture.md](architecture.md)) — remains application logic and is deliberately **not** modeled there.
+
+Working with it (LinkML is pinned in [`schema/requirements.txt`](../schema/requirements.txt)):
+
+```bash
+uv tool run --from linkml linkml-lint schema/interciter.yaml   # validate
+uv tool run --from linkml gen-pydantic schema/interciter.yaml   # Pydantic models
+uv tool run --from linkml gen-sqlddl   schema/interciter.yaml   # SQL DDL
+```

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<article article-type="research-article">
+  <front>
+    <journal-meta>
+      <journal-title-group>
+        <journal-title>Journal of Metabolic Studies</journal-title>
+      </journal-title-group>
+    </journal-meta>
+    <article-meta>
+      <article-id pub-id-type="doi">10.1234/interciter.b</article-id>
+      <article-id pub-id-type="pmid">30000001</article-id>
+      <title-group>
+        <article-title>Metformin lowers fasting glucose in adults with prediabetes</article-title>
+      </title-group>
+      <contrib-group>
+        <contrib contrib-type="author">
+          <name><surname>Alvarez</surname><given-names>Rosa</given-names></name>
+        </contrib>
+        <contrib contrib-type="author">
+          <name><surname>Chen</surname><given-names>Wei</given-names></name>
+        </contrib>
+      </contrib-group>
+      <pub-date pub-type="epub"><year>2019</year></pub-date>
+    </article-meta>
+  </front>
+  <body>
+    <sec>
+      <title>Results</title>
+      <p>Across the 24-week trial, metformin reduced fasting glucose in adults with prediabetes. The effect was significant relative to placebo.</p>
+    </sec>
+    <sec>
+      <title>Discussion</title>
+      <p>These findings indicate that metformin reduced fasting glucose consistently across subgroups.</p>
+    </sec>
+  </body>
+</article>

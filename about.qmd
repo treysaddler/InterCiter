@@ -2,4 +2,13 @@
 title: "About"
 ---
 
-About this site
+InterCiter is a knowledge-graph system that extracts individual claims from
+scientific papers, **anchors each claim to its exact source passage**, and
+classifies how citing claims relate to cited work — separating a citation's
+*function* (background, method, direct evidence, comparison) from its *stance*
+(support, contradict, neutral).
+
+The design philosophy is **provenance-first**: model outputs, human corrections,
+cluster groupings, and review decisions coexist as distinct, immutable,
+traceable records. Read the full [design overview](interciter-systems-design.md)
+for principles, MVP scope, and open decisions.

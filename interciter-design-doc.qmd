@@ -1,0 +1,25 @@
+---
+title: "InterCiter — Systems Design"
+subtitle: "Combined design document for review"
+date: today
+format:
+  docx:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+---
+
+{{< include interciter-systems-design.md >}}
+
+{{< include docs/data-model.md >}}
+
+{{< include docs/architecture.md >}}
+
+{{< include docs/scoring-and-review.md >}}
+
+{{< include docs/evaluation.md >}}
+
+{{< include docs/api.md >}}
+
+{{< include docs/grant-framing.md >}}

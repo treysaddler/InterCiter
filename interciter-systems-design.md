@@ -1,6 +1,6 @@
 # InterCiter — Systems Design Overview
 
-> **Revision 2** (2026-07-20). Incorporates three external design reviews: [GPT Sol](0001-gpt-5.6-sol-pro-feedback.md) (data-model and MVP critique), [Gemini](0002-gemini-3.1-pro-feedback.md) (physical-schema and UX critique of GPT Sol's proposal), and [Opus](0003-claude-opus-4.8-feedback.md) (adjudication of both). The design detail now lives in [docs/](docs/); this document is the entry point.
+> **Revision 2** (2026-07-20). Incorporates three external design reviews: [GPT Sol](feedback/0001-gpt-5.6-sol-pro-feedback.md) (data-model and MVP critique), [Gemini](feedback/0002-gemini-3.1-pro-feedback.md) (physical-schema and UX critique of GPT Sol's proposal), and [Opus](feedback/0003-claude-opus-4.8-feedback.md) (adjudication of both). The design detail now lives in [docs/](docs/); this document is the entry point.
 
 ## Document map
 

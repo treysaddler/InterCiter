@@ -1,13 +1,65 @@
 project:
   type: website
+  output-dir: _site
 
 website:
   title: "InterCiter"
+  description: "A provenance-first knowledge-graph system for scientific claims."
   navbar:
     left:
       - href: index.qmd
         text: Home
-      - about.qmd
+      - href: interciter-systems-design.md
+        text: Design Overview
+      - text: Design Docs
+        menu:
+          - href: docs/data-model.md
+            text: Data Model
+          - href: docs/architecture.md
+            text: Architecture
+          - href: docs/scoring-and-review.md
+            text: Scoring & Review
+          - href: docs/evaluation.md
+            text: Evaluation
+          - href: docs/api.md
+            text: API
+          - href: docs/grant-framing.md
+            text: Grant Framing
+      - text: Feedback
+        menu:
+          - href: feedback/0001-gpt-5.6-sol-pro-feedback.md
+            text: "0001 · GPT Sol"
+          - href: feedback/0002-gemini-3.1-pro-feedback.md
+            text: "0002 · Gemini"
+          - href: feedback/0003-claude-opus-4.8-feedback.md
+            text: "0003 · Opus"
+      - href: about.qmd
+        text: About
+  sidebar:
+    style: docked
+    contents:
+      - section: "Design Docs"
+        contents:
+          - href: docs/data-model.md
+            text: Data Model
+          - href: docs/architecture.md
+            text: Architecture
+          - href: docs/scoring-and-review.md
+            text: Scoring & Review
+          - href: docs/evaluation.md
+            text: Evaluation
+          - href: docs/api.md
+            text: API
+          - href: docs/grant-framing.md
+            text: Grant Framing
+      - section: "Design Reviews"
+        contents:
+          - href: feedback/0001-gpt-5.6-sol-pro-feedback.md
+            text: "0001 · GPT Sol"
+          - href: feedback/0002-gemini-3.1-pro-feedback.md
+            text: "0002 · Gemini"
+          - href: feedback/0003-claude-opus-4.8-feedback.md
+            text: "0003 · Opus"
 
 format:
   html:

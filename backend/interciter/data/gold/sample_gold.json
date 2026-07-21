@@ -1,0 +1,126 @@
+{
+  "domain": "metabolic-prediabetes",
+  "corpus_version": "sample-gold-v1",
+  "papers": [
+    {
+      "doi": "10.1234/interciter.b",
+      "order": 1,
+      "xml_resource": "paper_b.xml",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "B-c1",
+          "text": "metformin reduced fasting glucose in adults with prediabetes",
+          "occurrence_type": "reported_result",
+          "section": "Results",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "probable",
+          "relations": []
+        },
+        {
+          "gold_id": "B-c2",
+          "text": "the effect was significant relative to placebo",
+          "occurrence_type": "reported_result",
+          "section": "Results",
+          "effect_direction": "unclear",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        },
+        {
+          "gold_id": "B-c3",
+          "text": "metformin reduced fasting glucose consistently across subgroups",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "probable",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1234/interciter.a",
+      "order": 2,
+      "xml_resource": "paper_a.xml",
+      "citations": [
+        { "marker": "1", "resolved_doi": "10.1234/interciter.b" },
+        { "marker": "2", "resolved_doi": "10.1234/external.assay2" },
+        { "marker": "3", "resolved_doi": "10.1234/external.transient3" }
+      ],
+      "claims": [
+        {
+          "gold_id": "A-c1",
+          "text": "metformin reduced fasting glucose in adults with prediabetes",
+          "occurrence_type": "reported_result",
+          "section": "Results",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "probable",
+          "relations": [
+            {
+              "cited_doi": "10.1234/interciter.b",
+              "function": "direct_evidence",
+              "stance": "support",
+              "scope": "whole_claim",
+              "resolution": "claim_resolved",
+              "target_gold_id": "B-c1"
+            }
+          ]
+        },
+        {
+          "gold_id": "A-c2",
+          "text": "the effect persisted and remained significant at twelve months",
+          "occurrence_type": "reported_result",
+          "section": "Results",
+          "effect_direction": "unclear",
+          "negated": false,
+          "certainty": "definite",
+          "relations": [
+            {
+              "cited_doi": "10.1234/external.transient3",
+              "function": "comparison",
+              "stance": "contradict",
+              "scope": "whole_claim",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        },
+        {
+          "gold_id": "A-c3",
+          "text": "the assay protocol was performed as described previously",
+          "occurrence_type": "method_description",
+          "section": "Discussion",
+          "effect_direction": null,
+          "negated": null,
+          "certainty": null,
+          "relations": [
+            {
+              "cited_doi": "10.1234/external.assay2",
+              "function": "method",
+              "stance": "neutral",
+              "scope": "whole_claim",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        },
+        {
+          "gold_id": "A-c4",
+          "text": "metformin decreased fasting glucose in this cohort",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "probable",
+          "relations": []
+        }
+      ]
+    }
+  ],
+  "equivalences": [
+    ["A-c1", "B-c1", "B-c3", "A-c4"]
+  ]
+}

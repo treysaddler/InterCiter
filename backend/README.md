@@ -28,10 +28,16 @@ interciter/
     projection.py      Composed claim views, one-hop trace, decomposed scores
     jobs.py            First-class job resources (polling model) + idempotency
     review.py          Human claims, revisions, review decisions, cluster fixes
+  evaluation/
+    gold.py            Gold-corpus schema + loader
+    metrics.py         Metric primitives (PRF, confusion, ECE, risk/coverage)
+    harness.py         Isolated ingest + gold alignment + per-stage scoring
+    report.py          Structured per-stage report (text + JSON)
   api/                 FastAPI app + /v1 routers (incl. security.py auth deps)
   data/sample/         Two bundled JATS papers for the demo corpus
+  data/gold/           Adjudicated gold labels for the sample corpus
   sample.py            Seed the sample corpus
-  cli.py               initdb / ingest / seed / serve
+  cli.py               initdb / ingest / seed / useradd / evaluate / serve
 ```
 
 ## Quick start

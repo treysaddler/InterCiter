@@ -60,6 +60,21 @@ def _cmd_useradd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_evaluate(args: argparse.Namespace) -> int:
+    import json
+
+    from .evaluation.gold import load_gold
+    from .evaluation.harness import evaluate
+
+    gold = load_gold(args.gold)
+    report = evaluate(gold)
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(report.format_text())
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -87,6 +102,13 @@ def main(argv: list[str] | None = None) -> int:
         "--role", default="user", choices=["user", "reviewer", "admin"]
     )
     p_user.set_defaults(func=_cmd_useradd)
+
+    p_eval = sub.add_parser("evaluate", help="Run the evaluation harness on a gold corpus")
+    p_eval.add_argument(
+        "--gold", default=None, help="Path to a gold corpus JSON (default: bundled sample)"
+    )
+    p_eval.add_argument("--json", action="store_true", help="Emit the report as JSON")
+    p_eval.set_defaults(func=_cmd_evaluate)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

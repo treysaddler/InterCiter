@@ -1,0 +1,303 @@
+"""Pydantic API schemas (request/response DTOs).
+
+Two representation styles, matching the design (docs/architecture.md, api.md):
+
+* **Composed, reader-friendly views** are the default read path — claim text plus a
+  source snippet plus a provenance link — so a researcher never has to understand
+  occurrence-vs-interpretation to read a result.
+* **Audit views** expose the underlying immutable records behind explicit endpoints.
+
+These are decoupled from the ORM on purpose; the ORM is the system of record, these
+are the contract.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from . import enums
+
+
+# ---------------------------------------------------------------------------------
+# Ingestion / jobs
+# ---------------------------------------------------------------------------------
+
+
+class PaperSubmission(BaseModel):
+    """Submit a paper by identifier or inline open-access JATS XML."""
+
+    doi: str | None = None
+    pmid: str | None = None
+    xml: str | None = Field(default=None, description="Inline open-access JATS XML.")
+    manifestation: enums.Manifestation = enums.Manifestation.published
+    idempotency_key: str | None = Field(
+        default=None,
+        description="Retries with the same key return the same job (no double-ingest).",
+    )
+
+
+class JobView(BaseModel):
+    job_id: str
+    job_type: enums.JobType
+    status: enums.JobStatus
+    paper_work_id: str | None = None
+    extraction_run_id: str | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------------------------
+# Bibliographic
+# ---------------------------------------------------------------------------------
+
+
+class PaperVersionView(BaseModel):
+    version_id: str
+    manifestation: enums.Manifestation
+    artifact_hash: str | None = None
+    full_text_available: bool
+    license_status: str | None = None
+    parser_name: str | None = None
+    parser_version: str | None = None
+    parse_status: enums.ParseStatus | None = None
+
+
+class PaperView(BaseModel):
+    work_id: str
+    title: str | None = None
+    authors: list[str] = []
+    venue: str | None = None
+    year: int | None = None
+    doi: str | None = None
+    pmid: str | None = None
+    s2_corpus_id: str | None = None
+    availability_state: enums.AvailabilityState
+
+
+class PassageView(BaseModel):
+    passage_id: str
+    paper_version_id: str
+    section: str | None = None
+    paragraph: int | None = None
+    sentence: int | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    verbatim_text: str
+
+
+# ---------------------------------------------------------------------------------
+# Claims — composed default view + audit views
+# ---------------------------------------------------------------------------------
+
+
+class EvidenceRef(BaseModel):
+    """The provenance link every claim/relation response embeds."""
+
+    passage_id: str
+    paper_version_id: str
+    work_id: str
+    section: str | None = None
+    verbatim_text: str
+    char_start: int | None = None
+    char_end: int | None = None
+
+
+class ClaimView(BaseModel):
+    """Composed, reader-friendly claim view (the projected read-side object).
+
+    ``claim_id`` is the current interpretation head's id; the audit trail sits behind
+    the ``occurrence_id`` / ``interpretation_id`` links.
+    """
+
+    claim_id: str
+    normalized_text: str
+    occurrence_id: str
+    interpretation_id: str
+    occurrence_type: enums.OccurrenceType
+    qualifiers: dict[str, Any] | None = None
+    work_id: str
+    evidence: EvidenceRef
+
+
+class ClaimOccurrenceView(BaseModel):
+    occurrence_id: str
+    passage_id: str
+    span_start: int | None = None
+    span_end: int | None = None
+    occurrence_type: enums.OccurrenceType
+    extraction_run_id: str
+
+
+class ClaimInterpretationView(BaseModel):
+    interpretation_id: str
+    claim_occurrence_id: str
+    normalized_text: str
+    qualifiers: dict[str, Any] | None = None
+    extraction_run_id: str | None = None
+    author_id: str | None = None
+    parent_interpretation_ids: list[str] = []
+    created_by: str | None = None
+    created_at: datetime
+
+
+class ExtractionRunView(BaseModel):
+    run_id: str
+    model: str | None = None
+    provider: str | None = None
+    model_version: str | None = None
+    prompt_template_version: str | None = None
+    parser_version: str | None = None
+    code_revision: str | None = None
+    inference_parameters: dict[str, Any] | None = None
+    timestamp: datetime
+
+
+# ---------------------------------------------------------------------------------
+# Relations & traversal
+# ---------------------------------------------------------------------------------
+
+
+class TargetCandidate(BaseModel):
+    interpretation_id: str
+    score: float
+
+
+class RelationAssertionView(BaseModel):
+    assertion_id: str
+    citing_occurrence_id: str
+    citation_mention_id: str | None = None
+    evidence_passage_id: str | None = None
+    cited_work_id: str | None = None
+    target_interpretation_id: str | None = None
+    target_candidates: list[TargetCandidate] = []
+    function: enums.RelationFunction | None = None
+    stance: enums.RelationStance | None = None
+    scope: enums.RelationScope | None = None
+    resolution: enums.RelationResolution
+    target_link_score: float | None = None
+    stance_distribution: dict[str, float] | None = None
+    extraction_run_id: str
+    status: enums.AssertionStatus
+
+
+class TraceHop(BaseModel):
+    """One resolved hop from a claim to its cited antecedent.
+
+    ``paper_resolved`` hops are labeled as such and never presented as a claim-level
+    continuation (api.md).
+    """
+
+    assertion_id: str
+    function: enums.RelationFunction | None = None
+    stance: enums.RelationStance | None = None
+    resolution: enums.RelationResolution
+    target_link_score: float | None = None
+    target_claim: ClaimView | None = None
+    target_work: PaperView | None = None
+    evidence: EvidenceRef | None = None
+
+
+class OneHopTrace(BaseModel):
+    root_claim_id: str
+    hops: list[TraceHop] = []
+    truncated: bool = False
+    note: str | None = None
+
+
+# ---------------------------------------------------------------------------------
+# Human-authored claims, revisions, review, clusters
+# ---------------------------------------------------------------------------------
+
+
+class HumanClaimCreate(BaseModel):
+    normalized_text: str
+    author_id: str
+    passage_id: str | None = Field(
+        default=None,
+        description="Attach to an existing occurrence's passage; a new occurrence is created.",
+    )
+    occurrence_id: str | None = Field(
+        default=None,
+        description="Attach an interpretation to an existing occurrence instead.",
+    )
+    occurrence_type: enums.OccurrenceType = enums.OccurrenceType.reported_result
+    qualifiers: dict[str, Any] | None = None
+
+
+class InterpretationRevision(BaseModel):
+    normalized_text: str
+    author_id: str
+    qualifiers: dict[str, Any] | None = None
+    material: bool = Field(
+        default=True,
+        description="Material revisions mark dependent assertions stale_pending_review.",
+    )
+
+
+class RevisionResult(BaseModel):
+    new_interpretation: ClaimInterpretationView
+    parent_interpretation_id: str
+    staled_assertion_ids: list[str] = []
+
+
+class ReviewDecisionCreate(BaseModel):
+    subject_type: enums.ReviewSubjectType
+    subject_id: str
+    reviewer_id: str
+    decision_dimension: str
+    label: str | None = None
+    rationale: str | None = None
+
+
+class ReviewDecisionView(BaseModel):
+    review_id: str
+    subject_type: enums.ReviewSubjectType
+    subject_id: str
+    reviewer_id: str
+    decision_dimension: str
+    label: str | None = None
+    rationale: str | None = None
+    timestamp: datetime
+
+
+class ClusterMemberView(BaseModel):
+    membership_id: str
+    interpretation_id: str
+    normalized_text: str
+    method: enums.ClusteringMethod
+    membership_confidence: float | None = None
+    status: enums.MembershipStatus
+    stance_in_context: enums.RelationStance | None = None
+
+
+class ClusterView(BaseModel):
+    cluster_id: str
+    clustering_method: str | None = None
+    threshold_version: str | None = None
+    members: list[ClusterMemberView] = []
+    conflicting_stances: bool = False
+
+
+# ---------------------------------------------------------------------------------
+# Scores
+# ---------------------------------------------------------------------------------
+
+
+class ScoreComponent(BaseModel):
+    name: str
+    value: float | None = None
+    assessment_id: str | None = None
+    algorithm_version: str | None = None
+    inputs: dict[str, Any] | None = None
+
+
+class ClaimScores(BaseModel):
+    """Decomposed signals — never a blended scalar (docs/scoring-and-review.md)."""
+
+    claim_id: str
+    components: list[ScoreComponent] = []

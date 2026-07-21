@@ -24,20 +24,21 @@ interciter/
     parser.py          Hardened JATS/PMC XML parser (defusedxml)
     extractor.py       Swappable extraction interface + deterministic stub
     pipeline.py        Ingest -> passages, claims, relations, clustering
+    pmc.py             PMC Open Access fetcher (E-utilities; cache; rate-limit)
   services/
     projection.py      Composed claim views, one-hop trace, decomposed scores
     jobs.py            First-class job resources (polling model) + idempotency
     review.py          Human claims, revisions, review decisions, cluster fixes
   evaluation/
-    gold.py            Gold-corpus schema + loader
+    gold.py            Gold-corpus schema + loader (bundled or PMC fetch-on-demand)
     metrics.py         Metric primitives (PRF, confusion, ECE, risk/coverage)
     harness.py         Isolated ingest + gold alignment + per-stage scoring
     report.py          Structured per-stage report (text + JSON)
   api/                 FastAPI app + /v1 routers (incl. security.py auth deps)
   data/sample/         Two bundled JATS papers for the demo corpus
-  data/gold/           Adjudicated gold labels for the sample corpus
+  data/gold/           Gold labels: sample_gold.json, t2d_glycemic_v1.json, GUIDELINES.md
   sample.py            Seed the sample corpus
-  cli.py               initdb / ingest / seed / useradd / evaluate / serve
+  cli.py               initdb / ingest / seed / useradd / evaluate / pmc-* / serve
 ```
 
 ## Quick start
@@ -101,3 +102,34 @@ export INTERCITER_DATABASE_URL="postgresql+psycopg://user:pass@localhost/interci
 The default is a local SQLite file (`interciter.db`) so the MVP runs with zero
 infrastructure. Table creation uses `create_all` for the MVP; production would use
 migrations.
+
+## Evaluation and the gold set
+
+Evaluation is a first-class component (docs/evaluation.md). The harness ingests a gold
+corpus into an isolated DB, aligns predictions to adjudicated labels, and scores every
+stage separately — extraction recall, citation-scope, function/stance F1, target
+retrieval (recall@k), calibration (ECE) and selective risk/coverage, clustering, and
+cost/latency. Abstention is measured, never counted as error.
+
+Two corpora ship:
+
+- `sample_gold` — the two bundled toy papers (exhaustively annotated; precision reported).
+- `t2d_glycemic_v1` — a **real** pilot in the chosen slice: type-2-diabetes glycemic-control
+  RCTs from the PMC Open Access subset (a metformin add-on trial that cites two other OA
+  trials). Only annotations keyed to PMCID/DOI are stored; **full text is fetched on
+  demand and cached locally, never committed** (papers are CC BY-NC / BY-NC-ND).
+
+```sh
+uv run interciter evaluate                        # bundled toy corpus
+INTERCITER_NCBI_EMAIL=you@example.org \
+  uv run interciter evaluate --corpus t2d_glycemic_v1   # real PMC-OA pilot (fetches)
+uv run interciter pmc-inspect PMC7839591          # dump passages/citations to annotate
+uv run interciter pmc-fetch PMC7839591 --out paper.xml
+```
+
+Annotation protocol and label definitions live in
+[interciter/data/gold/GUIDELINES.md](interciter/data/gold/GUIDELINES.md). The corpus
+declares `exhaustive_claims`: when false (sparsely annotated real papers), the harness
+reports recall only, since precision over all predictions would be meaningless. Set
+`INTERCITER_NET_TESTS=1` to run the network-gated fetch/eval tests.
+

@@ -5,3 +5,5 @@ interciter.db
 **/__pycache__/
 .pytest_cache/
 *.egg-info/
+# Fetched PMC full text — cached locally, never committed (licensing)
+.cache/

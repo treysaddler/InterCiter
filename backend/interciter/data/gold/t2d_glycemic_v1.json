@@ -1,0 +1,162 @@
+{
+  "domain": "t2d-glycemic-control",
+  "corpus_version": "t2d-glycemic-v1",
+  "source": "pmc-oa",
+  "exhaustive_claims": false,
+  "_provenance": "Annotations only; full text is fetched on demand from PMC OA and never redistributed. Papers are CC BY-NC / CC BY-NC-ND. This is a draft pilot for adjudication (I. draft -> human adjudicate), built from real result sentences and citation contexts read from the JATS. gold_id text fields quote or closely paraphrase the source sentence for span alignment.",
+  "papers": [
+    {
+      "doi": "10.1111/dom.14232",
+      "pmcid": "PMC7839591",
+      "order": 1,
+      "license": "CC BY-NC 4.0",
+      "title": "Efficacy and safety of once-weekly semaglutide versus once-daily sitagliptin as add-on to metformin (SUSTAIN China)",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "SEMA-c1",
+          "text": "At week 30, mean HbA1c (baseline 8.1%) was reduced by 1.4% with semaglutide 0.5 mg, 1.7% with semaglutide 1.0 mg and 0.9% with sitagliptin",
+          "occurrence_type": "reported_result",
+          "section": "Efficacy",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1038/s41467-024-52353-y",
+      "pmcid": "PMC11437099",
+      "order": 2,
+      "license": "CC BY-NC-ND 4.0",
+      "title": "Efficacy and safety of GLP-1 analog ecnoglutide in adults with type 2 diabetes: a randomized, double-blind, placebo-controlled trial",
+      "citations": [],
+      "claims": [
+        {
+          "gold_id": "ECN-c1",
+          "text": "participants receiving target doses of 0.4, 0.8, and 1.2 mg ecnoglutide had mean HbA1c reductions from baseline of -1.81%, -1.90%, and -1.68%",
+          "occurrence_type": "reported_result",
+          "section": "Primary outcome",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        },
+        {
+          "gold_id": "ECN-c2",
+          "text": "all doses of ecnoglutide were significantly superior to placebo at reducing HbA1c",
+          "occurrence_type": "reported_result",
+          "section": "Primary outcome",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        }
+      ]
+    },
+    {
+      "doi": "10.1038/s41467-026-72574-7",
+      "pmcid": "PMC13369722",
+      "order": 3,
+      "license": "CC BY-NC-ND 4.0",
+      "title": "Efsubaglutide alfa added to metformin improves glycaemia with beta-cell functional responses in type 2 diabetes (SUPER 2)",
+      "citations": [
+        { "marker": "22", "resolved_doi": "10.1016/S0140-6736(14)60976-4" },
+        { "marker": "23", "resolved_doi": "10.1111/dom.14232" },
+        { "marker": "24", "resolved_doi": "10.1172/JCI175634" },
+        { "marker": "28", "resolved_doi": "10.1038/s41467-024-52353-y" }
+      ],
+      "claims": [
+        {
+          "gold_id": "EF-c1",
+          "text": "At the primary endpoint of week 24, HbA1c was reduced by 19.67 mmol/mol (-1.80%)",
+          "occurrence_type": "reported_result",
+          "section": "Primary outcomes",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        },
+        {
+          "gold_id": "EF-c1b",
+          "text": "In summary, Efsubaglutide 3 mg once weekly, added to metformin, achieved robust and durable HbA1c reductions",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": []
+        },
+        {
+          "gold_id": "EF-c2",
+          "text": "dulaglutide 1.5 mg reduced HbA1c by 1.42% after 26 weeks, and semaglutide 1.0 mg reduced HbA1c by 1.4-1.7% after 30 weeks in metformin-treated patients",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "decrease",
+          "negated": false,
+          "certainty": "definite",
+          "relations": [
+            {
+              "cited_doi": "10.1016/S0140-6736(14)60976-4",
+              "function": "comparison",
+              "stance": "neutral",
+              "scope": "partial_claim",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            },
+            {
+              "cited_doi": "10.1111/dom.14232",
+              "function": "comparison",
+              "stance": "neutral",
+              "scope": "partial_claim",
+              "resolution": "claim_resolved",
+              "target_gold_id": "SEMA-c1"
+            }
+          ]
+        },
+        {
+          "gold_id": "EF-c3",
+          "text": "Efsubaglutide significantly increased the fasting insulin-to-glucagon ratio, in line with the known pharmacological actions of GLP-1-based therapies",
+          "occurrence_type": "reported_result",
+          "section": "Discussion",
+          "effect_direction": "increase",
+          "negated": false,
+          "certainty": "definite",
+          "relations": [
+            {
+              "cited_doi": "10.1172/JCI175634",
+              "function": "background",
+              "stance": "support",
+              "scope": "whole_claim",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        },
+        {
+          "gold_id": "EF-c4",
+          "text": "The baseline BMI of this trial was 27 kg/m2, which is comparable to other relevant studies in Asia",
+          "occurrence_type": "background_assertion",
+          "section": "Discussion",
+          "effect_direction": null,
+          "negated": null,
+          "certainty": null,
+          "relations": [
+            {
+              "cited_doi": "10.1038/s41467-024-52353-y",
+              "function": "background",
+              "stance": "neutral",
+              "scope": "paper_level_only",
+              "resolution": "paper_resolved",
+              "target_gold_id": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "equivalences": [
+    ["EF-c1", "EF-c1b"]
+  ]
+}

@@ -63,15 +63,58 @@ def _cmd_useradd(args: argparse.Namespace) -> int:
 def _cmd_evaluate(args: argparse.Namespace) -> int:
     import json
 
-    from .evaluation.gold import load_gold
+    from .evaluation.gold import load_gold, load_gold_named
     from .evaluation.harness import evaluate
 
-    gold = load_gold(args.gold)
+    gold = load_gold_named(args.corpus) if args.corpus else load_gold(args.gold)
     report = evaluate(gold)
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print(report.format_text())
+    return 0
+
+
+def _cmd_pmc_fetch(args: argparse.Namespace) -> int:
+    from .ingestion.pmc import PMCFetchError, fetch_jats
+
+    try:
+        xml = fetch_jats(args.pmcid, get_settings(), use_cache=not args.no_cache)
+    except PMCFetchError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if args.out:
+        Path(args.out).write_text(xml, encoding="utf-8")
+        print(f"Wrote {len(xml)} chars to {args.out}")
+    else:
+        print(f"Fetched {args.pmcid}: {len(xml)} chars (cached under pmc_cache_dir)")
+    return 0
+
+
+def _cmd_pmc_inspect(args: argparse.Namespace) -> int:
+    """Fetch + parse a PMC paper and print passages/citations to aid annotation."""
+    from .ingestion.parser import parse_jats
+    from .ingestion.pmc import PMCFetchError, fetch_jats
+
+    try:
+        xml = fetch_jats(args.pmcid, get_settings())
+    except PMCFetchError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    paper = parse_jats(xml)
+    print(f"# {paper.title}")
+    print(f"doi={paper.doi} pmid={paper.pmid} year={paper.year} venue={paper.venue}")
+    print(f"authors: {', '.join(paper.authors)}")
+    print(f"references: {len(paper.references)} | passages: {len(paper.passages)}\n")
+    for i, p in enumerate(paper.passages):
+        cites = ", ".join(
+            f"[{c.marker_text}->{c.rid}: {paper.references.get(c.rid).doi if c.rid in paper.references else '?'}]"
+            for c in p.citations
+        )
+        section = p.section or "-"
+        print(f"[{i}] ({section}) {p.text}")
+        if cites:
+            print(f"      cites: {cites}")
     return 0
 
 
@@ -105,10 +148,27 @@ def main(argv: list[str] | None = None) -> int:
 
     p_eval = sub.add_parser("evaluate", help="Run the evaluation harness on a gold corpus")
     p_eval.add_argument(
-        "--gold", default=None, help="Path to a gold corpus JSON (default: bundled sample)"
+        "--gold", default=None, help="Path to a gold corpus JSON file"
+    )
+    p_eval.add_argument(
+        "--corpus",
+        default=None,
+        help="Name of a bundled gold corpus under data/gold (e.g. t2d_glycemic_v1)",
     )
     p_eval.add_argument("--json", action="store_true", help="Emit the report as JSON")
     p_eval.set_defaults(func=_cmd_evaluate)
+
+    p_fetch = sub.add_parser("pmc-fetch", help="Fetch and cache a PMC OA paper's JATS XML")
+    p_fetch.add_argument("pmcid", help="PMC id, e.g. PMC1234567")
+    p_fetch.add_argument("--out", default=None, help="Also write the XML to this path")
+    p_fetch.add_argument("--no-cache", action="store_true", help="Bypass the local cache")
+    p_fetch.set_defaults(func=_cmd_pmc_fetch)
+
+    p_inspect = sub.add_parser(
+        "pmc-inspect", help="Fetch + parse a PMC paper; print passages/citations"
+    )
+    p_inspect.add_argument("pmcid", help="PMC id, e.g. PMC1234567")
+    p_inspect.set_defaults(func=_cmd_pmc_inspect)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

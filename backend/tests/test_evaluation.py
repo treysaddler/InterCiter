@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
+
+import pytest
 
 from interciter.evaluation import metrics
-from interciter.evaluation.gold import load_gold
+from interciter.evaluation.gold import load_gold, load_gold_named
 from interciter.evaluation.harness import evaluate
+
+_NET = os.environ.get("INTERCITER_NET_TESTS") == "1"
+_netonly = pytest.mark.skipif(not _NET, reason="network test; set INTERCITER_NET_TESTS=1")
 
 
 def test_gold_corpus_loads():
@@ -58,7 +64,43 @@ def test_clustering_recall_is_measured():
     # No spurious groupings, but the stub under-recalls equivalence (measured, not hidden).
     assert cl.precision == 1.0
     assert cl.recall < 1.0
-    assert cl.tp > 0
+
+
+# --- Real PMC-OA gold corpus (offline validation + network-gated run) -----------
+
+
+def test_real_corpus_loads_and_is_wellformed_offline():
+    """Loads and validates without any network access (no full text is fetched)."""
+    gold = load_gold_named("t2d_glycemic_v1")
+    assert gold.source == "pmc-oa"
+    # Sparsely annotated real papers: precision must be suppressed, recall reported.
+    assert gold.exhaustive_claims is False
+    assert len(gold.papers) >= 3
+    assert all(p.pmcid and p.doi and p.license for p in gold.papers)
+
+    # Antecedents precede citers by ingestion order.
+    orders = [p.order for p in gold.papers]
+    assert orders == sorted(orders)
+
+    # Every claim_resolved relation targets an in-corpus antecedent claim id.
+    gold_ids = {c.gold_id for c in gold.all_claims()}
+    resolved_targets = [
+        r.target_gold_id
+        for p in gold.papers
+        for c in p.claims
+        for r in c.relations
+        if r.resolution.value == "claim_resolved"
+    ]
+    assert resolved_targets, "pilot should exercise at least one claim_resolved relation"
+    assert all(t in gold_ids for t in resolved_targets)
+
+
+@_netonly
+def test_real_corpus_evaluates_end_to_end():
+    report = evaluate(load_gold_named("t2d_glycemic_v1"))
+    assert report.claim_extraction.exhaustive is False
+    assert report.claim_extraction.spans.recall > 0.0
+    assert report.parsing.citation_resolution_accuracy > 0.0
 
 
 def test_report_serializes_to_json():

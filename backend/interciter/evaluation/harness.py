@@ -28,11 +28,10 @@ from ..enums import (
 from ..ingestion.extractor import Extractor, default_extractor
 from ..ingestion.pipeline import ingest_paper
 from ..models import Base
-from ..sample import _load
 from ..schemas import ClaimView
 from ..services import projection
 from . import metrics
-from .gold import GoldCorpus, load_gold
+from .gold import GoldCorpus, load_gold, load_paper_xml
 from .report import (
     CalibrationReport,
     ClaimExtractionReport,
@@ -132,10 +131,9 @@ def evaluate(
     # 1. Ingest gold papers in adjudicated order, timing each.
     latencies: list[float] = []
     for paper in sorted(gold.papers, key=lambda p: p.order):
+        xml = load_paper_xml(paper, settings)
         start = time.perf_counter()
-        ingest_paper(
-            session, xml=_load(paper.xml_resource), extractor=extractor, settings=settings
-        )
+        ingest_paper(session, xml=xml, extractor=extractor, settings=settings)
         latencies.append(time.perf_counter() - start)
 
     # 2. Index works and predictions.
@@ -244,9 +242,16 @@ def _score_claim_extraction(report, gold, gold_to_pred, pred_by_doi) -> None:
 
     fn = len(gold_results) - tp
     fp = len([pc for pc in pred_results if pc.interpretation_id not in matched_pred])
-    p, r, f = metrics.prf(tp, fp, fn)
+    if gold.exhaustive_claims:
+        p, r, f = metrics.prf(tp, fp, fn)
+        spans = PRF(p, r, f, tp, fp, fn)
+    else:
+        # Precision over all predictions is meaningless when gold is a subset; recall only.
+        r = round(tp / (tp + fn), 4) if (tp + fn) else 0.0
+        spans = PRF(0.0, r, 0.0, tp, 0, fn)
     report.claim_extraction = ClaimExtractionReport(
-        spans=PRF(p, r, f, tp, fp, fn),
+        spans=spans,
+        exhaustive=gold.exhaustive_claims,
         effect_direction_accuracy=round(dir_c / dir_t, 4) if dir_t else 0.0,
         negation_accuracy=round(neg_c / neg_t, 4) if neg_t else 0.0,
         certainty_accuracy=round(cert_c / cert_t, 4) if cert_t else 0.0,

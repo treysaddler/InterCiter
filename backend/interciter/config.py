@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     extractor_model_version: str = "0.1.0"
     prompt_template_version: str = "stub-v1"
 
+    # PMC Open Access fetching (evaluation gold set). NCBI asks that requests identify a
+    # tool and contact email; an API key raises the rate limit from 3 to 10 req/s.
+    ncbi_tool: str = "interciter"
+    ncbi_email: str = ""
+    ncbi_api_key: str | None = None
+    # Local cache for fetched JATS XML (gitignored; keyed by PMCID). Paper text is not
+    # redistributed — only annotations keyed to PMCID/DOI are.
+    pmc_cache_dir: str = ".cache/pmc"
+
     # Emit SQL for debugging.
     echo_sql: bool = False
 

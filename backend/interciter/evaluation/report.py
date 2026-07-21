@@ -47,6 +47,9 @@ class ParsingReport:
 @dataclass
 class ClaimExtractionReport:
     spans: PRF = field(default_factory=PRF)
+    # False when the gold corpus is not exhaustively annotated: precision/F1 over all
+    # predictions would be meaningless, so only recall is reported.
+    exhaustive: bool = True
     effect_direction_accuracy: float = 0.0
     negation_accuracy: float = 0.0
     certainty_accuracy: float = 0.0
@@ -114,8 +117,12 @@ class EvaluationReport:
         add("")
         ce = self.claim_extraction
         add("Claim extraction (empirical result claims)")
-        add(f"  span P / R / F1            : {ce.spans.precision:.3f} / {ce.spans.recall:.3f} "
-            f"/ {ce.spans.f1:.3f}  (tp={ce.spans.tp} fp={ce.spans.fp} fn={ce.spans.fn})")
+        if ce.exhaustive:
+            add(f"  span P / R / F1            : {ce.spans.precision:.3f} / {ce.spans.recall:.3f} "
+                f"/ {ce.spans.f1:.3f}  (tp={ce.spans.tp} fp={ce.spans.fp} fn={ce.spans.fn})")
+        else:
+            add(f"  span recall                : {ce.spans.recall:.3f}  (tp={ce.spans.tp} fn={ce.spans.fn}); "
+                f"precision n/a — non-exhaustive gold")
         add(f"  qualifier accuracy         : dir={ce.effect_direction_accuracy:.3f} "
             f"neg={ce.negation_accuracy:.3f} cert={ce.certainty_accuracy:.3f} "
             f"(n={ce.qualifiers_evaluated})")

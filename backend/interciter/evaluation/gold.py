@@ -55,9 +55,19 @@ class GoldCitation(BaseModel):
 
 
 class GoldPaper(BaseModel):
-    doi: str
+    doi: str | None = None
     order: int = Field(description="Ingestion order; antecedents must precede citers.")
-    xml_resource: str = Field(description="Filename under interciter/data/sample/.")
+    # Exactly one source: a bundled sample XML, or a PMC id fetched on demand.
+    xml_resource: str | None = Field(
+        default=None, description="Filename under interciter/data/sample/ (bundled papers)."
+    )
+    pmcid: str | None = Field(
+        default=None, description="PMC id (e.g. PMC1234567) fetched from the OA subset."
+    )
+    license: str | None = Field(
+        default=None, description="Per-article license of the fetched full text."
+    )
+    title: str | None = None
     citations: list[GoldCitation] = []
     claims: list[GoldClaim] = []
 
@@ -65,6 +75,18 @@ class GoldPaper(BaseModel):
 class GoldCorpus(BaseModel):
     domain: str
     corpus_version: str
+    source: str = Field(
+        default="bundled",
+        description="Where full text comes from: 'bundled' or 'pmc-oa'.",
+    )
+    exhaustive_claims: bool = Field(
+        default=True,
+        description=(
+            "True when every result claim in each paper is annotated, so extraction"
+            " precision is meaningful. False for sparsely-annotated corpora, where only"
+            " recall over annotated claims is reported."
+        ),
+    )
     papers: list[GoldPaper]
     equivalences: list[list[str]] = Field(
         default_factory=list,
@@ -73,6 +95,23 @@ class GoldCorpus(BaseModel):
 
     def all_claims(self) -> list[GoldClaim]:
         return [c for p in self.papers for c in p.claims]
+
+
+def load_paper_xml(paper: GoldPaper, settings=None) -> str:
+    """Resolve a gold paper's JATS XML: bundled resource or PMC fetch-on-demand."""
+    if paper.xml_resource:
+        return (
+            resources.files("interciter.data.sample")
+            .joinpath(paper.xml_resource)
+            .read_text(encoding="utf-8")
+        )
+    if paper.pmcid:
+        from ..ingestion.pmc import fetch_jats
+
+        return fetch_jats(paper.pmcid, settings)
+    raise ValueError(
+        f"gold paper (order={paper.order}) has neither xml_resource nor pmcid"
+    )
 
 
 def load_gold(path: str | None = None) -> GoldCorpus:
@@ -86,4 +125,18 @@ def load_gold(path: str | None = None) -> GoldCorpus:
     else:
         with open(path, encoding="utf-8") as handle:
             raw = handle.read()
+    return GoldCorpus.model_validate(json.loads(raw))
+
+
+def load_gold_named(name: str) -> GoldCorpus:
+    """Load a gold corpus bundled under ``interciter/data/gold`` by name.
+
+    Accepts a bare name (``t2d_glycemic_v1``) or a filename (``t2d_glycemic_v1.json``).
+    """
+    filename = name if name.endswith(".json") else f"{name}.json"
+    raw = (
+        resources.files("interciter.data.gold")
+        .joinpath(filename)
+        .read_text(encoding="utf-8")
+    )
     return GoldCorpus.model_validate(json.loads(raw))

@@ -22,18 +22,105 @@ def _cmd_initdb(_: argparse.Namespace) -> int:
 
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
+    from .ingestion.extractor import build_extractor
+
     xml = Path(args.path).read_text(encoding="utf-8")
+    extractor = build_extractor(args.extractor, model=args.model)
     init_db()
     with SessionLocal() as session:
-        result = ingest_paper(session, xml=xml, settings=get_settings())
+        result = ingest_paper(
+            session, xml=xml, extractor=extractor, settings=get_settings()
+        )
     print(
-        f"Ingested work={result.work_id} version={result.version_id}\n"
+        f"Ingested work={result.work_id} version={result.version_id} "
+        f"[{extractor.name}]\n"
         f"  passages={result.passages} occurrences={result.occurrences} "
         f"interpretations={result.interpretations}\n"
         f"  relations={result.relation_assertions} "
         f"(claim_resolved={result.claim_resolved}, paper_resolved={result.paper_resolved})"
     )
     return 0
+
+
+def _load_source_xml(source: str) -> str:
+    """Resolve a CLI source to JATS XML: a local file path, else a PMCID to fetch."""
+    path = Path(source)
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    from .ingestion.pmc import fetch_jats
+
+    return fetch_jats(source, get_settings())
+
+
+def _cmd_llm_export_batch(args: argparse.Namespace) -> int:
+    from .ingestion.extractor import build_extractor
+    from .ingestion.llm_extractor import export_requests
+    from .ingestion.parser import parse_jats
+
+    paper = parse_jats(_load_source_xml(args.source))
+    extractor = build_extractor("llm", client=_NullClient(), model=args.model)
+    requests = extractor.build_requests(paper)
+    count = export_requests(requests, args.out)
+    print(f"Wrote {count} prompt(s) to {args.out} (model={extractor.model})")
+    print("Run these through your offline runner (e.g. vLLM on Biowulf), then import.")
+    return 0
+
+
+def _cmd_llm_import_batch(args: argparse.Namespace) -> int:
+    from .ingestion.extractor import build_extractor
+    from .ingestion.llm_client import BatchResponseClient, load_batch_responses
+
+    responses = load_batch_responses(args.responses)
+    client = BatchResponseClient(responses)
+    extractor = build_extractor("llm", client=client, model=args.model)
+    xml = _load_source_xml(args.source)
+    init_db()
+    with SessionLocal() as session:
+        result = ingest_paper(
+            session, xml=xml, extractor=extractor, settings=get_settings()
+        )
+    print(
+        f"Imported {len(responses)} response(s); ingested work={result.work_id} "
+        f"[{extractor.name}]\n"
+        f"  occurrences={result.occurrences} interpretations={result.interpretations} "
+        f"relations={result.relation_assertions}"
+    )
+    return 0
+
+
+def _cmd_llm_compare(args: argparse.Namespace) -> int:
+    from .evaluation.compare import compare_extractors, format_comparison
+    from .evaluation.gold import load_gold, load_gold_named
+    from .ingestion.extractor import build_extractor
+    from .ingestion.llm_client import BatchResponseClient, load_batch_responses
+
+    gold = load_gold_named(args.corpus) if args.corpus else load_gold(args.gold)
+    extractors = {}
+    if args.include_stub:
+        extractors["stub"] = build_extractor("stub")
+    for model in args.model or []:
+        extractors[model] = build_extractor("llm", model=model)
+    for spec in args.batch or []:
+        name, _, path = spec.partition("=")
+        if not path:
+            print(f"error: --batch expects NAME=PATH, got {spec!r}", file=sys.stderr)
+            return 1
+        client = BatchResponseClient(load_batch_responses(path))
+        extractors[name] = build_extractor("llm", client=client, model=name)
+    if not extractors:
+        print("error: provide --model, --batch, or --include-stub", file=sys.stderr)
+        return 1
+    reports = compare_extractors(gold, extractors)
+    print(format_comparison(reports))
+    return 0
+
+
+class _NullClient:
+    """A client that never returns a completion — used for prompt export only."""
+
+    def complete(self, request):  # noqa: D401, ANN001
+        return None
+
 
 
 def _cmd_seed(_: argparse.Namespace) -> int:
@@ -293,6 +380,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p_ingest = sub.add_parser("ingest", help="Ingest a JATS XML file")
     p_ingest.add_argument("path", help="Path to a JATS/PMC XML file")
+    p_ingest.add_argument(
+        "--extractor", default="stub", choices=["stub", "llm"], help="Extraction backend"
+    )
+    p_ingest.add_argument(
+        "--model", default=None, help="Model name for --extractor llm (overrides config)"
+    )
     p_ingest.set_defaults(func=_cmd_ingest)
 
     sub.add_parser("seed", help="Seed the bundled sample corpus").set_defaults(
@@ -408,6 +501,41 @@ def main(argv: list[str] | None = None) -> int:
         "--persist", action="store_true", help="Write EntityGrounding rows to the database"
     )
     p_gc.set_defaults(func=_cmd_ground_claim)
+
+    p_llm_export = sub.add_parser(
+        "llm-export-batch",
+        help="Build LLM extraction prompts for a paper as JSONL (offline batch runs)",
+    )
+    p_llm_export.add_argument("source", help="A JATS file path or a PMCID to fetch")
+    p_llm_export.add_argument("--out", required=True, help="Output JSONL path for prompts")
+    p_llm_export.add_argument("--model", default=None, help="Model name (overrides config)")
+    p_llm_export.set_defaults(func=_cmd_llm_export_batch)
+
+    p_llm_import = sub.add_parser(
+        "llm-import-batch",
+        help="Ingest a paper using offline batch responses (e.g. from Biowulf)",
+    )
+    p_llm_import.add_argument("source", help="A JATS file path or a PMCID to fetch")
+    p_llm_import.add_argument("--responses", required=True, help="Batch responses JSONL")
+    p_llm_import.add_argument("--model", default=None, help="Model name (overrides config)")
+    p_llm_import.set_defaults(func=_cmd_llm_import_batch)
+
+    p_llm_cmp = sub.add_parser(
+        "llm-compare", help="Score extractors side by side on a gold corpus"
+    )
+    p_llm_cmp.add_argument("--corpus", default=None, help="Bundled gold corpus name")
+    p_llm_cmp.add_argument("--gold", default=None, help="Path to a gold corpus JSON")
+    p_llm_cmp.add_argument(
+        "--model", action="append", default=None, help="Live LLM model (repeatable)"
+    )
+    p_llm_cmp.add_argument(
+        "--batch", action="append", default=None,
+        help="Batch-backed extractor as NAME=responses.jsonl (repeatable)",
+    )
+    p_llm_cmp.add_argument(
+        "--include-stub", action="store_true", help="Include the deterministic stub"
+    )
+    p_llm_cmp.set_defaults(func=_cmd_llm_compare)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

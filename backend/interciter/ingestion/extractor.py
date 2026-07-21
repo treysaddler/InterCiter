@@ -250,3 +250,39 @@ class StubExtractor:
 
 def default_extractor() -> Extractor:
     return StubExtractor()
+
+
+def build_extractor(
+    name: str = "stub",
+    *,
+    settings=None,
+    client=None,
+    model: str | None = None,
+) -> Extractor:
+    """Construct an extractor by name.
+
+    ``stub`` is the deterministic, offline default. ``llm`` builds an
+    :class:`~interciter.ingestion.llm_extractor.LLMExtractor` bound to an
+    OpenAI-compatible client (NIEHS LiteLLM / Biowulf), or to an injected ``client``
+    (e.g. a batch-replay client). Imports are local to avoid a module import cycle.
+    """
+    if name == "stub":
+        return StubExtractor()
+    if name == "llm":
+        from ..config import get_settings
+        from .llm_client import client_from_settings
+        from .llm_extractor import LLMExtractor
+
+        settings = settings or get_settings()
+        model = model or settings.llm_model
+        if client is None:
+            client = client_from_settings(settings)
+        return LLMExtractor(
+            client=client,
+            model=model,
+            provider=settings.llm_provider,
+            prompt_template_version=settings.llm_prompt_template_version,
+            temperature=settings.llm_temperature,
+            max_tokens=settings.llm_max_tokens,
+        )
+    raise ValueError(f"unknown extractor: {name!r}")

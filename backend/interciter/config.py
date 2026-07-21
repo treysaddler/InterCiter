@@ -66,6 +66,20 @@ class Settings(BaseSettings):
     embedding_prefilter_enabled: bool = True
     embedding_prefilter_threshold: float = 0.5
 
+    # LLM extraction. The pipeline is model-agnostic: any OpenAI-compatible chat endpoint
+    # works — the NIEHS LiteLLM proxy (live) or a Biowulf-hosted server. Biowulf can also
+    # run offline: export prompts, run them there (e.g. vLLM), import the responses. The
+    # extractor validates model output strictly and abstains on anything malformed.
+    llm_base_url: str = ""  # e.g. https://litellm.example.org/v1
+    llm_api_key: str | None = None
+    llm_model: str = "gpt-4o"
+    llm_provider: str = "niehs-litellm"
+    llm_temperature: float = 0.0
+    llm_max_tokens: int = 1536
+    llm_timeout: int = 120
+    llm_prompt_template_version: str = "extract-v1"
+    llm_batch_dir: str = ".cache/llm-batch"
+
     # Emit SQL for debugging.
     echo_sql: bool = False
 

@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     name_res_url: str = "https://name-resolution-sri.renci.org"
     robokop_cache_dir: str = ".cache/robokop"
 
+    # SPECTER2 paper-level prefilter for cross-paper clustering. Gates which cross-paper
+    # claim pairs are even compared; the claim-level decision itself stays token-overlap
+    # (paper-level embeddings never assert claim equivalence — docs/architecture.md).
+    # Gracefully disabled per-pair when either paper lacks a cached embedding.
+    embedding_prefilter_enabled: bool = True
+    embedding_prefilter_threshold: float = 0.5
+
     # Emit SQL for debugging.
     echo_sql: bool = False
 

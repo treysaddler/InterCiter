@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from interciter.enums import RelationResolution, RelationStance
-from interciter.ingestion.pipeline import ingest_paper
-from interciter.services import projection
+from sqlalchemy import select
+
+from interciter import models
+from interciter.config import Settings
+from interciter.enums import Manifestation, OccurrenceType, RelationResolution, RelationStance
+from interciter.ingestion.pipeline import _cluster_new_interpretations, ingest_paper
+from interciter.services import enrichment, projection
 
 from helpers import load_sample
 
@@ -13,6 +17,44 @@ def _ingest_both(session):
     b = ingest_paper(session, xml=load_sample("paper_b.xml"))
     a = ingest_paper(session, xml=load_sample("paper_a.xml"))
     return b, a
+
+
+def _paper_with_claim(session, run_id, work_id, corpus_id, text):
+    """Seed a minimal work→version→passage→occurrence→interpretation for clustering."""
+    session.add(
+        models.PaperWork(work_id=work_id, s2_corpus_id=corpus_id)
+    )
+    session.add(
+        models.PaperVersion(
+            version_id=f"v_{work_id}", work_id=work_id, manifestation=Manifestation.published
+        )
+    )
+    session.add(
+        models.Passage(
+            passage_id=f"p_{work_id}", paper_version_id=f"v_{work_id}", verbatim_text=text
+        )
+    )
+    session.add(
+        models.ClaimOccurrence(
+            occurrence_id=f"o_{work_id}",
+            passage_id=f"p_{work_id}",
+            occurrence_type=OccurrenceType.reported_result,
+            extraction_run_id=run_id,
+        )
+    )
+    session.add(
+        models.ClaimInterpretation(
+            interpretation_id=f"i_{work_id}",
+            claim_occurrence_id=f"o_{work_id}",
+            normalized_text=text,
+            extraction_run_id=run_id,
+            parent_interpretation_ids=[],
+        )
+    )
+
+
+def _memberships(session) -> int:
+    return len(session.scalars(select(models.ClusterMembership)).all())
 
 
 def test_ingest_produces_records(session):
@@ -48,6 +90,43 @@ def test_one_hop_trace_reaches_b(session):
     assert hop.target_claim is not None
     assert "glucose" in hop.target_claim.normalized_text.lower()
     assert hop.evidence is not None  # every hop carries evidence
+
+
+def test_specter2_prefilter_gates_dissimilar_papers(session, tmp_path):
+    # Two papers with identical claim text would cluster on token overlap alone; a
+    # paper-level SPECTER2 gate (orthogonal embeddings) blocks the cross-paper pair.
+    session.add(models.ExtractionRun(run_id="r1"))
+    _paper_with_claim(session, "r1", "wa", "100", "metformin reduces fasting glucose")
+    _paper_with_claim(session, "r1", "wb", "200", "metformin reduces fasting glucose")
+    session.flush()
+    settings = Settings(s2_cache_dir=str(tmp_path), embedding_prefilter_threshold=0.9)
+    enrichment.cache_embedding("100", [1.0, 0.0], settings=settings)
+    enrichment.cache_embedding("200", [0.0, 1.0], settings=settings)  # orthogonal
+    _cluster_new_interpretations(session, "r1", settings)
+    assert _memberships(session) == 0
+
+
+def test_specter2_prefilter_allows_similar_papers(session, tmp_path):
+    session.add(models.ExtractionRun(run_id="r1"))
+    _paper_with_claim(session, "r1", "wa", "100", "metformin reduces fasting glucose")
+    _paper_with_claim(session, "r1", "wb", "200", "metformin reduces fasting glucose")
+    session.flush()
+    settings = Settings(s2_cache_dir=str(tmp_path), embedding_prefilter_threshold=0.9)
+    enrichment.cache_embedding("100", [1.0, 0.0], settings=settings)
+    enrichment.cache_embedding("200", [1.0, 0.0], settings=settings)  # aligned
+    _cluster_new_interpretations(session, "r1", settings)
+    assert _memberships(session) >= 2  # both interpretations joined one cluster
+
+
+def test_prefilter_falls_back_when_embeddings_missing(session, tmp_path):
+    # No cached embeddings -> gate defers to token overlap, so identical claims cluster.
+    session.add(models.ExtractionRun(run_id="r1"))
+    _paper_with_claim(session, "r1", "wa", "100", "metformin reduces fasting glucose")
+    _paper_with_claim(session, "r1", "wb", "200", "metformin reduces fasting glucose")
+    session.flush()
+    settings = Settings(s2_cache_dir=str(tmp_path))
+    _cluster_new_interpretations(session, "r1", settings)
+    assert _memberships(session) >= 2
 
 
 def test_scores_are_decomposed(session):

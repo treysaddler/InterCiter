@@ -269,7 +269,7 @@ def ingest_paper(
             result.relation_assertions += 1
 
     session.commit()
-    _cluster_new_interpretations(session, run.run_id)
+    _cluster_new_interpretations(session, run.run_id, settings)
     return result
 
 
@@ -373,12 +373,76 @@ def _build_relation_assertion(
     )
 
 
-def _cluster_new_interpretations(session: Session, run_id: str) -> None:
+def _interp_corpus_map(session: Session, interp_ids: list[str]) -> dict[str, str | None]:
+    """Map each interpretation id to its paper's ``s2_corpus_id`` (via occurrence→work)."""
+    if not interp_ids:
+        return {}
+    rows = session.execute(
+        select(
+            models.ClaimInterpretation.interpretation_id,
+            models.PaperWork.s2_corpus_id,
+        )
+        .join(
+            models.ClaimOccurrence,
+            models.ClaimInterpretation.claim_occurrence_id
+            == models.ClaimOccurrence.occurrence_id,
+        )
+        .join(models.Passage, models.ClaimOccurrence.passage_id == models.Passage.passage_id)
+        .join(
+            models.PaperVersion,
+            models.Passage.paper_version_id == models.PaperVersion.version_id,
+        )
+        .join(models.PaperWork, models.PaperVersion.work_id == models.PaperWork.work_id)
+        .where(models.ClaimInterpretation.interpretation_id.in_(interp_ids))
+    ).all()
+    return {iid: cid for iid, cid in rows}
+
+
+def _build_paper_prefilter(session: Session, settings: Settings, interps):
+    """Return ``allows(a_id, b_id) -> bool``: a paper-level SPECTER2 gate for clustering.
+
+    Narrows which *cross-paper* claim pairs are even compared: two claims from different
+    papers are only considered when the papers' SPECTER2 cosine clears the threshold. The
+    claim-level equivalence decision still uses token-overlap — embeddings never assert
+    claim equivalence (docs/architecture.md). The gate is skipped (returns ``True``) for
+    same-paper pairs or whenever either paper lacks a cached embedding, so behavior
+    degrades to the token-overlap baseline rather than over-fragmenting.
+    """
+    if not settings.embedding_prefilter_enabled:
+        return lambda a_id, b_id: True
+
+    from ..services.enrichment import cosine, load_embedding
+
+    corpus = _interp_corpus_map(session, [i.interpretation_id for i in interps])
+    emb_cache: dict[str, list[float] | None] = {}
+    threshold = settings.embedding_prefilter_threshold
+
+    def _embedding(corpus_id: str) -> list[float] | None:
+        if corpus_id not in emb_cache:
+            emb_cache[corpus_id] = load_embedding(corpus_id, settings=settings)
+        return emb_cache[corpus_id]
+
+    def allows(a_id: str, b_id: str) -> bool:
+        ca, cb = corpus.get(a_id), corpus.get(b_id)
+        if not ca or not cb or ca == cb:
+            return True  # can't gate (missing id) or same paper -> defer to token overlap
+        ea, eb = _embedding(ca), _embedding(cb)
+        if not ea or not eb:
+            return True  # missing embedding -> fall back to the baseline
+        return cosine(ea, eb) >= threshold
+
+    return allows
+
+
+def _cluster_new_interpretations(
+    session: Session, run_id: str, settings: Settings
+) -> None:
     """High-precision soft clustering across independent papers.
 
     Groups this run's interpretations with existing ones only when semantic overlap is
     high; uncertain pairs stay unclustered (abstention). Membership is a soft row, never
-    a merge — reverting is just deactivating the row.
+    a merge — reverting is just deactivating the row. A paper-level SPECTER2 prefilter
+    gates which cross-paper pairs are compared at all (paper-level narrowing only).
     """
     new_interps = list(
         session.scalars(
@@ -396,6 +460,7 @@ def _cluster_new_interpretations(session: Session, run_id: str) -> None:
         )
     )
     cluster_of: dict[str, str] = {m.interpretation_id: m.cluster_id for m in active}
+    allows = _build_paper_prefilter(session, settings, all_interps)
 
     for interp in new_interps:
         best_id: str | None = None
@@ -403,6 +468,8 @@ def _cluster_new_interpretations(session: Session, run_id: str) -> None:
         for other in all_interps:
             if other.interpretation_id == interp.interpretation_id:
                 continue
+            if not allows(interp.interpretation_id, other.interpretation_id):
+                continue  # paper-level prefilter: papers too dissimilar to compare
             score = _overlap_score(interp.normalized_text, other.normalized_text)
             if score > best_score:
                 best_score, best_id = score, other.interpretation_id

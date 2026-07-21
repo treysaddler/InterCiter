@@ -41,6 +41,24 @@ class Settings(BaseSettings):
     # redistributed — only annotations keyed to PMCID/DOI are.
     pmc_cache_dir: str = ".cache/pmc"
 
+    # Semantic Scholar. The Academic Graph API is usable unauthenticated (shared global
+    # pool); an API key raises limits and is *required* for the Datasets API. Per-paper
+    # JSON is cached under ``s2_cache_dir``; bulk snapshots under ``s2_datasets_dir``
+    # (both gitignored). Only identifiers/annotations and the small manifest are ever
+    # committed — never fetched text or shards.
+    s2_api_key: str | None = None
+    s2_graph_base: str = "https://api.semanticscholar.org/graph/v1"
+    s2_datasets_base: str = "https://api.semanticscholar.org/datasets/v1"
+    s2_cache_dir: str = ".cache/s2"
+    s2_datasets_dir: str = ".cache/s2-datasets"
+
+    # ROBOKOP / NCATS Translator reference services (entity grounding + one-hop edges).
+    # All cache-first; responses cached under ``robokop_cache_dir`` (gitignored).
+    robokop_trapi_url: str = "https://automat.renci.org/robokopkg/1.5/query"
+    node_norm_url: str = "https://nodenormalization-sri.renci.org"
+    name_res_url: str = "https://name-resolution-sri.renci.org"
+    robokop_cache_dir: str = ".cache/robokop"
+
     # Emit SQL for debugging.
     echo_sql: bool = False
 

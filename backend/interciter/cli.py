@@ -118,6 +118,86 @@ def _cmd_pmc_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_s2_enrich(args: argparse.Namespace) -> int:
+    import json
+
+    from .ingestion.semantic_scholar import (
+        S2Error,
+        get_embedding,
+        get_paper,
+        get_references,
+    )
+
+    try:
+        paper = get_paper(args.id, use_cache=not args.no_cache)
+        out: dict = {"paper": paper}
+        if args.refs:
+            out["references"] = get_references(
+                args.id, max_records=args.max_refs, use_cache=not args.no_cache
+            )
+        if args.embedding:
+            vector = get_embedding(args.id, use_cache=not args.no_cache)
+            out["embedding_dims"] = len(vector) if vector else 0
+    except S2Error as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def _cmd_s2_datasets(args: argparse.Namespace) -> int:
+    import json
+
+    from .datasets import (
+        S2DatasetsError,
+        latest_release,
+        list_releases,
+        lookup_corpusid,
+        pull_dataset,
+    )
+
+    try:
+        if args.action == "releases":
+            releases = list_releases()
+            latest = latest_release()["release_id"]
+            print(f"latest: {latest}")
+            print(f"total releases: {len(releases)}")
+            print("recent:", ", ".join(releases[-5:]))
+        elif args.action == "pull":
+            manifest = pull_dataset(
+                args.name, release_id=args.release, max_shards=args.shards
+            )
+            print(f"release pinned: {manifest.release_id}")
+            print(f"shards cached: {len(manifest.shards)}")
+            for shard in manifest.shards:
+                print(f"  {shard.dataset}/{shard.basename} ({shard.bytes} bytes)")
+        elif args.action == "lookup":
+            record = lookup_corpusid(args.corpusid, dataset_name=args.dataset)
+            print(json.dumps(record, indent=2) if record else "not found")
+    except S2DatasetsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_robokop(args: argparse.Namespace) -> int:
+    import json
+
+    from .ingestion.robokop import RobokopError, ground, query_edges
+
+    try:
+        if args.action == "ground":
+            node = ground(args.term, biolink_type=args.type)
+            print(json.dumps(node, indent=2) if node else "no grounding")
+        elif args.action == "edges":
+            edges = query_edges(args.subject, args.object, predicate=args.predicate)
+            print(json.dumps(edges, indent=2))
+    except RobokopError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -169,6 +249,50 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_inspect.add_argument("pmcid", help="PMC id, e.g. PMC1234567")
     p_inspect.set_defaults(func=_cmd_pmc_inspect)
+
+    p_s2 = sub.add_parser(
+        "s2-enrich", help="Fetch Semantic Scholar enrichment for a paper id"
+    )
+    p_s2.add_argument("id", help="Paper id, e.g. DOI:10.…, PMID:…, PMCID:PMC…, CorpusId:…")
+    p_s2.add_argument("--refs", action="store_true", help="Also fetch resolved references")
+    p_s2.add_argument(
+        "--max-refs", type=int, default=50, dest="max_refs", help="Cap references fetched"
+    )
+    p_s2.add_argument(
+        "--embedding", action="store_true", help="Also report SPECTER2 embedding dims"
+    )
+    p_s2.add_argument("--no-cache", action="store_true", help="Bypass the local cache")
+    p_s2.set_defaults(func=_cmd_s2_enrich)
+
+    p_ds = sub.add_parser(
+        "s2-datasets", help="Semantic Scholar bulk datasets (requires INTERCITER_S2_API_KEY)"
+    )
+    ds_sub = p_ds.add_subparsers(dest="action", required=True)
+    ds_sub.add_parser("releases", help="List available releases")
+    p_ds_pull = ds_sub.add_parser("pull", help="Download + manifest shards of a dataset")
+    p_ds_pull.add_argument("name", help="Dataset name, e.g. papers, citations, abstracts")
+    p_ds_pull.add_argument("--release", default="latest", help="Release id (default latest)")
+    p_ds_pull.add_argument(
+        "--shards", type=int, default=1, help="Max shards to pull (0/omit for all -> use --all)"
+    )
+    p_ds_pull.add_argument(
+        "--all", action="store_const", const=None, dest="shards", help="Pull all shards"
+    )
+    p_ds_lookup = ds_sub.add_parser("lookup", help="Find a record by corpusid in the cache")
+    p_ds_lookup.add_argument("corpusid", help="Semantic Scholar corpusId")
+    p_ds_lookup.add_argument("--dataset", default="papers", help="Dataset to scan")
+    p_ds.set_defaults(func=_cmd_s2_datasets)
+
+    p_rk = sub.add_parser("robokop", help="ROBOKOP / Translator grounding + edge lookup")
+    rk_sub = p_rk.add_subparsers(dest="action", required=True)
+    p_rk_ground = rk_sub.add_parser("ground", help="Ground a name or CURIE to a canonical node")
+    p_rk_ground.add_argument("term", help="Free-text name or a CURIE (prefix:local)")
+    p_rk_ground.add_argument("--type", default=None, help="Optional BioLink type filter")
+    p_rk_edges = rk_sub.add_parser("edges", help="One-hop TRAPI edges between two CURIEs")
+    p_rk_edges.add_argument("subject", help="Subject CURIE")
+    p_rk_edges.add_argument("object", help="Object CURIE")
+    p_rk_edges.add_argument("--predicate", default=None, help="Optional BioLink predicate")
+    p_rk.set_defaults(func=_cmd_robokop)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

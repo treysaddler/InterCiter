@@ -218,6 +218,7 @@ def _cmd_robokop(args: argparse.Namespace) -> int:
     import json
 
     from .ingestion.robokop import RobokopError, ground, query_edges
+    from .services.grounding import corroborate
 
     try:
         if args.action == "ground":
@@ -226,9 +227,42 @@ def _cmd_robokop(args: argparse.Namespace) -> int:
         elif args.action == "edges":
             edges = query_edges(args.subject, args.object, predicate=args.predicate)
             print(json.dumps(edges, indent=2))
+        elif args.action == "corroborate":
+            records = corroborate(args.subject, args.object, predicate=args.predicate)
+            print(json.dumps(records, indent=2))
     except RobokopError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    return 0
+
+
+def _cmd_ground_claim(args: argparse.Namespace) -> int:
+    import json
+
+    from . import models
+    from .ingestion.robokop import RobokopError
+    from .services.grounding import ground_interpretation
+
+    init_db()
+    with SessionLocal() as session:
+        interp = session.get(models.ClaimInterpretation, args.interpretation_id)
+        if interp is None:
+            print(
+                f"error: interpretation {args.interpretation_id} not found",
+                file=sys.stderr,
+            )
+            return 1
+        extra = [("term", t) for t in (args.term or [])]
+        try:
+            result = ground_interpretation(session, interp, extra_terms=extra)
+        except RobokopError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+    payload = {
+        "interpretation_id": result.interpretation_id,
+        "groundings": [vars(g) for g in result.groundings],
+    }
+    print(json.dumps(payload, indent=2))
     return 0
 
 
@@ -339,7 +373,22 @@ def main(argv: list[str] | None = None) -> int:
     p_rk_edges.add_argument("subject", help="Subject CURIE")
     p_rk_edges.add_argument("object", help="Object CURIE")
     p_rk_edges.add_argument("--predicate", default=None, help="Optional BioLink predicate")
+    p_rk_corr = rk_sub.add_parser(
+        "corroborate", help="One-hop edges with BioLink knowledge-source provenance"
+    )
+    p_rk_corr.add_argument("subject", help="Subject CURIE")
+    p_rk_corr.add_argument("object", help="Object CURIE")
+    p_rk_corr.add_argument("--predicate", default=None, help="Optional BioLink predicate")
     p_rk.set_defaults(func=_cmd_robokop)
+
+    p_gc = sub.add_parser(
+        "ground-claim", help="Ground a stored interpretation's entity qualifiers to CURIEs"
+    )
+    p_gc.add_argument("interpretation_id", help="A ClaimInterpretation id")
+    p_gc.add_argument(
+        "--term", action="append", default=None, help="Extra free-text term to ground (repeatable)"
+    )
+    p_gc.set_defaults(func=_cmd_ground_claim)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

@@ -19,6 +19,7 @@ from interciter.ingestion import robokop, semantic_scholar
 from interciter import models
 from interciter.enums import AvailabilityState
 from interciter.services import enrichment
+from interciter.services import grounding
 _NET = os.environ.get("INTERCITER_NET_TESTS") == "1"
 _netonly = pytest.mark.skipif(not _NET, reason="network test; set INTERCITER_NET_TESTS=1")
 _HAS_KEY = bool(os.environ.get("INTERCITER_S2_API_KEY"))
@@ -227,6 +228,98 @@ def test_reference_links_normalizes_intents(monkeypatch):
     assert links[0]["cited_corpus_id"] == "7"
     assert links[0]["intents"] == ["background"]
     assert links[0]["is_influential"] is True
+
+
+# --- Grounding + corroboration (ROBOKOP, derived) -------------------------------
+
+def test_candidate_terms_picks_non_null_entities():
+    quals = {
+        "intervention": "metformin",
+        "comparator": None,
+        "outcome": "HbA1c",
+        "population": "  ",
+        "effect_direction": "decrease",
+    }
+    assert grounding.candidate_terms(quals) == [
+        ("intervention", "metformin"),
+        ("outcome", "HbA1c"),
+    ]
+    assert grounding.candidate_terms(None) == []
+
+
+def test_ground_terms_maps_node_records(monkeypatch):
+    def _fake_ground(term, **k):
+        if term == "metformin":
+            return {
+                "id": {"identifier": "CHEBI:6801", "label": "metformin"},
+                "type": ["biolink:SmallMolecule"],
+            }
+        return None
+
+    monkeypatch.setattr(grounding.robokop, "ground", _fake_ground)
+    results = grounding.ground_terms(
+        [("intervention", "metformin"), ("outcome", "nonsense-xyz")], use_cache=False
+    )
+    assert results[0].curie == "CHEBI:6801"
+    assert results[0].types == ["biolink:SmallMolecule"]
+    assert results[1].curie is None  # unresolved term retained, not dropped
+
+
+def test_ground_interpretation_uses_qualifiers(session, monkeypatch):
+    monkeypatch.setattr(
+        grounding.robokop,
+        "ground",
+        lambda term, **k: {
+            "id": {"identifier": "CHEBI:6801"},
+            "type": ["biolink:SmallMolecule"],
+        },
+    )
+    interp = models.ClaimInterpretation(
+        interpretation_id="i1",
+        claim_occurrence_id="o1",
+        normalized_text="metformin lowers HbA1c",
+        qualifiers={"intervention": "metformin"},
+        parent_interpretation_ids=[],
+    )
+    session.add(interp)
+    session.flush()
+    result = grounding.ground_interpretation(session, interp)
+    assert result.interpretation_id == "i1"
+    assert result.resolved()[0].curie == "CHEBI:6801"
+
+
+def test_knowledge_sources_splits_roles():
+    edge = {
+        "sources": [
+            {"resource_id": "infores:ctd", "resource_role": "primary_knowledge_source"},
+            {"resource_id": "infores:robokop", "resource_role": "aggregator_knowledge_source"},
+            {"resource_id": "infores:automat", "resource_role": "aggregator_knowledge_source"},
+        ]
+    }
+    ks = grounding.knowledge_sources(edge)
+    assert ks["primary_knowledge_source"] == "infores:ctd"
+    assert ks["aggregator_knowledge_source"] == ["infores:robokop", "infores:automat"]
+
+
+def test_corroborate_attaches_provenance(monkeypatch):
+    monkeypatch.setattr(
+        grounding.robokop,
+        "query_edges",
+        lambda *a, **k: [
+            {
+                "subject": "CHEBI:6801",
+                "predicate": "biolink:treats",
+                "object": "MONDO:0005148",
+                "sources": [
+                    {"resource_id": "infores:ctd", "resource_role": "primary_knowledge_source"}
+                ],
+            }
+        ],
+    )
+    records = grounding.corroborate("CHEBI:6801", "MONDO:0005148", use_cache=False)
+    assert records[0]["predicate"] == "biolink:treats"
+    assert records[0]["primary_knowledge_source"] == "infores:ctd"
+    assert records[0]["aggregator_knowledge_source"] == []
 
 
 # --- Live (network-gated) -------------------------------------------------------

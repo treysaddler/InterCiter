@@ -584,6 +584,7 @@ class CollectionAddMembersResult(BaseModel):
     collection_id: str
     added_count: int = 0
     skipped_identifiers: list[str] = Field(default_factory=list)
+    created_stub_work_ids: list[str] = Field(default_factory=list)
     members: list[CollectionMemberView] = Field(default_factory=list)
 
 

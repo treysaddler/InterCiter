@@ -228,6 +228,7 @@ def add_members(
 
     added_members: list[CollectionMemberView] = []
     skipped: list[str] = []
+    created_stub_work_ids: list[str] = []
 
     for work_id in work_ids:
         work = _resolve_existing_work(session, work_id=work_id)
@@ -255,6 +256,8 @@ def add_members(
                 skipped.append(doi)
                 continue
             work = session.get(models.PaperWork, job.paper_work_id)
+            if work is not None:
+                created_stub_work_ids.append(work.work_id)
         if work is None:
             skipped.append(doi)
             continue
@@ -279,6 +282,8 @@ def add_members(
                 skipped.append(pmid)
                 continue
             work = session.get(models.PaperWork, job.paper_work_id)
+            if work is not None:
+                created_stub_work_ids.append(work.work_id)
         if work is None:
             skipped.append(pmid)
             continue
@@ -298,6 +303,7 @@ def add_members(
         collection_id=collection.collection_id,
         added_count=len(added_members),
         skipped_identifiers=skipped,
+        created_stub_work_ids=list(dict.fromkeys(created_stub_work_ids)),
         members=added_members,
     )
 

@@ -202,6 +202,7 @@ export interface CollectionAddMembersResult {
   collection_id: string
   added_count: number
   skipped_identifiers: string[]
+  created_stub_work_ids: string[]
   members: CollectionMemberView[]
 }
 

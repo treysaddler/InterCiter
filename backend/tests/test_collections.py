@@ -61,6 +61,7 @@ def test_collection_members_work_id_and_identifier_batch(client, user_headers):
     assert add.status_code == 200, add.text
     body = add.json()
     assert body["added_count"] >= 3
+    assert len(body["created_stub_work_ids"]) >= 1
 
     detail = client.get(f"/v1/collections/{collection_id}", headers=user_headers)
     assert detail.status_code == 200

@@ -235,6 +235,9 @@ Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 > Continued: collection detail now exposes aggregate citation tallies for the
 > whole collection and supports member sorting by recency or support/contradict
 > citation volume.
+>
+> Continued: batch import now shows parsed DOI/PMID preview chips before submit
+> and richer import feedback (added/skipped + metadata-stub creations).
 
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)
 Goal: non-mutating enrichment flagging retracted / noticed works.

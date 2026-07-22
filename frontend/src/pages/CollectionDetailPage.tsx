@@ -12,6 +12,8 @@ import PageHeading from '../components/PageHeading'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
+const DOI_LIKE = /^10\.\d{4,9}\/\S+$/i
+
 function readFileText(file: File): Promise<string> {
   if (typeof file.text === 'function') {
     return file.text()
@@ -22,6 +24,21 @@ function readFileText(file: File): Promise<string> {
     reader.onload = () => resolve(String(reader.result ?? ''))
     reader.readAsText(file)
   })
+}
+
+function parseIdentifiers(text: string): { dois: string[]; pmids: string[] } {
+  const dois: string[] = []
+  const pmids: string[] = []
+  for (const token of text.split(/[\s,;]+/)) {
+    const t = token.trim()
+    if (!t) continue
+    if (DOI_LIKE.test(t)) dois.push(t)
+    else if (/^\d+$/.test(t)) pmids.push(t)
+  }
+  return {
+    dois: Array.from(new Set(dois)),
+    pmids: Array.from(new Set(pmids)),
+  }
 }
 
 /**
@@ -47,6 +64,7 @@ export default function CollectionDetailPage() {
   const [saving, setSaving] = useState(false)
   const [savingMeta, setSavingMeta] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const parsed = parseIdentifiers(csvText)
 
   useEffect(() => {
     if (!detail.data) return
@@ -65,7 +83,14 @@ export default function CollectionDetailPage() {
         `/collections/${collectionId}/members`,
         { csv_text: csvText },
       )
-      setMessage(`Added ${result.added_count} member(s).`)
+      const stubCount = result.created_stub_work_ids.length
+      const skippedCount = result.skipped_identifiers.length
+      setMessage(
+        `Added ${result.added_count} member(s)` +
+          (stubCount ? `; ${stubCount} created as metadata stubs` : '') +
+          (skippedCount ? `; ${skippedCount} skipped` : '') +
+          '.',
+      )
       setCsvText('')
       detail.reload()
     } catch (err) {
@@ -213,6 +238,25 @@ export default function CollectionDetailPage() {
               onChange={(e) => setCsvText(e.target.value)}
               placeholder="10.1000/example-doi\n12345678"
             />
+            {(parsed.dois.length > 0 || parsed.pmids.length > 0) && (
+              <div className="margin-top-1" aria-live="polite">
+                <p className="font-body-3xs text-base margin-y-05">
+                  Ready to import: {parsed.dois.length} DOI(s), {parsed.pmids.length} PMID(s)
+                </p>
+                <div className="display-flex flex-wrap">
+                  {parsed.dois.slice(0, 8).map((doi) => (
+                    <span key={doi} className="usa-tag bg-base-lighter text-ink margin-right-05 margin-bottom-05">
+                      DOI {doi}
+                    </span>
+                  ))}
+                  {parsed.pmids.slice(0, 8).map((pmid) => (
+                    <span key={pmid} className="usa-tag bg-base-lighter text-ink margin-right-05 margin-bottom-05">
+                      PMID {pmid}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <button type="submit" className="usa-button" disabled={saving}>
               {saving ? 'Adding…' : 'Add members'}
             </button>

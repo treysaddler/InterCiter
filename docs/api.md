@@ -120,7 +120,9 @@ metadata stubs for unknown identifiers through the existing ingest path.
 - `PATCH /v1/collections/{id}` — update `{name?, description?}`.
 - `DELETE /v1/collections/{id}` — delete a collection (and memberships).
 - `POST /v1/collections/{id}/members` — batch add members (`{work_ids[], dois[],
-  pmids[], csv_text?}`) and returns `{added_count, skipped_identifiers, members[]}`.
+  pmids[], csv_text?}`) and returns `{added_count, skipped_identifiers,
+  created_stub_work_ids, members[]}` where `created_stub_work_ids` are works that
+  were registered as metadata stubs during identifier ingestion.
 - `DELETE /v1/collections/{id}/members/{work_id}` — remove one member.
 
 All collection endpoints are auth-scoped to the caller's own resources. Writes require

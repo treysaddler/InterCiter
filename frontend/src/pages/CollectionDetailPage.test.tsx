@@ -12,12 +12,14 @@ vi.mock('../api/client', () => ({
 const mockedGet = vi.mocked(api.get)
 const mockedPatch = vi.mocked(api.patch)
 const mockedDel = vi.mocked(api.del)
+const mockedPost = vi.mocked(api.post)
 
 describe('CollectionDetailPage', () => {
   beforeEach(() => {
     mockedGet.mockReset()
     mockedPatch.mockReset()
     mockedDel.mockReset()
+    mockedPost.mockReset()
   })
 
   it('requests member tallies and renders member entry', async () => {
@@ -156,6 +158,48 @@ describe('CollectionDetailPage', () => {
 
     expect(await screen.findByText(/loaded identifiers from ids.csv/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Identifiers')).toHaveValue('10.1000/example\n12345678')
+    expect(screen.getByText(/ready to import: 1 doi\(s\), 1 pmid\(s\)/i)).toBeInTheDocument()
+  })
+
+  it('shows rich import feedback after adding members', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 0,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: null,
+      members: [],
+    })
+    mockedPost.mockResolvedValue({
+      collection_id: 'coll_1',
+      added_count: 3,
+      skipped_identifiers: ['bad-id'],
+      created_stub_work_ids: ['work_stub_1'],
+      members: [],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(await screen.findByLabelText('Identifiers'), {
+      target: { value: '10.1000/example 12345678 bad-id' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /add members/i }))
+
+    expect(mockedPost).toHaveBeenCalledWith('/collections/coll_1/members', {
+      csv_text: '10.1000/example 12345678 bad-id',
+    })
+    expect(
+      await screen.findByText(/added 3 member\(s\); 1 created as metadata stubs; 1 skipped/i),
+    ).toBeInTheDocument()
   })
 
   it('changes member sort and requests updated ordering', async () => {

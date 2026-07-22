@@ -69,6 +69,10 @@ export interface UserView {
   created_at: string
 }
 
+export interface UserWithToken extends UserView {
+  api_token: string
+}
+
 export interface SessionInfo {
   user_id: string
   display_name: string

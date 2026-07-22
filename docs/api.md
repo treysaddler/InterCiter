@@ -58,6 +58,16 @@ The response reports cycles, truncated branches, evidence for every hop, and sep
 - `DELETE /v1/clusters/{cluster_id}/members/{interpretation_id}` — reviewer removes a bad membership (sets `status: removed`; nothing is destroyed).
 - `POST /v1/review-decisions` — per-dimension review of an occurrence / interpretation / assertion / membership, with rationale.
 
+## Network graph — papers, authors, citations, claims (MVP)
+
+A derived, read-side projection (like the claim views): the immutable record is flattened into a generic node/edge envelope so the same shape serves the citation network today and a ROBOKOP claim graph later. Nodes carry an open `type` discriminator (`paper`, `author`, `claim`, …); edges are directed with a `type` (`cites`, `authored`, `relates`). `cites` edges union two sources — passage-grounded `CitationMention`s (full-text corpus) and bibliographic `CitationEdge`s (which can point at metadata-only stubs). Every view is bounded and reports `truncated` when a cap is hit.
+
+- `GET /v1/graph/papers` — a bounded overview of the citation network (`limit`, `include_authors`). Reads stay open.
+- `GET /v1/graph/papers/{work_id}` — the citation neighborhood centered on one paper, BFS to `depth` hops (both directions), `include_authors` optional.
+- `POST /v1/graph/papers/{work_id}/expand` — grow the graph on demand from **Semantic Scholar**: pulls the paper's references, creates any missing cited works as metadata-only stubs, and persists each as a `semantic_scholar` `CitationEdge` (idempotent — re-expanding never duplicates). A write, so it requires an authenticated principal (+ CSRF for cookie auth). Returns counts plus the refreshed neighborhood.
+- `GET /v1/graph/claims` — the in-corpus claim-relationship network (nodes are interpretations; edges are `claim_resolved` `RelationAssertion`s carrying function/stance).
+- `POST /v1/graph/claims/{interpretation_id}/expand-robokop` — planned ROBOKOP one-hop claim expansion; returns `501 Not Implemented` until wired, so clients can gate the feature.
+
 ## Identity, sessions, and accounts (MVP)
 
 Every request resolves to a `Principal` from **either** an `Authorization: Bearer <token>` header (API/CLI clients) **or** a browser session cookie. Reads stay open; only writes require a principal, and some require `reviewer`/`admin` or ownership. The raw token is stored only as a SHA-256 hash.

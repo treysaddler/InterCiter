@@ -196,6 +196,8 @@ describe('CollectionDetailPage', () => {
 
     expect(mockedPost).toHaveBeenCalledWith('/collections/coll_1/members', {
       csv_text: '10.1000/example 12345678 bad-id',
+      dois: ['10.1000/example'],
+      pmids: ['12345678'],
     })
     expect(
       await screen.findByText(/added 3 member\(s\); 1 created as metadata stubs; 1 skipped/i),

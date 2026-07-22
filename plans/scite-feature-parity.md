@@ -238,6 +238,9 @@ Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 >
 > Continued: batch import now shows parsed DOI/PMID preview chips before submit
 > and richer import feedback (added/skipped + metadata-stub creations).
+>
+> Continued: frontend add-members requests now send parsed `dois[]` and
+> `pmids[]` explicitly alongside raw `csv_text` for clearer payload semantics.
 
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)
 Goal: non-mutating enrichment flagging retracted / noticed works.

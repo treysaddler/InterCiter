@@ -81,7 +81,11 @@ export default function CollectionDetailPage() {
     try {
       const result = await api.post<CollectionAddMembersResult>(
         `/collections/${collectionId}/members`,
-        { csv_text: csvText },
+        {
+          csv_text: csvText,
+          dois: parsed.dois,
+          pmids: parsed.pmids,
+        },
       )
       const stubCount = result.created_stub_work_ids.length
       const skippedCount = result.skipped_identifiers.length

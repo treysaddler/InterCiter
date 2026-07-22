@@ -175,6 +175,29 @@ export default function CollectionDetailPage() {
     }
   }
 
+  function onExportMembers() {
+    if (!detail.data || detail.data.members.length === 0) return
+    const lines = ['work_id,doi,pmid,title']
+    for (const member of detail.data.members) {
+      const safeTitle = (member.title ?? '').replaceAll('"', '""')
+      lines.push(
+        [
+          member.work_id,
+          member.doi ?? '',
+          member.pmid ?? '',
+          `"${safeTitle}"`,
+        ].join(','),
+      )
+    }
+    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${collectionId}-members.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       <p className="margin-top-4 margin-bottom-0">
@@ -297,6 +320,13 @@ export default function CollectionDetailPage() {
                   onChange={(e) => setMemberFilter(e.target.value)}
                   placeholder="Search title, DOI, PMID, or work ID"
                 />
+                <button
+                  type="button"
+                  className="usa-button usa-button--outline margin-top-1"
+                  onClick={onExportMembers}
+                >
+                  Export members CSV
+                </button>
               </div>
               <div className="maxw-card margin-bottom-2">
                 <label className="usa-label" htmlFor="member-sort">Sort members</label>

@@ -381,4 +381,80 @@ describe('CollectionDetailPage', () => {
     })
     expect(screen.getByText(/no members match this filter/i)).toBeInTheDocument()
   })
+
+  it('exports collection members as CSV', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 1,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: {
+        total: 1,
+        by_stance: { support: 1 },
+        by_function: { direct_evidence: 1 },
+        by_resolution: { claim_resolved: 1 },
+        by_section: { Results: 1 },
+        abstained: 0,
+      },
+      members: [
+        {
+          collection_membership_id: 'cmem_1',
+          work_id: 'work_1',
+          title: 'A metformin trial',
+          doi: '10.1000/example-a',
+          pmid: '12345',
+          year: 2021,
+          added_at: '2026-01-01T00:00:00Z',
+          citation_tallies: {
+            total: 1,
+            by_stance: { support: 1 },
+            by_function: { direct_evidence: 1 },
+            by_resolution: { claim_resolved: 1 },
+            by_section: { Results: 1 },
+            abstained: 0,
+          },
+        },
+      ],
+    })
+
+    const createObjectURL = vi.fn(() => 'blob:test')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectURL,
+      configurable: true,
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectURL,
+      configurable: true,
+    })
+    const anchorClick = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /export members csv/i }))
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    const blob = createObjectURL.mock.calls[0][0] as Blob
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('failed to read blob text'))
+      reader.onload = () => resolve(String(reader.result ?? ''))
+      reader.readAsText(blob)
+    })
+    expect(text).toContain('work_id,doi,pmid,title')
+    expect(text).toContain('work_1,10.1000/example-a,12345,"A metformin trial"')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
+    anchorClick.mockRestore()
+  })
 })

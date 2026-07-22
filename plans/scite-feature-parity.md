@@ -329,7 +329,30 @@ Deps: WP4.
       make fe-test`. Live/external tests gated by `INTERCITER_NET_TESTS=1`.
 - [ ] Preserve decomposed scores + explicit abstention; no blended scalar.
 
-## 5. Notes / open questions
+## 5. Immediate next execution order
+
+1. Collection-level watch setup (WP4 to WP8 bridge)
+- Add a simple "Watch this collection" toggle in collection detail.
+- Persist watch metadata backend-side first (state only, no delivery channel yet).
+
+2. New-citation delta endpoint for collections
+- Add a backend derived read that compares current member citation tallies against
+  a last-seen snapshot.
+- Return only newly observed support/contradict signals per member and aggregate.
+
+3. Retraction/integrity badges on collection members (WP5 starter)
+- Add nullable integrity flags to collection member views.
+- Render badges in collection detail and include integrity signal in exports.
+
+4. Bulk actions on filtered members
+- Add a bulk remove action for current filtered members with explicit confirmation.
+- Make CSV export filter-aware to align with the identifiers TXT export behavior.
+
+5. Collection regression coverage expansion
+- Add backend tests for delta calculation and ownership/authorization rules.
+- Add frontend tests for watch toggle, bulk remove flow, and integrity badge render.
+
+## 6. Notes / open questions
 - Retraction feed choice (S2 vs Crossref vs Retraction Watch) — decide in WP5.
 - Assistant model target: NIEHS LiteLLM proxy vs Biowulf vLLM — both supported by
   `llm_client.py`; pick per-deployment via config.

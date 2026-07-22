@@ -51,6 +51,9 @@ export default function PaperDetailPage() {
           <li className="margin-top-1">
             <Link to={`/graph/papers/${workId}`}>Explore citation network →</Link>
           </li>
+          <li className="margin-top-1">
+            <Link to={`/papers/${workId}/report`}>View citation report →</Link>
+          </li>
         </ul>
       )}
 

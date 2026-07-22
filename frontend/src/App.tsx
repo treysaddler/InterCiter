@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage'
 import SearchPage from './pages/SearchPage'
 import PapersPage from './pages/PapersPage'
 import PaperDetailPage from './pages/PaperDetailPage'
+import ReportPage from './pages/ReportPage'
 import ClaimDetailPage from './pages/ClaimDetailPage'
 import IngestPage from './pages/IngestPage'
 import JobPage from './pages/JobPage'
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="search" element={<SearchPage />} />
         <Route path="papers" element={<PapersPage />} />
         <Route path="papers/:workId" element={<PaperDetailPage />} />
+        <Route path="papers/:workId/report" element={<ReportPage />} />
         <Route path="papers/:workId/claims/:claimId" element={<ClaimDetailPage />} />
         {/* Standalone claim route for links from relations/traces. */}
         <Route path="claims/:claimId" element={<ClaimDetailPage />} />

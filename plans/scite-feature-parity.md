@@ -181,8 +181,7 @@ Deps: none (embedding rerank optional, degrade gracefully).
 > `tests/test_search.py` (9) + `SearchPage.test.tsx` (3). Deferred (optional):
 > SPECTER2 embedding rerank and a `source type` facet.
 
-
-### WP3 — Paper Report page  (F4)
+### WP3 — Paper Report page  (F4)   ✅ DONE
 Goal: scite-style per-paper report.
 Backend: `services/report.py` composing WP1 tallies + a citations-over-time
 timeline (group citing works by year) + conflicting-stance summary + filterable
@@ -192,6 +191,14 @@ PaperDetail): tally header, timeline (reuse a lightweight chart or a11y table),
 filter controls, statement list. Retraction banner placeholder consumes WP5.
 Tests: backend report shape + timeline bucketing; frontend render.
 Deps: WP1. Soft-deps WP5 (retraction banner optional until WP5 lands).
+
+> Implemented: `services/report.py` + `GET /v1/papers/{work_id}/report`
+> (faceted filters section/function/stance/resolution/min_year/max_year,
+> unfiltered facet counts, recomputed tallies, timeline buckets by citing-work
+> year with unique-work counts, conflicting-stance summary, filterable statement
+> list). Frontend: new `ReportPage` + route `/papers/:workId/report`, linked
+> from `PaperDetailPage`, with USWDS filter controls + timeline a11y table.
+> Tests: `backend/tests/test_report.py` (3) + `frontend/src/pages/ReportPage.test.tsx` (2).
 
 ### WP4 — Collections  (F5)
 Goal: curated, monitored sets of works.

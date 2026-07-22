@@ -351,6 +351,64 @@ class CitationStats(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Paper reports — scite-style per-paper dashboard payload (scite-parity WP3, F4)
+# ---------------------------------------------------------------------------------
+
+
+class ReportTimelinePoint(BaseModel):
+    """Citation activity bucketed by citing-work publication year."""
+
+    year: int
+    statement_count: int = 0
+    citing_work_count: int = 0
+
+
+class ReportConflictSummary(BaseModel):
+    """Quick signal for conflicting stances in a paper's incoming citations."""
+
+    has_conflicting_stances: bool = False
+    supporting_statements: int = 0
+    contradicting_statements: int = 0
+    neutral_or_unclear_statements: int = 0
+    conflicting_citing_work_count: int = 0
+
+
+class ReportFacets(BaseModel):
+    """Available filter values with counts over the unfiltered citation set."""
+
+    section: dict[str, int] = Field(default_factory=dict)
+    function: dict[str, int] = Field(default_factory=dict)
+    stance: dict[str, int] = Field(default_factory=dict)
+    resolution: dict[str, int] = Field(default_factory=dict)
+    year: dict[str, int] = Field(default_factory=dict)
+
+
+class ReportAppliedFilters(BaseModel):
+    """Filters applied to the report statement list + tallies."""
+
+    section: str | None = None
+    function: str | None = None
+    stance: str | None = None
+    resolution: str | None = None
+    min_year: int | None = None
+    max_year: int | None = None
+
+
+class PaperReport(BaseModel):
+    """Derived per-paper citation report (tallies, timeline, conflicts, statements)."""
+
+    work_id: str
+    total_statements: int = 0
+    filtered_statements: int = 0
+    facets: ReportFacets = Field(default_factory=ReportFacets)
+    applied_filters: ReportAppliedFilters = Field(default_factory=ReportAppliedFilters)
+    tallies: CitationTallies = Field(default_factory=CitationTallies)
+    timeline: list[ReportTimelinePoint] = Field(default_factory=list)
+    conflict_summary: ReportConflictSummary = Field(default_factory=ReportConflictSummary)
+    statements: list[CitationStatement] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------
 # Full-text claim search (scite-parity WP2, F3)
 # ---------------------------------------------------------------------------------
 

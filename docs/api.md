@@ -32,6 +32,23 @@ A derived, non-mutating roll-up of the `RelationAssertion`s that *point at* a su
 - `GET /v1/papers/{work_id}/citation-stats` — every relation that cites the work, whether paper-level (`cited_work_id`) or claim-level (resolved to a claim in the work).
 - `GET /v1/claims/{interpretation_id}/citation-stats` — every relation that resolved to that specific claim interpretation.
 
+## Reports — per-paper citation dashboard
+
+Scite-style report payload for one paper (scite F4), built as a derived, non-mutating
+view on top of citation stats (WP1). The endpoint supports filtering the statement
+list and recomputed tallies by section/function/stance/resolution/year while keeping
+function and stance separate and abstention explicit.
+
+- `GET /v1/papers/{work_id}/report` — query params `section`, `function`, `stance`,
+  `resolution`, `min_year`, `max_year`. Returns `{work_id, total_statements,
+  filtered_statements, facets, applied_filters, tallies, timeline,
+  conflict_summary, statements[]}` where:
+  - `timeline` is grouped by citing-work publication year (statement and unique-work
+    counts),
+  - `conflict_summary` highlights supporting vs contradicting mix and whether both
+    are present,
+  - `statements` are citation-stat rows with evidence spans.
+
 ## Search — full-text claim search
 
 Search *inside* citation statements, not just titles and abstracts (scite F3). A derived, non-mutating read: a keyword is matched case-insensitively against both the normalized claim text **and** the verbatim source passage, and the unit returned is the current interpretation **head** of a claim occurrence. Function, stance, and resolution stay **separate** facet dimensions; every hit keeps its evidence span. Reads stay open (no auth).

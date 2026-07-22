@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,11 +12,12 @@ from ...schemas import (
     CitationStats,
     ExtractionRunView,
     JobView,
+    PaperReport,
     PaperSubmission,
     PaperVersionView,
     PaperView,
 )
-from ...services import citation_stats, jobs
+from ...services import citation_stats, jobs, report
 from ...services.jobs import SubmissionError
 from ...services.projection import list_papers as _list_papers, paper_view
 from ..deps import db_session
@@ -87,6 +88,33 @@ def get_paper_citation_stats(
     """How the paper has been cited: stance/function/section tallies + statements."""
     try:
         return citation_stats.citation_stats_for_work(session, work_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="paper not found") from exc
+
+
+@router.get("/papers/{work_id}/report", response_model=PaperReport)
+def get_paper_report(
+    work_id: str,
+    section: str | None = Query(None, description="Filter to a source section."),
+    function: str | None = Query(None, description="Filter to one relation function."),
+    stance: str | None = Query(None, description="Filter to one relation stance."),
+    resolution: str | None = Query(None, description="Filter to one resolution state."),
+    min_year: int | None = Query(None, description="Earliest citing-work year."),
+    max_year: int | None = Query(None, description="Latest citing-work year."),
+    session: Session = Depends(db_session),
+) -> PaperReport:
+    """Scite-style per-paper report: tallies, timeline, conflicts, and statements."""
+    try:
+        return report.paper_report_for_work(
+            session,
+            work_id,
+            section=section,
+            function=function,
+            stance=stance,
+            resolution=resolution,
+            min_year=min_year,
+            max_year=max_year,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="paper not found") from exc
 

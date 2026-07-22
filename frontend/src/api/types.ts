@@ -122,6 +122,49 @@ export interface CitationStats {
   statements: CitationStatement[]
 }
 
+export interface ReportTimelinePoint {
+  year: number
+  statement_count: number
+  citing_work_count: number
+}
+
+export interface ReportConflictSummary {
+  has_conflicting_stances: boolean
+  supporting_statements: number
+  contradicting_statements: number
+  neutral_or_unclear_statements: number
+  conflicting_citing_work_count: number
+}
+
+export interface ReportFacets {
+  section: Record<string, number>
+  function: Record<string, number>
+  stance: Record<string, number>
+  resolution: Record<string, number>
+  year: Record<string, number>
+}
+
+export interface ReportAppliedFilters {
+  section: string | null
+  function: string | null
+  stance: string | null
+  resolution: string | null
+  min_year: number | null
+  max_year: number | null
+}
+
+export interface PaperReport {
+  work_id: string
+  total_statements: number
+  filtered_statements: number
+  facets: ReportFacets
+  applied_filters: ReportAppliedFilters
+  tallies: CitationTallies
+  timeline: ReportTimelinePoint[]
+  conflict_summary: ReportConflictSummary
+  statements: CitationStatement[]
+}
+
 export interface ClaimOccurrenceView {
   occurrence_id: string
   passage_id: string

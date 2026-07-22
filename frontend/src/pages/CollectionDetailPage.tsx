@@ -48,6 +48,7 @@ export default function CollectionDetailPage() {
   const navigate = useNavigate()
   const { collectionId = '' } = useParams()
   const [memberSort, setMemberSort] = useState('added_desc')
+  const [memberFilter, setMemberFilter] = useState('')
   const detail = useApi<CollectionDetailView>(
     () =>
       api.get<CollectionDetailView>(
@@ -65,6 +66,13 @@ export default function CollectionDetailPage() {
   const [savingMeta, setSavingMeta] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const parsed = parseIdentifiers(csvText)
+  const normalizedFilter = memberFilter.trim().toLowerCase()
+  const filteredMembers = detail.data?.members.filter((member) => {
+    if (!normalizedFilter) return true
+    return [member.title, member.doi, member.pmid, member.work_id]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(normalizedFilter))
+  }) ?? []
 
   useEffect(() => {
     if (!detail.data) return
@@ -281,6 +289,16 @@ export default function CollectionDetailPage() {
           {detail.data.members.length > 0 && (
             <>
               <div className="maxw-card margin-bottom-2">
+                <label className="usa-label" htmlFor="member-filter">Filter members</label>
+                <input
+                  id="member-filter"
+                  className="usa-input"
+                  value={memberFilter}
+                  onChange={(e) => setMemberFilter(e.target.value)}
+                  placeholder="Search title, DOI, PMID, or work ID"
+                />
+              </div>
+              <div className="maxw-card margin-bottom-2">
                 <label className="usa-label" htmlFor="member-sort">Sort members</label>
                 <select
                   id="member-sort"
@@ -305,7 +323,7 @@ export default function CollectionDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {detail.data.members.map((member) => (
+                {filteredMembers.map((member) => (
                   <tr key={member.collection_membership_id}>
                     <td>
                       <Link to={`/papers/${member.work_id}`}>
@@ -343,6 +361,11 @@ export default function CollectionDetailPage() {
                 ))}
               </tbody>
               </table>
+              {filteredMembers.length === 0 && (
+                <p className="text-base margin-top-1 margin-bottom-0">
+                  No members match this filter.
+                </p>
+              )}
             </>
           )}
         </>

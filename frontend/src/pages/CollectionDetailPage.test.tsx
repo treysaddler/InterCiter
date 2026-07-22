@@ -304,4 +304,81 @@ describe('CollectionDetailPage', () => {
       '/collections/coll_1?include_member_tallies=true&member_sort=support_desc',
     )
   })
+
+  it('filters members by identifier text', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 2,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: {
+        total: 1,
+        by_stance: { support: 1 },
+        by_function: { direct_evidence: 1 },
+        by_resolution: { claim_resolved: 1 },
+        by_section: { Results: 1 },
+        abstained: 0,
+      },
+      members: [
+        {
+          collection_membership_id: 'cmem_1',
+          work_id: 'work_1',
+          title: 'A metformin trial',
+          doi: '10.1000/example-a',
+          pmid: null,
+          year: 2021,
+          added_at: '2026-01-01T00:00:00Z',
+          citation_tallies: {
+            total: 1,
+            by_stance: { support: 1 },
+            by_function: { direct_evidence: 1 },
+            by_resolution: { claim_resolved: 1 },
+            by_section: { Results: 1 },
+            abstained: 0,
+          },
+        },
+        {
+          collection_membership_id: 'cmem_2',
+          work_id: 'work_2',
+          title: 'A semaglutide trial',
+          doi: '10.1000/example-b',
+          pmid: null,
+          year: 2022,
+          added_at: '2026-01-02T00:00:00Z',
+          citation_tallies: {
+            total: 0,
+            by_stance: {},
+            by_function: {},
+            by_resolution: {},
+            by_section: {},
+            abstained: 0,
+          },
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('link', { name: /a metformin trial/i })
+    fireEvent.change(screen.getByLabelText('Filter members'), {
+      target: { value: 'example-b' },
+    })
+
+    expect(screen.queryByRole('link', { name: /a metformin trial/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /a semaglutide trial/i })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filter members'), {
+      target: { value: 'not-a-match' },
+    })
+    expect(screen.getByText(/no members match this filter/i)).toBeInTheDocument()
+  })
 })

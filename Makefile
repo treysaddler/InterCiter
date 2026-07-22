@@ -9,11 +9,14 @@ BACKEND  := backend
 FRONTEND := frontend
 DOCS     := docs
 
+COMPOSE  := docker compose
+
 .PHONY: help \
 	lint pydantic sqlddl jsonschema all clean \
 	be-install be-test be-seed be-serve \
 	fe-install fe-dev fe-build fe-typecheck fe-test \
 	docs-render docs-preview \
+	docker-build docker-up docker-down docker-logs docker-seed docker-admin \
 	test
 
 help: ## Show this help
@@ -80,6 +83,26 @@ docs-render: ## Render the Quarto site to docs/_site
 
 docs-preview: ## Live-reloading preview of the Quarto site
 	cd $(DOCS) && quarto preview
+
+# --- Docker (full stack: Postgres + API + web) ------------------------------
+
+docker-build: ## Build the backend and frontend container images
+	$(COMPOSE) build
+
+docker-up: ## Start the full stack (db + api + web) in the background
+	$(COMPOSE) up --build -d
+
+docker-down: ## Stop the stack (add ARGS=-v to also drop the database volume)
+	$(COMPOSE) down $(ARGS)
+
+docker-logs: ## Tail logs from all services
+	$(COMPOSE) logs -f
+
+docker-seed: ## Seed the bundled sample corpus into the running stack
+	$(COMPOSE) exec backend interciter seed
+
+docker-admin: ## Bootstrap an admin user (NAME=<username>)
+	$(COMPOSE) exec backend interciter useradd $(NAME) --role admin
 
 # --- Aggregate --------------------------------------------------------------
 

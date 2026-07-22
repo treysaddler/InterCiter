@@ -65,14 +65,40 @@ docs/                          Documentation & Quarto site
 backend/                       FastAPI service (package `interciter`), uv-managed
   interciter/                  API, ingestion, services, CLI, auth/sessions
   tests/                       Pytest suite
+  Dockerfile                   API image (multi-stage, non-root)
 frontend/                      React + TypeScript + Vite SPA (USWDS)
   src/                         Screens, components, API client, auth context
+  Dockerfile, nginx.conf       Web image (build SPA, serve + reverse-proxy /v1)
 schema/
   interciter.yaml              LinkML logical data model
   generated/                   Generated Pydantic / SQL DDL / JSON Schema
   requirements.txt             Schema tooling dependencies
-Makefile                       Schema, backend, frontend, and docs tasks
+docker-compose.yml             Full stack: PostgreSQL + API + web
+Makefile                       Schema, backend, frontend, docker, and docs tasks
 ```
+
+## Running with Docker
+
+The whole stack — PostgreSQL (system of record), the FastAPI API, and the
+nginx-served SPA — runs with [Docker Compose](https://docs.docker.com/compose/).
+nginx reverse-proxies `/v1` and `/health` to the API, so the browser sees a single
+origin and the BFF session cookie works without CORS.
+
+```sh
+cp .env.example .env               # set POSTGRES_PASSWORD before exposing anywhere
+make docker-up                     # build + start db, api, web (detached)
+make docker-seed                   # load the bundled sample corpus
+make docker-admin NAME=me          # bootstrap an admin user (prints an API token)
+```
+
+The UI is then served at `http://localhost:8080`. Scale the API vertically with
+more workers (`UVICORN_WORKERS` in `.env`) or horizontally behind a load balancer
+(`docker compose up --scale backend=N`). Tail logs with `make docker-logs` and
+stop with `make docker-down` (add `ARGS=-v` to also drop the database volume).
+
+The compose stack runs over plain HTTP, so `SESSION_COOKIE_SECURE` defaults to
+`false`; set it to `true` and terminate TLS in front for any real deployment.
+See `make help` for all container targets.
 
 ## Working with the schema
 

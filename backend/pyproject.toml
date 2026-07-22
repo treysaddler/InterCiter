@@ -22,6 +22,11 @@ dev = [
     "pytest>=8.2",
     "httpx>=0.27",
 ]
+# Production serving: the PostgreSQL driver (system of record) so the same image can
+# point INTERCITER_DATABASE_URL at a postgresql+psycopg URL instead of local SQLite.
+prod = [
+    "psycopg[binary]>=3.1",
+]
 
 [project.scripts]
 interciter = "interciter.cli:main"

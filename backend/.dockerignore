@@ -1,0 +1,16 @@
+# Keep the build context small and reproducible.
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+tests/
+# Local databases, fetched PMC text, secrets — never bake into the image.
+*.db
+.cache/
+.env
+.env.*
+!.env.example
+.DS_Store
+Dockerfile
+.dockerignore

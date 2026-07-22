@@ -1,0 +1,72 @@
+# InterCiter — full stack for local deployment and scaling.
+#
+#   docker compose up --build          # build + start db, api, web
+#   docker compose exec backend interciter seed        # load the sample corpus
+#   docker compose exec backend interciter useradd me --role admin   # bootstrap
+#
+# The web UI is served at http://localhost:${WEB_PORT:-8080}. nginx reverse-proxies
+# /v1 and /health to the API, so the browser sees one origin and the BFF session
+# cookie works without CORS. PostgreSQL is the system of record.
+#
+# Copy .env.example to .env and set POSTGRES_PASSWORD before exposing this anywhere.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-interciter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-interciter}
+      POSTGRES_DB: ${POSTGRES_DB:-interciter}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-interciter} -d ${POSTGRES_DB:-interciter}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      INTERCITER_DATABASE_URL: >-
+        postgresql+psycopg://${POSTGRES_USER:-interciter}:${POSTGRES_PASSWORD:-interciter}@db:5432/${POSTGRES_DB:-interciter}
+      # http-only local stack: cookies can't be Secure or the browser drops them.
+      # Set this to true (and terminate TLS in front) for any real deployment.
+      INTERCITER_SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    # Scale request throughput with more uvicorn workers (or `docker compose up
+    # --scale backend=N` behind a load balancer).
+    command:
+      - uvicorn
+      - interciter.api.app:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --workers
+      - "${UVICORN_WORKERS:-2}"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://backend:8000
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:

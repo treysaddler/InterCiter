@@ -27,6 +27,7 @@ npm run dev        # http://localhost:5173  (proxies /v1 and /health to :8000)
 npm run typecheck  # tsc, no emit
 npm run build      # tsc -b && vite build  ->  dist/
 npm run preview    # serve the production build
+npm test           # vitest run (jsdom); npm run test:watch to watch
 ```
 
 ## Layout

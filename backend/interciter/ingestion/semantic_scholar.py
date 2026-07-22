@@ -52,6 +52,7 @@ DEFAULT_REFERENCE_FIELDS = (
     "isInfluential",
     "citedPaper.externalIds",
     "citedPaper.title",
+    "citedPaper.year",
 )
 
 # Id prefixes accepted by the Academic Graph API, letting us resolve from what we

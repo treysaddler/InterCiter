@@ -92,6 +92,36 @@ export interface ClaimScores {
   components: ScoreComponent[]
 }
 
+// --- Citation statistics (how a work/claim has been cited; scite-parity WP1) ---
+
+export interface CitationStatement {
+  assertion_id: string
+  citing_work_id: string | null
+  citing_claim_id: string | null
+  function: string | null
+  stance: string | null
+  resolution: string
+  status: string
+  section: string | null
+  evidence: EvidenceRef | null
+}
+
+export interface CitationTallies {
+  total: number
+  by_stance: Record<string, number>
+  by_function: Record<string, number>
+  by_resolution: Record<string, number>
+  by_section: Record<string, number>
+  abstained: number
+}
+
+export interface CitationStats {
+  subject_type: string
+  subject_id: string
+  tallies: CitationTallies
+  statements: CitationStatement[]
+}
+
 export interface ClaimOccurrenceView {
   occurrence_id: string
   passage_id: string
@@ -236,4 +266,24 @@ export interface ClaimExpansion {
   resolved_terms: number
   corroborating_edges: number
   graph: GraphView
+}
+
+// --- Seed-based discovery (ranked connected papers; litmaps-parity WP-L1) ---
+
+export interface DiscoveryCandidate {
+  work_id: string | null
+  external_id: string | null
+  title: string | null
+  year: number | null
+  connection_score: number
+  supporting_seed_ids: string[]
+  is_influential: boolean
+  in_corpus: boolean
+}
+
+export interface DiscoveryResult {
+  seed_work_ids: string[]
+  candidates: DiscoveryCandidate[]
+  seeds_resolved: number
+  skipped_seed_ids: string[]
 }

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ... import models
 from ...auth import NotAuthorized, Principal
 from ...schemas import (
+    CitationStats,
     ClaimInterpretationView,
     ClaimOccurrenceView,
     ClaimScores,
@@ -18,7 +19,7 @@ from ...schemas import (
     PassageView,
     RevisionResult,
 )
-from ...services import projection, review
+from ...services import citation_stats, projection, review
 from ...services.projection import NotFound
 from ..deps import db_session
 from ..security import require_user
@@ -41,6 +42,17 @@ def get_paper_claims(
     if session.get(models.PaperWork, work_id) is None:
         raise HTTPException(status_code=404, detail="paper not found")
     return projection.claims_for_paper(session, work_id)
+
+
+@router.get("/claims/{claim_id}/citation-stats", response_model=CitationStats)
+def get_claim_citation_stats(
+    claim_id: str, session: Session = Depends(db_session)
+) -> CitationStats:
+    """How this claim has been cited: stance/function/section tallies + statements."""
+    try:
+        return citation_stats.citation_stats_for_claim(session, claim_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="claim not found") from exc
 
 
 @router.post("/claims", response_model=ClaimInterpretationView, status_code=201)

@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 from ... import models
 from ...auth import Principal
 from ...schemas import (
+    CitationStats,
     ExtractionRunView,
     JobView,
     PaperSubmission,
     PaperVersionView,
     PaperView,
 )
-from ...services import jobs
+from ...services import citation_stats, jobs
 from ...services.jobs import SubmissionError
 from ...services.projection import list_papers as _list_papers, paper_view
 from ..deps import db_session
@@ -77,6 +78,17 @@ def list_papers(
 ) -> list[PaperView]:
     """List ingested papers (the reader's entry point, US-1.2). Reads stay open."""
     return _list_papers(session, limit=max(1, min(limit, 200)), offset=max(0, offset))
+
+
+@router.get("/papers/{work_id}/citation-stats", response_model=CitationStats)
+def get_paper_citation_stats(
+    work_id: str, session: Session = Depends(db_session)
+) -> CitationStats:
+    """How the paper has been cited: stance/function/section tallies + statements."""
+    try:
+        return citation_stats.citation_stats_for_work(session, work_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="paper not found") from exc
 
 
 @router.get("/papers/{work_id}/versions", response_model=list[PaperVersionView])

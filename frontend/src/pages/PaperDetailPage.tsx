@@ -1,8 +1,10 @@
 import { Link, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { ClaimView, PaperView } from '../api/types'
+import type { CitationStats, ClaimView, PaperView } from '../api/types'
+import CitationTallies from '../components/CitationTallies'
 import PageHeading from '../components/PageHeading'
+import RelatedWork from '../components/RelatedWork'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
@@ -15,6 +17,10 @@ export default function PaperDetailPage() {
   const paper = useApi<PaperView>(() => api.get<PaperView>(`/papers/${workId}`), [workId])
   const claims = useApi<ClaimView[]>(
     () => api.get<ClaimView[]>(`/papers/${workId}/claims`),
+    [workId],
+  )
+  const stats = useApi<CitationStats>(
+    () => api.get<CitationStats>(`/papers/${workId}/citation-stats`),
     [workId],
   )
 
@@ -47,6 +53,14 @@ export default function PaperDetailPage() {
           </li>
         </ul>
       )}
+
+      <h2 className="margin-top-4">How this paper has been cited</h2>
+      {stats.loading && <Loading />}
+      {stats.error && <ErrorAlert message={stats.error} />}
+      {stats.data && <CitationTallies tallies={stats.data.tallies} />}
+
+      <h2 className="margin-top-4">Related work</h2>
+      <RelatedWork workId={workId} />
 
       <h2 className="margin-top-4">Claims</h2>
       {claims.loading && <Loading />}

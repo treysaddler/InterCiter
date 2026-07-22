@@ -3,12 +3,14 @@ import { Link, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type {
+  CitationStats,
   ClaimOccurrenceView,
   ClaimScores,
   ClaimView,
   ExtractionRunView,
   RelationAssertionView,
 } from '../api/types'
+import CitationTallies from '../components/CitationTallies'
 import EvidencePane from '../components/EvidencePane'
 import PageHeading from '../components/PageHeading'
 import RelationList from '../components/RelationList'
@@ -44,6 +46,10 @@ export default function ClaimDetailPage() {
     () => api.get<ClaimScores>(`/claims/${claimId}/scores`),
     [claimId],
   )
+  const stats = useApi<CitationStats>(
+    () => api.get<CitationStats>(`/claims/${claimId}/citation-stats`),
+    [claimId],
+  )
 
   if (claim.loading) return <><PageHeading>Claim</PageHeading><Loading /></>
   if (claim.error) return <><PageHeading>Claim</PageHeading><ErrorAlert message={claim.error} /></>
@@ -75,6 +81,11 @@ export default function ClaimDetailPage() {
           {relationships.loading && <Loading />}
           {relationships.error && <ErrorAlert message={relationships.error} />}
           {relationships.data && <RelationList relations={relationships.data} />}
+
+          <h2 className="margin-top-4">How this claim has been cited</h2>
+          {stats.loading && <Loading />}
+          {stats.error && <ErrorAlert message={stats.error} />}
+          {stats.data && <CitationTallies tallies={stats.data.tallies} />}
         </div>
 
         {/* Decomposed scores + provenance. */}

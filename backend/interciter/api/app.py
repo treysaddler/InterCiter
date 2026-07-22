@@ -12,7 +12,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from ..db import init_db
-from .routers import claims, graph, papers, relations, review, session, users
+from .routers import (
+    claims,
+    discovery,
+    graph,
+    papers,
+    relations,
+    review,
+    session,
+    users,
+)
 
 
 @asynccontextmanager
@@ -38,6 +47,7 @@ app.include_router(claims.router, prefix="/v1", tags=["claims"])
 app.include_router(relations.router, prefix="/v1", tags=["relations"])
 app.include_router(review.router, prefix="/v1", tags=["review"])
 app.include_router(graph.router, prefix="/v1", tags=["graph"])
+app.include_router(discovery.router, prefix="/v1", tags=["discovery"])
 app.include_router(session.router, prefix="/v1", tags=["auth"])
 app.include_router(users.router, prefix="/v1", tags=["users"])
 

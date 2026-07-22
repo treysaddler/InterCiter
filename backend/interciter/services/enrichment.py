@@ -135,8 +135,8 @@ def reference_links(
     """Return normalized reference records (contexts + intents) for later persistence.
 
     Pure read: shapes each resolved reference into
-    ``{cited_corpus_id, cited_doi, cited_pmid, cited_title, contexts, intents,
-    is_influential}``. Intents are Semantic Scholar's labels — kept raw as weak
+    ``{cited_corpus_id, cited_doi, cited_pmid, cited_title, cited_year, contexts,
+    intents, is_influential}``. Intents are Semantic Scholar's labels — kept raw as weak
     supervision, never mapped onto InterCiter's function/stance ontology here.
     """
     settings = settings or get_settings()
@@ -153,6 +153,7 @@ def reference_links(
                 "cited_doi": ext.get("DOI"),
                 "cited_pmid": ext.get("PubMed"),
                 "cited_title": cited.get("title"),
+                "cited_year": cited.get("year"),
                 "contexts": ref.get("contexts") or [],
                 "intents": ref.get("intents") or [],
                 "is_influential": bool(ref.get("isInfluential")),

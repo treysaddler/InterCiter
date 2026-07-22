@@ -149,7 +149,7 @@ WP-L1 (discovery) is independent and immediately useful via the existing graph U
 Follow repo conventions (see §5 checklist). Verify with `make be-test` +
 `make fe-typecheck && make fe-test`. Update `docs/api.md`.
 
-### WP-L1 — Seed-based discovery (ranked candidates)  (L1/L2)
+### WP-L1 — Seed-based discovery (ranked candidates)  (L1/L2)   ✅ DONE
 Goal: given seed work(s), return a ranked list of the most-connected papers the
 user is likely missing.
 Backend: `services/discovery.py` (derived/non-mutating). Input: list of seed

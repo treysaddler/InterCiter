@@ -302,6 +302,55 @@ class ClaimScores(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Citation statistics — aggregate "how has this been cited" (scite-parity WP1)
+# ---------------------------------------------------------------------------------
+
+
+class CitationStatement(BaseModel):
+    """One citing relation pointing at the subject, carrying its section facet.
+
+    A "citation statement" is a :class:`RelationAssertion` that targets the subject —
+    either a cited work (paper-level resolution) or a specific target claim (claim-level
+    resolution). Function and stance are kept as SEPARATE dimensions; an abstaining
+    relation leaves both null rather than collapsing to a single label.
+    """
+
+    assertion_id: str
+    citing_work_id: str | None = None
+    citing_claim_id: str | None = None
+    function: enums.RelationFunction | None = None
+    stance: enums.RelationStance | None = None
+    resolution: enums.RelationResolution
+    status: enums.AssertionStatus
+    section: str | None = None
+    evidence: EvidenceRef | None = None
+
+
+class CitationTallies(BaseModel):
+    """Roll-up counts by each dimension (the scite-style supporting/contrasting view).
+
+    Stance and function stay separate — there is no blended 3-way label. ``abstained``
+    counts statements that commit to neither a function nor a stance.
+    """
+
+    total: int = 0
+    by_stance: dict[str, int] = Field(default_factory=dict)
+    by_function: dict[str, int] = Field(default_factory=dict)
+    by_resolution: dict[str, int] = Field(default_factory=dict)
+    by_section: dict[str, int] = Field(default_factory=dict)
+    abstained: int = 0
+
+
+class CitationStats(BaseModel):
+    """How a work or claim has been cited across the corpus (tallies + statements)."""
+
+    subject_type: str = Field(description='"work" or "claim".')
+    subject_id: str
+    tallies: CitationTallies
+    statements: list[CitationStatement] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------------
 
@@ -446,3 +495,49 @@ class ClaimExpansion(BaseModel):
     resolved_terms: int = 0
     corroborating_edges: int = 0
     graph: GraphView
+
+
+# ---------------------------------------------------------------------------------
+# Seed-based discovery — ranked connected papers (litmaps-parity WP-L1)
+# ---------------------------------------------------------------------------------
+
+
+class DiscoveryRequest(BaseModel):
+    """Ask for the papers most connected to a set of seed works."""
+
+    seed_work_ids: list[str] = Field(min_length=1)
+    limit: int = Field(default=25, ge=1, le=100)
+    min_year: int | None = Field(
+        default=None, description="Drop candidates published before this year (when known)."
+    )
+
+
+class DiscoveryCandidate(BaseModel):
+    """A candidate paper ranked by how many seeds connect to it.
+
+    ``work_id`` is set when the candidate already exists in the corpus (so the UI can
+    deep-link it); otherwise ``external_id`` carries a Semantic Scholar identifier the
+    user could ingest. Nothing is persisted by discovery — these are suggestions.
+    """
+
+    work_id: str | None = None
+    external_id: str | None = None
+    title: str | None = None
+    year: int | None = None
+    connection_score: int = Field(
+        default=0, description="Number of seed works that reference this candidate."
+    )
+    supporting_seed_ids: list[str] = Field(default_factory=list)
+    is_influential: bool = False
+    in_corpus: bool = False
+
+
+class DiscoveryResult(BaseModel):
+    """Ranked discovery candidates plus which seeds could be resolved."""
+
+    seed_work_ids: list[str] = Field(default_factory=list)
+    candidates: list[DiscoveryCandidate] = Field(default_factory=list)
+    seeds_resolved: int = Field(
+        default=0, description="Seeds that had a DOI/PMID/corpusId to query."
+    )
+    skipped_seed_ids: list[str] = Field(default_factory=list)

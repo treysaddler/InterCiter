@@ -25,6 +25,13 @@ One paper accumulates many jobs over time (parse, extract, re-extract, hydrate),
 
 Every claim and relation response **embeds or links its evidence**. There is no representation of a claim that can't be traced to a passage in one request.
 
+## Citation statistics — how a work/claim has been cited
+
+A derived, non-mutating roll-up of the `RelationAssertion`s that *point at* a subject. Unlike scite's single supporting/contrasting/mentioning label, InterCiter keeps **function and stance as separate dimensions** and counts **abstention explicitly** (a relation that commits to neither) rather than folding it into "mentioning". Each response carries per-dimension tallies (`by_stance`, `by_function`, `by_resolution`, `by_section`) plus the underlying citing statements, each with its citing work, section facet, and evidence span.
+
+- `GET /v1/papers/{work_id}/citation-stats` — every relation that cites the work, whether paper-level (`cited_work_id`) or claim-level (resolved to a claim in the work).
+- `GET /v1/claims/{interpretation_id}/citation-stats` — every relation that resolved to that specific claim interpretation.
+
 ## Revisions (MVP)
 
 Revising is creating, so it's a `POST`, not a `PATCH`:
@@ -67,6 +74,12 @@ A derived, read-side projection (like the claim views): the immutable record is 
 - `POST /v1/graph/papers/{work_id}/expand` — grow the graph on demand from **Semantic Scholar**: pulls the paper's references, creates any missing cited works as metadata-only stubs, and persists each as a `semantic_scholar` `CitationEdge` (idempotent — re-expanding never duplicates). A write, so it requires an authenticated principal (+ CSRF for cookie auth). Returns counts plus the refreshed neighborhood.
 - `GET /v1/graph/claims` — the in-corpus claim-relationship network (nodes are interpretations; edges are `claim_resolved` `RelationAssertion`s carrying function/stance).
 - `POST /v1/graph/claims/{interpretation_id}/expand-robokop` — explore a claim in the **ROBOKOP knowledge graph**: grounds the claim's entity qualifiers (or explicit `terms` in the body) to canonical CURIEs, then draws the background-knowledge edges between them with `primary_knowledge_source` / `aggregator_knowledge_source` provenance. A write (persists additive `EntityGrounding` side rows; KG edges are derived context and are not stored), so it requires an authenticated principal (+ CSRF for cookie auth). Corroborating context, never a truth oracle that overrides a source-grounded extraction.
+
+## Discovery — seed-based related work
+
+Litmaps-style "dive deeper": given one or more seed works, rank the papers most connected to them by **co-reference degree** (how many seeds cite the same paper). Discovery reads the seeds' references from **Semantic Scholar** — a network call — so it is auth-gated like graph expansion, but it **persists nothing**: candidates are suggestions. In-corpus candidates carry a `work_id` for deep-linking; the rest carry a Semantic Scholar `external_id` a user could ingest.
+
+- `POST /v1/discovery/seeds` — body `{seed_work_ids, limit?, min_year?}`. Returns ranked `candidates` (title, year, `connection_score`, `supporting_seed_ids`, `is_influential`, `in_corpus`) plus `seeds_resolved` / `skipped_seed_ids`. Requires an authenticated principal (+ CSRF for cookie auth); `404` if a seed work id is unknown, `502` on a Semantic Scholar error.
 
 ## Identity, sessions, and accounts (MVP)
 

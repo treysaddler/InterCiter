@@ -141,7 +141,7 @@ conventions: LinkML-first schema edits, `services/` for derived/non-mutating
 reads, projection pattern, reads-open/writes-CSRF, USWDS UI, tests both sides,
 update `docs/api.md`. Verify: `make be-test` + `make fe-typecheck && make fe-test`.
 
-### WP1 — Aggregate citation tallies + section facet  (F1/F4)
+### WP1 — Aggregate citation tallies + section facet  (F1/F4)   ✅ DONE
 Goal: expose, per cited work AND per claim, tallies of citing statements by
 stance / function / resolution, plus the citing section as a facet.
 Backend:

@@ -26,6 +26,18 @@ def test_idempotency_key_dedupes(client, user_headers):
     assert first["job_id"] == second["job_id"]
 
 
+def test_list_papers(client, user_headers):
+    empty = client.get("/v1/papers")
+    assert empty.status_code == 200 and empty.json() == []
+
+    _submit(client, "paper_a.xml", user_headers)
+    _submit(client, "paper_b.xml", user_headers)
+
+    listed = client.get("/v1/papers").json()  # reads stay open (no auth header)
+    assert len(listed) >= 2
+    assert all("availability_state" in p and "work_id" in p for p in listed)
+
+
 def test_full_read_flow_and_trace(client, user_headers):
     _submit(client, "paper_b.xml", user_headers)
     job_a = _submit(client, "paper_a.xml", user_headers)

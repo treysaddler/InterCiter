@@ -188,6 +188,19 @@ def paper_view(work: models.PaperWork) -> PaperView:
     )
 
 
+def list_papers(
+    session: Session, *, limit: int = 50, offset: int = 0
+) -> list[PaperView]:
+    """Ingested works, ordered by title then id — the reader's entry list (US-1.2)."""
+    stmt = (
+        select(models.PaperWork)
+        .order_by(models.PaperWork.title, models.PaperWork.work_id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return [paper_view(w) for w in session.scalars(stmt)]
+
+
 def one_hop_trace(session: Session, claim_id: str) -> OneHopTrace:
     """Trace a claim one hop to its cited antecedents.
 

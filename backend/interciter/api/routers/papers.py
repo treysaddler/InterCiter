@@ -17,7 +17,7 @@ from ...schemas import (
 )
 from ...services import jobs
 from ...services.jobs import SubmissionError
-from ...services.projection import paper_view
+from ...services.projection import list_papers as _list_papers, paper_view
 from ..deps import db_session
 from ..security import require_user
 
@@ -69,6 +69,14 @@ def get_paper(work_id: str, session: Session = Depends(db_session)) -> PaperView
     if work is None:
         raise HTTPException(status_code=404, detail="paper not found")
     return paper_view(work)
+
+
+@router.get("/papers", response_model=list[PaperView])
+def list_papers(
+    limit: int = 50, offset: int = 0, session: Session = Depends(db_session)
+) -> list[PaperView]:
+    """List ingested papers (the reader's entry point, US-1.2). Reads stay open."""
+    return _list_papers(session, limit=max(1, min(limit, 200)), offset=max(0, offset))
 
 
 @router.get("/papers/{work_id}/versions", response_model=list[PaperVersionView])

@@ -1,7 +1,9 @@
 import { Routes, Route } from 'react-router-dom'
 
 import AppShell from './components/AppShell'
+import RequireAuth from './auth/RequireAuth'
 import HomePage from './pages/HomePage'
+import LoginPage from './pages/LoginPage'
 import PapersPage from './pages/PapersPage'
 import PaperDetailPage from './pages/PaperDetailPage'
 import ClaimDetailPage from './pages/ClaimDetailPage'
@@ -15,22 +17,46 @@ import NotFoundPage from './pages/NotFoundPage'
 
 /**
  * Route map mirrors the information architecture in docs/ui-design.md §5.
- * Every screen is a stub today; each names the /v1 endpoints it will consume.
+ * Reads are open; write-oriented areas are gated by RequireAuth.
  */
 export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
+        <Route path="login" element={<LoginPage />} />
         <Route path="papers" element={<PapersPage />} />
         <Route path="papers/:workId" element={<PaperDetailPage />} />
         <Route path="papers/:workId/claims/:claimId" element={<ClaimDetailPage />} />
-        <Route path="ingest" element={<IngestPage />} />
+        {/* Standalone claim route for links from relations/traces. */}
+        <Route path="claims/:claimId" element={<ClaimDetailPage />} />
+        <Route
+          path="ingest"
+          element={
+            <RequireAuth>
+              <IngestPage />
+            </RequireAuth>
+          }
+        />
         <Route path="jobs/:jobId" element={<JobPage />} />
         <Route path="runs/:runId" element={<RunPage />} />
-        <Route path="review" element={<ReviewPage />} />
+        <Route
+          path="review"
+          element={
+            <RequireAuth roles={['reviewer']}>
+              <ReviewPage />
+            </RequireAuth>
+          }
+        />
         <Route path="clusters/:clusterId" element={<ClusterPage />} />
-        <Route path="account" element={<AccountPage />} />
+        <Route
+          path="account"
+          element={
+            <RequireAuth>
+              <AccountPage />
+            </RequireAuth>
+          }
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

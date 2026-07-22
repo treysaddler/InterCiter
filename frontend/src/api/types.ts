@@ -61,12 +61,6 @@ export interface JobView {
   updated_at: string
 }
 
-export interface CurrentUser {
-  user_id: string
-  display_name: string
-  role: string
-}
-
 export interface UserView {
   user_id: string
   display_name: string
@@ -81,4 +75,70 @@ export interface SessionInfo {
   role: string
   csrf_token: string
   expires_at: string
+}
+
+export interface CurrentUser {
+  user_id: string
+  display_name: string
+  role: string
+}
+
+export interface ClaimScores {
+  claim_id: string
+  components: ScoreComponent[]
+}
+
+export interface ClaimOccurrenceView {
+  occurrence_id: string
+  passage_id: string
+  span_start: number | null
+  span_end: number | null
+  occurrence_type: string
+  extraction_run_id: string
+}
+
+export interface TargetCandidate {
+  interpretation_id: string
+  score: number
+}
+
+export interface RelationAssertionView {
+  assertion_id: string
+  citing_occurrence_id: string
+  citation_mention_id: string | null
+  evidence_passage_id: string | null
+  cited_work_id: string | null
+  target_interpretation_id: string | null
+  target_candidates: TargetCandidate[]
+  function: string | null
+  stance: string | null
+  scope: string | null
+  resolution: string
+  target_link_score: number | null
+  stance_distribution: Record<string, number> | null
+  extraction_run_id: string
+  status: string
+}
+
+export interface PaperVersionView {
+  version_id: string
+  manifestation: string
+  artifact_hash: string | null
+  full_text_available: boolean
+  license_status: string | null
+  parser_name: string | null
+  parser_version: string | null
+  parse_status: string | null
+}
+
+export interface ExtractionRunView {
+  run_id: string
+  model: string | null
+  provider: string | null
+  model_version: string | null
+  prompt_template_version: string | null
+  parser_version: string | null
+  code_revision: string | null
+  inference_parameters: Record<string, unknown> | null
+  timestamp: string
 }

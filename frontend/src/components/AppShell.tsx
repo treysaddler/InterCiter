@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   GovBanner,
   GridContainer,
@@ -10,6 +10,7 @@ import {
 } from '@trussworks/react-uswds'
 
 import PageFocus from './PageFocus'
+import { useAuth } from '../auth/AuthContext'
 
 const NAV = [
   { to: '/papers', label: 'Papers' },
@@ -20,6 +21,14 @@ const NAV = [
 
 export default function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { status, user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function onSignOut() {
+    await logout()
+    setMobileNavOpen(false)
+    navigate('/')
+  }
 
   const navItems = NAV.map((item) => (
     <NavLink
@@ -31,6 +40,28 @@ export default function AppShell() {
       <span>{item.label}</span>
     </NavLink>
   ))
+
+  navItems.push(
+    status === 'authenticated' && user ? (
+      <button
+        key="signout"
+        type="button"
+        className="usa-nav__link usa-button usa-button--unstyled"
+        onClick={onSignOut}
+      >
+        <span>Sign out ({user.display_name})</span>
+      </button>
+    ) : (
+      <NavLink
+        key="signin"
+        to="/login"
+        className="usa-nav__link"
+        onClick={() => setMobileNavOpen(false)}
+      >
+        <span>Sign in</span>
+      </NavLink>
+    ),
+  )
 
   return (
     <>

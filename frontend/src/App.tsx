@@ -1,7 +1,9 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 
 import AppShell from './components/AppShell'
 import RequireAuth from './auth/RequireAuth'
+import { Loading } from './components/States'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import PapersPage from './pages/PapersPage'
@@ -14,6 +16,10 @@ import ReviewPage from './pages/ReviewPage'
 import ClusterPage from './pages/ClusterPage'
 import AccountPage from './pages/AccountPage'
 import NotFoundPage from './pages/NotFoundPage'
+
+// The graph view pulls in Cytoscape (a large canvas library) that no other screen
+// needs, so it is code-split and only fetched when a user opens /graph.
+const GraphPage = lazy(() => import('./pages/GraphPage'))
 
 /**
  * Route map mirrors the information architecture in docs/ui-design.md §5.
@@ -30,6 +36,22 @@ export default function App() {
         <Route path="papers/:workId/claims/:claimId" element={<ClaimDetailPage />} />
         {/* Standalone claim route for links from relations/traces. */}
         <Route path="claims/:claimId" element={<ClaimDetailPage />} />
+        <Route
+          path="graph"
+          element={
+            <Suspense fallback={<Loading label="Loading graph…" />}>
+              <GraphPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="graph/papers/:workId"
+          element={
+            <Suspense fallback={<Loading label="Loading graph…" />}>
+              <GraphPage />
+            </Suspense>
+          }
+        />
         <Route
           path="ingest"
           element={

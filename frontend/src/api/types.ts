@@ -193,3 +193,39 @@ export interface ClusterView {
   members: ClusterMemberView[]
   conflicting_stances: boolean
 }
+
+// --- Network graph (papers / authors / citations / claims) ---
+
+export type GraphNodeType = 'paper' | 'author' | 'claim' | string
+
+export interface GraphNode {
+  id: string
+  type: GraphNodeType
+  label: string
+  data: Record<string, unknown>
+}
+
+export interface GraphEdge {
+  id: string
+  source: string
+  target: string
+  type: string
+  label: string | null
+  data: Record<string, unknown>
+}
+
+export interface GraphView {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  center_id: string | null
+  truncated: boolean
+}
+
+export interface GraphExpansion {
+  work_id: string
+  references_fetched: number
+  works_created: number
+  edges_created: number
+  skipped_reason: string | null
+  graph: GraphView
+}

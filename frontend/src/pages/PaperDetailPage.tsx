@@ -42,6 +42,9 @@ export default function PaperDetailPage() {
               {paper.data.availability_state}
             </span>
           </li>
+          <li className="margin-top-1">
+            <Link to={`/graph/papers/${workId}`}>Explore citation network →</Link>
+          </li>
         </ul>
       )}
 

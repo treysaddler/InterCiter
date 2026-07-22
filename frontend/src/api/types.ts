@@ -287,3 +287,36 @@ export interface DiscoveryResult {
   seeds_resolved: number
   skipped_seed_ids: string[]
 }
+
+// --- Full-text claim search (scite-parity WP2, F3) ---
+
+export interface SearchHit {
+  claim_id: string
+  normalized_text: string
+  occurrence_id: string
+  interpretation_id: string
+  work_id: string
+  paper_title: string | null
+  year: number | null
+  section: string | null
+  function: string[]
+  stance: string[]
+  resolution: string[]
+  evidence: EvidenceRef
+}
+
+export interface SearchFacets {
+  section: Record<string, number>
+  function: Record<string, number>
+  stance: Record<string, number>
+  resolution: Record<string, number>
+}
+
+export interface SearchResults {
+  query: string
+  total: number
+  limit: number
+  offset: number
+  hits: SearchHit[]
+  facets: SearchFacets
+}

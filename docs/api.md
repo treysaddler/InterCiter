@@ -32,6 +32,12 @@ A derived, non-mutating roll-up of the `RelationAssertion`s that *point at* a su
 - `GET /v1/papers/{work_id}/citation-stats` — every relation that cites the work, whether paper-level (`cited_work_id`) or claim-level (resolved to a claim in the work).
 - `GET /v1/claims/{interpretation_id}/citation-stats` — every relation that resolved to that specific claim interpretation.
 
+## Search — full-text claim search
+
+Search *inside* citation statements, not just titles and abstracts (scite F3). A derived, non-mutating read: a keyword is matched case-insensitively against both the normalized claim text **and** the verbatim source passage, and the unit returned is the current interpretation **head** of a claim occurrence. Function, stance, and resolution stay **separate** facet dimensions; every hit keeps its evidence span. Reads stay open (no auth).
+
+- `GET /v1/search/claims` — query params `q` (keyword), `section`, `function`, `stance`, `resolution`, `min_year`, `max_year`, `limit` (1–100, default 25), `offset`. Returns `{query, total, limit, offset, hits[], facets}`. Each hit carries `claim_id`, `normalized_text`, `work_id`, `paper_title`, `year`, `section`, `function[]`, `stance[]`, `resolution[]`, and an `evidence` ref. `facets` gives counts per section/function/stance/resolution over the text/year-matched set (before the categorical facets are applied), so every narrowing option a query allows stays visible. A `function`/`stance`/`resolution` filter matches a claim with *at least one* relation of that value.
+
 ## Revisions (MVP)
 
 Revising is creating, so it's a `POST`, not a `PATCH`:

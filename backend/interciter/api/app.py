@@ -19,6 +19,7 @@ from .routers import (
     papers,
     relations,
     review,
+    search,
     session,
     users,
 )
@@ -44,6 +45,7 @@ app = FastAPI(
 
 app.include_router(papers.router, prefix="/v1", tags=["papers", "jobs"])
 app.include_router(claims.router, prefix="/v1", tags=["claims"])
+app.include_router(search.router, prefix="/v1", tags=["search"])
 app.include_router(relations.router, prefix="/v1", tags=["relations"])
 app.include_router(review.router, prefix="/v1", tags=["review"])
 app.include_router(graph.router, prefix="/v1", tags=["graph"])

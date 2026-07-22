@@ -351,6 +351,58 @@ class CitationStats(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Full-text claim search (scite-parity WP2, F3)
+# ---------------------------------------------------------------------------------
+
+
+class SearchHit(BaseModel):
+    """One claim that matched a full-text search, with its provenance and facets.
+
+    The unit is the current interpretation *head* of a claim occurrence. ``function``,
+    ``stance``, and ``resolution`` list the distinct values across the relations that
+    cite from this claim (kept as SEPARATE dimensions, never a blended label).
+    """
+
+    claim_id: str
+    normalized_text: str
+    occurrence_id: str
+    interpretation_id: str
+    work_id: str
+    paper_title: str | None = None
+    year: int | None = None
+    section: str | None = None
+    function: list[str] = Field(default_factory=list)
+    stance: list[str] = Field(default_factory=list)
+    resolution: list[str] = Field(default_factory=list)
+    evidence: EvidenceRef
+
+
+class SearchFacets(BaseModel):
+    """Available facet values (with counts) for the current text query.
+
+    Counts are computed over the text/year-matched candidate set *before* the
+    categorical facets are applied, so the reader always sees every option that a
+    given query could narrow to.
+    """
+
+    section: dict[str, int] = Field(default_factory=dict)
+    function: dict[str, int] = Field(default_factory=dict)
+    stance: dict[str, int] = Field(default_factory=dict)
+    resolution: dict[str, int] = Field(default_factory=dict)
+
+
+class SearchResults(BaseModel):
+    """A page of claim search results plus facet counts for the whole match set."""
+
+    query: str
+    total: int
+    limit: int
+    offset: int
+    hits: list[SearchHit] = Field(default_factory=list)
+    facets: SearchFacets = Field(default_factory=SearchFacets)
+
+
+# ---------------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------------
 

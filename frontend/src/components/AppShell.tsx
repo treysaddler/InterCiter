@@ -13,6 +13,7 @@ import PageFocus from './PageFocus'
 import { useAuth } from '../auth/AuthContext'
 
 const NAV = [
+  { to: '/search', label: 'Search' },
   { to: '/papers', label: 'Papers' },
   { to: '/graph', label: 'Explore' },
   { to: '/ingest', label: 'Submit a paper' },

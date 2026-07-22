@@ -157,7 +157,7 @@ Tests: backend aggregation (support/contrast/mention counts, section grouping,
 abstention excluded/labeled); frontend component render.
 Deps: none. Unlocks WP3, WP4, WP7.
 
-### WP2 — Claim/citation full-text search  (F3)
+### WP2 — Claim/citation full-text search  (F3)   ✅ DONE
 Goal: search verbatim claim/occurrence text with facets.
 Backend:
 - `services/search.py`: keyword search over ClaimInterpretation.normalized_text +
@@ -169,6 +169,18 @@ Frontend: new `SearchPage` + route + nav entry; query box, facet controls,
 result cards linking to claim/paper. Debounced.
 Tests: backend query + facet filters + pagination; frontend page basic render.
 Deps: none (embedding rerank optional, degrade gracefully).
+
+> Implemented: `services/search.py` + `GET /v1/search/claims` (keyword over
+> normalized claim text AND the verbatim source passage, case-insensitive
+> `lower() LIKE` for SQLite+PG; facets section/function/stance/resolution +
+> min_year/max_year; facet counts over the text/year set before categorical
+> filters; head-interpretation unit; pagination). Frontend: search-first
+> `HomePage` hero + reusable `SearchBox` + `SearchPage` (facet panel from live
+> counts, provenance-anchored result cards, curated example queries in
+> `data/exampleQueries.ts`) + `/search` route + "Search" nav entry. Tests:
+> `tests/test_search.py` (9) + `SearchPage.test.tsx` (3). Deferred (optional):
+> SPECTER2 embedding rerank and a `source type` facet.
+
 
 ### WP3 — Paper Report page  (F4)
 Goal: scite-style per-paper report.

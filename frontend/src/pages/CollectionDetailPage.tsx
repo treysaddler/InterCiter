@@ -1,5 +1,5 @@
-import { FormEvent, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { FormEvent, useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type {
@@ -12,10 +12,23 @@ import PageHeading from '../components/PageHeading'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
+function readFileText(file: File): Promise<string> {
+  if (typeof file.text === 'function') {
+    return file.text()
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.readAsText(file)
+  })
+}
+
 /**
  * Collection detail with batch identifier intake.
  */
 export default function CollectionDetailPage() {
+  const navigate = useNavigate()
   const { collectionId = '' } = useParams()
   const detail = useApi<CollectionDetailView>(
     () =>
@@ -25,9 +38,20 @@ export default function CollectionDetailPage() {
     [collectionId],
   )
   const [csvText, setCsvText] = useState('')
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savingMeta, setSavingMeta] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    if (!detail.data) return
+    setName(detail.data.name)
+    setDescription(detail.data.description ?? '')
+  }, [detail.data])
 
   async function onAddMembers(e: FormEvent) {
     e.preventDefault()
@@ -50,6 +74,25 @@ export default function CollectionDetailPage() {
     }
   }
 
+  async function onFileSelected(file: File | null) {
+    if (!file) return
+    setUploadingFile(true)
+    setError(null)
+    try {
+      const text = await readFileText(file)
+      setCsvText((prev) => {
+        const trimmed = prev.trim()
+        if (!trimmed) return text
+        return `${trimmed}\n${text}`
+      })
+      setMessage(`Loaded identifiers from ${file.name}.`)
+    } catch {
+      setError('Could not read the selected file.')
+    } finally {
+      setUploadingFile(false)
+    }
+  }
+
   async function onRemove(member: CollectionMemberView) {
     setError(null)
     try {
@@ -57,6 +100,40 @@ export default function CollectionDetailPage() {
       detail.reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function onSaveMetadata(e: FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSavingMeta(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await api.patch(`/collections/${collectionId}`, {
+        name: name.trim(),
+        description: description.trim() || null,
+      })
+      setMessage('Collection details updated.')
+      detail.reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSavingMeta(false)
+    }
+  }
+
+  async function onDeleteCollection() {
+    if (!window.confirm('Delete this collection and all memberships?')) return
+    setDeleting(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await api.del(`/collections/${collectionId}`)
+      navigate('/collections')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setDeleting(false)
     }
   }
 
@@ -72,14 +149,59 @@ export default function CollectionDetailPage() {
 
       {detail.data && (
         <>
-          {detail.data.description && (
-            <p className="text-base margin-top-0">{detail.data.description}</p>
-          )}
+          <h2>Manage collection</h2>
+          <form className="usa-form maxw-tablet" onSubmit={onSaveMetadata}>
+            <label className="usa-label" htmlFor="collection-name">Name</label>
+            <input
+              id="collection-name"
+              className="usa-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <label className="usa-label" htmlFor="collection-description">Description</label>
+            <textarea
+              id="collection-description"
+              className="usa-textarea"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <div className="display-flex flex-align-center flex-wrap">
+              <button type="submit" className="usa-button margin-right-1" disabled={savingMeta}>
+                {savingMeta ? 'Saving…' : 'Save details'}
+              </button>
+              <button
+                type="button"
+                className="usa-button usa-button--outline"
+                onClick={onDeleteCollection}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting…' : 'Delete collection'}
+              </button>
+            </div>
+          </form>
 
           <h2>Batch add members</h2>
           <p className="font-body-3xs text-base margin-top-0">
             Paste DOIs and PMIDs (comma, semicolon, whitespace, or newline separated).
           </p>
+          <label className="usa-label" htmlFor="identifiers-file">Upload CSV/TXT</label>
+          <input
+            id="identifiers-file"
+            className="usa-file-input"
+            type="file"
+            accept=".csv,.txt,text/csv,text/plain"
+            onChange={(e) => {
+              const file = e.currentTarget.files?.[0] ?? null
+              void onFileSelected(file)
+            }}
+          />
+          {uploadingFile && (
+            <p className="font-body-3xs text-base margin-top-05 margin-bottom-0">
+              Reading file…
+            </p>
+          )}
           <form className="usa-form maxw-tablet" onSubmit={onAddMembers}>
             <label className="usa-label" htmlFor="identifiers">Identifiers</label>
             <textarea

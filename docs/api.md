@@ -7,6 +7,7 @@ Versioned from day one (`/v1/`). API-first: every feature, including InterCiter'
 One paper accumulates many jobs over time (parse, extract, re-extract, hydrate), so jobs and runs are first-class resources rather than a single `GET /papers/{id}/status`.
 
 - `POST /v1/papers` — submit by DOI/PMID or open-access XML. Returns `202 Accepted` + a job resource. Supports an **idempotency key** so retries don't double-ingest.
+- `GET /v1/papers` — list ingested papers (metadata + availability state), bounded by `limit`/`offset`. The reader UI's entry list; reads stay open.
 - `GET /v1/jobs/{job_id}` — poll any async work (MVP notification model; webhooks on the same abstraction in phase 2).
 - `GET /v1/papers/{paper_id}` — work-level metadata + **availability state** (`full_text_extracted` … `ingestion_failed`, see architecture.md).
 - `GET /v1/papers/{paper_id}/versions` — the paper's `PaperVersion`s (preprint vs published vs correction).
@@ -53,8 +54,31 @@ The response reports cycles, truncated branches, evidence for every hop, and sep
 ## Clusters and review (MVP)
 
 - `GET /v1/clusters/{id}` — memberships with method + confidence; conflicting stances within a cluster surfaced explicitly.
+- `GET /v1/claims/{id}/clusters` — the clusters a claim belongs to, so clustering is reachable and reviewable from a claim (there is otherwise no discovery path to a cluster id).
 - `DELETE /v1/clusters/{cluster_id}/members/{interpretation_id}` — reviewer removes a bad membership (sets `status: removed`; nothing is destroyed).
 - `POST /v1/review-decisions` — per-dimension review of an occurrence / interpretation / assertion / membership, with rationale.
+
+## Identity, sessions, and accounts (MVP)
+
+Every request resolves to a `Principal` from **either** an `Authorization: Bearer <token>` header (API/CLI clients) **or** a browser session cookie. Reads stay open; only writes require a principal, and some require `reviewer`/`admin` or ownership. The raw token is stored only as a SHA-256 hash.
+
+**Sessions (Backend-for-Frontend).** So the browser never holds the raw token ([ui-design.md](ui-design.md) §11), the SPA exchanges it once for a server-side session:
+
+- `POST /v1/auth/login` — body `{api_token}`; sets an `HttpOnly; Secure; SameSite=Strict` session cookie plus a readable CSRF cookie; returns the CSRF token + expiry.
+- `POST /v1/auth/logout` — revokes the server-side session and clears cookies.
+- `GET /v1/auth/csrf` — returns the current session's CSRF token (lets the SPA recover it after a reload).
+
+Unsafe cookie-authenticated methods require a matching `X-CSRF-Token` header (double-submit). Bearer-authenticated requests need no CSRF (no ambient credential to forge). Sessions carry sliding-idle and absolute-lifetime timeouts (NIST SP 800-63B).
+
+**Accounts.** Manual account management for the MVP (all admin-only except `me`):
+
+- `GET /v1/users/me` — the identity/role the server resolved for the caller.
+- `GET /v1/users` — list accounts (id, name, role, active state).
+- `POST /v1/users` — create a user; the raw token is returned **exactly once**.
+- `PATCH /v1/users/{id}` — change role and/or activation. Deactivation revokes the user's sessions; a guard refuses to remove the last active admin (`409`).
+- `POST /v1/users/{id}/rotate-token` — issue a fresh token (old token + sessions invalidated); returned once.
+
+Long-term, token-paste is replaced by agency SSO / login.gov (OIDC + PIV/CAC) behind the same session boundary.
 
 ## Scores
 

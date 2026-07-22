@@ -56,16 +56,22 @@ extraction, selective claim alignment, and auditable lineage.
 docs/                          Documentation & Quarto site
   interciter-systems-design.md Design overview (entry point)
   data-model.md, ...           Detailed design documents
+  ui-design.md                 UI design, user stories, auth/session decisions
   feedback/                    External design reviews
   _quarto.yml                  Quarto website configuration
   index.qmd, about.qmd         Website landing and about pages
   styles.css                   Site styles
   _site/                       Rendered website output (build artifact)
+backend/                       FastAPI service (package `interciter`), uv-managed
+  interciter/                  API, ingestion, services, CLI, auth/sessions
+  tests/                       Pytest suite
+frontend/                      React + TypeScript + Vite SPA (USWDS)
+  src/                         Screens, components, API client, auth context
 schema/
   interciter.yaml              LinkML logical data model
   generated/                   Generated Pydantic / SQL DDL / JSON Schema
   requirements.txt             Schema tooling dependencies
-Makefile                       Schema validation and code-generation tasks
+Makefile                       Schema, backend, frontend, and docs tasks
 ```
 
 ## Working with the schema
@@ -99,10 +105,16 @@ also available as a single Word document for offline reading and comments.
 
 ## Status
 
-InterCiter is at the **design stage**. The MVP is scoped as a thin, auditable
-vertical slice: given an open-access biomedical paper, identify empirical result
-claims, show their exact source passages and citation contexts, classify each
-cited relationship (function + stance) with calibrated abstention, and trace one
-hop to the cited paper or a confidently matched target claim. See the
-[design overview](docs/interciter-systems-design.md) for MVP scope, deferred work, and
-open decisions.
+InterCiter has a working **MVP vertical slice**: a FastAPI backend (`backend/`)
+and a React + USWDS frontend (`frontend/`) implement the thin, auditable slice —
+given an open-access biomedical paper, identify empirical result claims, show
+their exact source passages and citation contexts, classify each cited
+relationship (function + stance) with calibrated abstention, and trace one hop to
+the cited paper or a confidently matched target claim. The web UI adds ingestion,
+a reviewer workspace, and account management over a Backend-for-Frontend session
+layer. The [design overview](docs/interciter-systems-design.md) covers scope,
+deferred work, and open decisions; [docs/ui-design.md](docs/ui-design.md) covers
+the UI, user stories, and auth/session design.
+
+Run the API with `make be-serve`, the UI with `make fe-dev`, and both test suites
+with `make test` (see `make help`).

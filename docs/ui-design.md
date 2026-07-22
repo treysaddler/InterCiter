@@ -1,13 +1,40 @@
 # InterCiter — UI Design & User Stories
 
-Status: **draft / planning**. This document plans InterCiter's first user
-interface. It is written to the same standard as the other design docs: it states
-constraints, weighs options explicitly, and captures user stories so we can check
-coverage before writing code. No frontend code exists yet — this is the blueprint.
+Status: **implemented (MVP)**. This document planned InterCiter's first user
+interface and now records what was built. It is written to the same standard as
+the other design docs: it states constraints, weighs options explicitly, and
+captures user stories so coverage is checkable. The MVP frontend now exists under
+`frontend/` and implements the screens and stories below; see
+[Implementation status](#implementation-status).
 
 The UI is a client of the existing `/v1` API ([api.md](api.md)); it renders and
 collects, it never becomes a second system of record. Everything a screen shows
 must be traceable to an API response, and every write goes back through the API.
+
+## Implementation status
+
+The MVP UI is built and runs against the API: a **React + TypeScript + Vite** SPA
+using **USWDS** via `@trussworks/react-uswds` (`frontend/`). All eleven screens are
+live against `/v1` — home, login, papers list, paper detail, **claim detail**
+(claim beside its verbatim passage with the span highlighted, one-hop relations
+with function/stance as separate tags and explicit abstention, decomposed score
+chips, provenance on demand), ingest, job (polling), extraction run, review
+(triage queue + revise / review-decision / clusters), cluster (with reviewer
+soft-remove), and account (self view + admin user management).
+
+Auth is the BFF session cookie with CSRF (§11); reads stay open, writes are gated.
+Accessibility is built in (USWDS components, skip-nav, gov banner, route-change
+focus). A Vitest + React Testing Library suite covers the evidence highlighter,
+score chips, relation/abstention rendering, and the CSRF client behavior.
+
+A few endpoints were added to the API this session to support the reader and
+reviewer flows: `GET /v1/papers` (list), `GET /v1/claims/{id}/clusters`, the BFF
+session endpoints (`POST /v1/auth/login|logout`, `GET /v1/auth/csrf`), and account
+management (`GET /v1/users`, `PATCH /v1/users/{id}`, `POST /v1/users/{id}/rotate-token`).
+See [api.md](api.md).
+
+Run it locally: `make be-serve` (API, cookies non-Secure for http dev) and
+`make fe-dev` (SPA on :5173, proxying `/v1`); seed data with `make be-seed`.
 
 ---
 

@@ -29,6 +29,14 @@ describe('CollectionDetailPage', () => {
       member_count: 1,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: {
+        total: 2,
+        by_stance: { support: 2 },
+        by_function: { direct_evidence: 2 },
+        by_resolution: { claim_resolved: 2 },
+        by_section: { Results: 2 },
+        abstained: 0,
+      },
       members: [
         {
           collection_membership_id: 'cmem_1',
@@ -58,12 +66,15 @@ describe('CollectionDetailPage', () => {
       </MemoryRouter>,
     )
 
-    expect(mockedGet).toHaveBeenCalledWith('/collections/coll_1?include_member_tallies=true')
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/collections/coll_1?include_member_tallies=true&member_sort=added_desc',
+    )
     expect(await screen.findByRole('link', { name: /a metformin trial/i })).toHaveAttribute(
       'href',
       '/papers/work_1',
     )
     expect(screen.getByText(/citation tallies/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /collection citation summary/i })).toBeInTheDocument()
   })
 
   it('saves collection metadata and can delete the collection', async () => {
@@ -75,6 +86,7 @@ describe('CollectionDetailPage', () => {
       member_count: 0,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: null,
       members: [],
     })
     mockedPatch.mockResolvedValue({
@@ -123,6 +135,7 @@ describe('CollectionDetailPage', () => {
       member_count: 0,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: null,
       members: [],
     })
 
@@ -143,5 +156,98 @@ describe('CollectionDetailPage', () => {
 
     expect(await screen.findByText(/loaded identifiers from ids.csv/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Identifiers')).toHaveValue('10.1000/example\n12345678')
+  })
+
+  it('changes member sort and requests updated ordering', async () => {
+    mockedGet
+      .mockResolvedValueOnce({
+        collection_id: 'coll_1',
+        owner_id: 'user_1',
+        name: 'Core diabetes papers',
+        description: 'priority evidence set',
+        member_count: 1,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        aggregate_citation_tallies: {
+          total: 1,
+          by_stance: { support: 1 },
+          by_function: { direct_evidence: 1 },
+          by_resolution: { claim_resolved: 1 },
+          by_section: { Results: 1 },
+          abstained: 0,
+        },
+        members: [
+          {
+            collection_membership_id: 'cmem_1',
+            work_id: 'work_1',
+            title: 'A metformin trial',
+            doi: '10.1000/example',
+            pmid: null,
+            year: 2021,
+            added_at: '2026-01-01T00:00:00Z',
+            citation_tallies: {
+              total: 1,
+              by_stance: { support: 1 },
+              by_function: { direct_evidence: 1 },
+              by_resolution: { claim_resolved: 1 },
+              by_section: { Results: 1 },
+              abstained: 0,
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        collection_id: 'coll_1',
+        owner_id: 'user_1',
+        name: 'Core diabetes papers',
+        description: 'priority evidence set',
+        member_count: 1,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        aggregate_citation_tallies: {
+          total: 1,
+          by_stance: { support: 1 },
+          by_function: { direct_evidence: 1 },
+          by_resolution: { claim_resolved: 1 },
+          by_section: { Results: 1 },
+          abstained: 0,
+        },
+        members: [
+          {
+            collection_membership_id: 'cmem_1',
+            work_id: 'work_1',
+            title: 'A metformin trial',
+            doi: '10.1000/example',
+            pmid: null,
+            year: 2021,
+            added_at: '2026-01-01T00:00:00Z',
+            citation_tallies: {
+              total: 1,
+              by_stance: { support: 1 },
+              by_function: { direct_evidence: 1 },
+              by_resolution: { claim_resolved: 1 },
+              by_section: { Results: 1 },
+              abstained: 0,
+            },
+          },
+        ],
+      })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByLabelText('Sort members')
+    fireEvent.change(screen.getByLabelText('Sort members'), {
+      target: { value: 'support_desc' },
+    })
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/collections/coll_1?include_member_tallies=true&member_sort=support_desc',
+    )
   })
 })

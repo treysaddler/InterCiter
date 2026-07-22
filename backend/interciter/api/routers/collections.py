@@ -50,6 +50,13 @@ def get_collection(
         False,
         description="Include per-member citation tallies from /citation-stats.",
     ),
+    member_sort: str = Query(
+        "added_desc",
+        description=(
+            "Member order: added_desc (default), added_asc, support_desc, "
+            "contradict_desc."
+        ),
+    ),
     session: Session = Depends(db_session),
     principal: Principal = Depends(require_user),
 ) -> CollectionDetailView:
@@ -59,6 +66,7 @@ def get_collection(
             collection_id,
             owner_id=principal.user_id,
             include_member_tallies=include_member_tallies,
+            member_sort=member_sort,
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -22,6 +22,7 @@ from ..schemas import (
     CollectionCreate,
     CollectionDetailView,
     CollectionMemberView,
+    CitationTallies,
     CollectionUpdate,
     CollectionView,
     PaperSubmission,
@@ -117,6 +118,7 @@ def get_collection(
     *,
     owner_id: str,
     include_member_tallies: bool = False,
+    member_sort: str = "added_desc",
 ) -> CollectionDetailView:
     collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
     memberships = list(
@@ -141,7 +143,15 @@ def get_collection(
         for m in memberships
         if m.work_id in works
     ]
-    return CollectionDetailView(**_collection_view(session, collection).model_dump(), members=members)
+
+    aggregate_tallies = _aggregate_tallies(members) if include_member_tallies else None
+    members = _sort_members(members, sort_key=member_sort)
+
+    return CollectionDetailView(
+        **_collection_view(session, collection).model_dump(),
+        aggregate_citation_tallies=aggregate_tallies,
+        members=members,
+    )
 
 
 def update_collection(
@@ -333,3 +343,66 @@ def _create_membership(
     session.add(member)
     session.flush()
     return member
+
+
+def _aggregate_tallies(members: list[CollectionMemberView]) -> CitationTallies:
+    total = 0
+    abstained = 0
+    by_stance: dict[str, int] = {}
+    by_function: dict[str, int] = {}
+    by_resolution: dict[str, int] = {}
+    by_section: dict[str, int] = {}
+
+    for member in members:
+        tallies = member.citation_tallies
+        if tallies is None:
+            continue
+        total += tallies.total
+        abstained += tallies.abstained
+        for key, value in tallies.by_stance.items():
+            by_stance[key] = by_stance.get(key, 0) + value
+        for key, value in tallies.by_function.items():
+            by_function[key] = by_function.get(key, 0) + value
+        for key, value in tallies.by_resolution.items():
+            by_resolution[key] = by_resolution.get(key, 0) + value
+        for key, value in tallies.by_section.items():
+            by_section[key] = by_section.get(key, 0) + value
+
+    return CitationTallies(
+        total=total,
+        by_stance=by_stance,
+        by_function=by_function,
+        by_resolution=by_resolution,
+        by_section=by_section,
+        abstained=abstained,
+    )
+
+
+def _sort_members(
+    members: list[CollectionMemberView], *, sort_key: str
+) -> list[CollectionMemberView]:
+    if sort_key == "added_asc":
+        return sorted(members, key=lambda member: member.added_at)
+    if sort_key == "support_desc":
+        return sorted(
+            members,
+            key=lambda member: (
+                (member.citation_tallies.by_stance.get("support", 0)
+                 if member.citation_tallies
+                 else 0),
+                member.added_at,
+            ),
+            reverse=True,
+        )
+    if sort_key == "contradict_desc":
+        return sorted(
+            members,
+            key=lambda member: (
+                (member.citation_tallies.by_stance.get("contradict", 0)
+                 if member.citation_tallies
+                 else 0),
+                member.added_at,
+            ),
+            reverse=True,
+        )
+    return sorted(members, key=lambda member: member.added_at, reverse=True)

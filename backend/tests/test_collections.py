@@ -90,6 +90,38 @@ def test_collection_detail_can_include_member_citation_tallies(client, user_head
     assert len(members) == 1
     assert members[0]["citation_tallies"] is not None
     assert "total" in members[0]["citation_tallies"]
+    assert detail.json()["aggregate_citation_tallies"] is not None
+
+
+def test_collection_detail_member_sorting_controls(client, user_headers):
+    _submit(client, user_headers, "paper_b.xml")
+    paper_a = _submit(client, user_headers, "paper_a.xml")
+    paper_b = _submit(client, user_headers, "paper_b.xml")
+
+    coll_id = _create_collection(client, user_headers)["collection_id"]
+    add = client.post(
+        f"/v1/collections/{coll_id}/members",
+        json={"work_ids": [paper_a["result"]["work_id"], paper_b["result"]["work_id"]]},
+        headers=user_headers,
+    )
+    assert add.status_code == 200
+
+    by_support = client.get(
+        f"/v1/collections/{coll_id}",
+        params={
+            "include_member_tallies": "true",
+            "member_sort": "support_desc",
+        },
+        headers=user_headers,
+    )
+    assert by_support.status_code == 200
+    members = by_support.json()["members"]
+    assert len(members) == 2
+    support_counts = [
+        (m["citation_tallies"] or {"by_stance": {}})["by_stance"].get("support", 0)
+        for m in members
+    ]
+    assert support_counts == sorted(support_counts, reverse=True)
 
 
 def test_collection_ownership_is_enforced(client, make_user):

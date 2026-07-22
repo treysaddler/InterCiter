@@ -30,12 +30,13 @@ function readFileText(file: File): Promise<string> {
 export default function CollectionDetailPage() {
   const navigate = useNavigate()
   const { collectionId = '' } = useParams()
+  const [memberSort, setMemberSort] = useState('added_desc')
   const detail = useApi<CollectionDetailView>(
     () =>
       api.get<CollectionDetailView>(
-        `/collections/${collectionId}?include_member_tallies=true`,
+        `/collections/${collectionId}?include_member_tallies=true&member_sort=${memberSort}`,
       ),
-    [collectionId],
+    [collectionId, memberSort],
   )
   const [csvText, setCsvText] = useState('')
   const [uploadingFile, setUploadingFile] = useState(false)
@@ -220,10 +221,32 @@ export default function CollectionDetailPage() {
           {message && <p className="text-green">{message}</p>}
           {error && <ErrorAlert message={error} />}
 
+          <h2 className="margin-top-4">Collection citation summary</h2>
+          {detail.data.aggregate_citation_tallies ? (
+            <CitationTallies tallies={detail.data.aggregate_citation_tallies} />
+          ) : (
+            <Empty>No aggregate citation data available yet.</Empty>
+          )}
+
           <h2 className="margin-top-4">Members</h2>
           {detail.data.members.length === 0 && <Empty>No members yet.</Empty>}
           {detail.data.members.length > 0 && (
-            <table className="usa-table width-full">
+            <>
+              <div className="maxw-card margin-bottom-2">
+                <label className="usa-label" htmlFor="member-sort">Sort members</label>
+                <select
+                  id="member-sort"
+                  className="usa-select"
+                  value={memberSort}
+                  onChange={(e) => setMemberSort(e.target.value)}
+                >
+                  <option value="added_desc">Recently added</option>
+                  <option value="added_asc">Oldest added</option>
+                  <option value="support_desc">Most supporting citations</option>
+                  <option value="contradict_desc">Most contradicting citations</option>
+                </select>
+              </div>
+              <table className="usa-table width-full">
               <caption className="usa-sr-only">Collection members</caption>
               <thead>
                 <tr>
@@ -267,7 +290,8 @@ export default function CollectionDetailPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </>
           )}
         </>
       )}

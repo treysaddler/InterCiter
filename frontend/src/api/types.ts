@@ -187,6 +187,7 @@ export interface CollectionView {
 }
 
 export interface CollectionDetailView extends CollectionView {
+  aggregate_citation_tallies: CitationTallies | null
   members: CollectionMemberView[]
 }
 

@@ -231,6 +231,10 @@ Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 > Continued: collection detail now supports metadata management (rename/update
 > description, delete collection) and batch identifier upload from CSV/TXT file
 > in addition to pasted text.
+>
+> Continued: collection detail now exposes aggregate citation tallies for the
+> whole collection and supports member sorting by recency or support/contradict
+> citation volume.
 
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)
 Goal: non-mutating enrichment flagging retracted / noticed works.

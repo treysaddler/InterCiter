@@ -561,6 +561,7 @@ class CollectionView(BaseModel):
 
 
 class CollectionDetailView(CollectionView):
+    aggregate_citation_tallies: CitationTallies | None = None
     members: list[CollectionMemberView] = Field(default_factory=list)
 
 

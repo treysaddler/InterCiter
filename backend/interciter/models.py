@@ -123,6 +123,13 @@ class CitationMention(Base):
     # supervision only — never InterCiter's function/stance ontology.
     source_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # Relationships (not just bare FK columns) so the unit-of-work orders inserts by
+    # dependency: the referenced passage and cited work are inserted first. Databases
+    # that enforce foreign keys immediately (PostgreSQL) require this; SQLite does not
+    # enforce FKs by default, which previously hid the missing ordering.
+    passage: Mapped[Passage] = relationship()
+    cited_work: Mapped[PaperWork | None] = relationship()
+
 
 # ---------------------------------------------------------------------------------
 # Extraction layer

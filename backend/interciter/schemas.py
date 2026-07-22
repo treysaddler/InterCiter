@@ -547,6 +547,7 @@ class CollectionMemberView(BaseModel):
     pmid: str | None = None
     year: int | None = None
     added_at: datetime
+    citation_tallies: CitationTallies | None = None
 
 
 class CollectionView(BaseModel):

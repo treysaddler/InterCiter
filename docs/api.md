@@ -113,7 +113,8 @@ metadata stubs for unknown identifiers through the existing ingest path.
 
 - `POST /v1/collections` — create a collection (`{name, description?}`).
 - `GET /v1/collections` — list the caller's collections.
-- `GET /v1/collections/{id}` — collection detail with member list.
+- `GET /v1/collections/{id}` — collection detail with member list. Optional query
+  `include_member_tallies=true` adds each member's WP1 citation tallies inline.
 - `PATCH /v1/collections/{id}` — update `{name?, description?}`.
 - `DELETE /v1/collections/{id}` — delete a collection (and memberships).
 - `POST /v1/collections/{id}/members` — batch add members (`{work_ids[], dois[],

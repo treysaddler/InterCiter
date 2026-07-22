@@ -26,13 +26,25 @@ from ..schemas import (
     CollectionView,
     PaperSubmission,
 )
-from . import jobs
+from . import citation_stats, jobs
 from .projection import NotFound
 
 _DOI_LIKE = re.compile(r"10\.\d{4,9}/\S+", flags=re.IGNORECASE)
 
 
-def _member_view(member: models.CollectionMembership, work: models.PaperWork) -> CollectionMemberView:
+def _member_view(
+    member: models.CollectionMembership,
+    work: models.PaperWork,
+    *,
+    include_tallies: bool,
+    session: Session,
+) -> CollectionMemberView:
+    tallies = None
+    if include_tallies:
+        try:
+            tallies = citation_stats.citation_stats_for_work(session, work.work_id).tallies
+        except KeyError:
+            tallies = None
     return CollectionMemberView(
         collection_membership_id=member.collection_membership_id,
         work_id=work.work_id,
@@ -41,6 +53,7 @@ def _member_view(member: models.CollectionMembership, work: models.PaperWork) ->
         pmid=work.pmid,
         year=work.year,
         added_at=member.added_at,
+        citation_tallies=tallies,
     )
 
 
@@ -99,7 +112,11 @@ def create_collection(
 
 
 def get_collection(
-    session: Session, collection_id: str, *, owner_id: str
+    session: Session,
+    collection_id: str,
+    *,
+    owner_id: str,
+    include_member_tallies: bool = False,
 ) -> CollectionDetailView:
     collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
     memberships = list(
@@ -114,7 +131,16 @@ def get_collection(
         w.work_id: w
         for w in session.scalars(select(models.PaperWork).where(models.PaperWork.work_id.in_(work_ids)))
     }
-    members = [_member_view(m, works[m.work_id]) for m in memberships if m.work_id in works]
+    members = [
+        _member_view(
+            m,
+            works[m.work_id],
+            include_tallies=include_member_tallies,
+            session=session,
+        )
+        for m in memberships
+        if m.work_id in works
+    ]
     return CollectionDetailView(**_collection_view(session, collection).model_dump(), members=members)
 
 
@@ -203,7 +229,9 @@ def add_members(
         member = _create_membership(
             session, collection_id=collection.collection_id, work_id=work.work_id, added_by=owner_id
         )
-        added_members.append(_member_view(member, work))
+        added_members.append(
+            _member_view(member, work, include_tallies=False, session=session)
+        )
 
     for doi in dois:
         work = _resolve_existing_work(session, doi=doi)
@@ -225,7 +253,9 @@ def add_members(
         member = _create_membership(
             session, collection_id=collection.collection_id, work_id=work.work_id, added_by=owner_id
         )
-        added_members.append(_member_view(member, work))
+        added_members.append(
+            _member_view(member, work, include_tallies=False, session=session)
+        )
 
     for pmid in pmids:
         work = _resolve_existing_work(session, pmid=pmid)
@@ -247,7 +277,9 @@ def add_members(
         member = _create_membership(
             session, collection_id=collection.collection_id, work_id=work.work_id, added_by=owner_id
         )
-        added_members.append(_member_view(member, work))
+        added_members.append(
+            _member_view(member, work, include_tallies=False, session=session)
+        )
 
     collection.updated_at = datetime.now().astimezone()
     session.commit()

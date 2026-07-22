@@ -7,6 +7,7 @@ import type {
   CollectionDetailView,
   CollectionMemberView,
 } from '../api/types'
+import CitationTallies from '../components/CitationTallies'
 import PageHeading from '../components/PageHeading'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
@@ -17,7 +18,10 @@ import { useApi } from '../hooks/useApi'
 export default function CollectionDetailPage() {
   const { collectionId = '' } = useParams()
   const detail = useApi<CollectionDetailView>(
-    () => api.get<CollectionDetailView>(`/collections/${collectionId}`),
+    () =>
+      api.get<CollectionDetailView>(
+        `/collections/${collectionId}?include_member_tallies=true`,
+      ),
     [collectionId],
   )
   const [csvText, setCsvText] = useState('')
@@ -114,6 +118,14 @@ export default function CollectionDetailPage() {
                       <Link to={`/papers/${member.work_id}`}>
                         {member.title ?? member.work_id}
                       </Link>
+                      {member.citation_tallies && (
+                        <details className="margin-top-1">
+                          <summary className="font-body-3xs">
+                            Citation tallies
+                          </summary>
+                          <CitationTallies tallies={member.citation_tallies} />
+                        </details>
+                      )}
                     </td>
                     <td>{member.year ?? '—'}</td>
                     <td>

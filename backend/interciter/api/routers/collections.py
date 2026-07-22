@@ -6,7 +6,7 @@ cookie sessions). Reads are scoped to the caller's own collections.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ...auth import NotAuthorized, Principal
@@ -46,11 +46,20 @@ def list_collections(
 @router.get("/collections/{collection_id}", response_model=CollectionDetailView)
 def get_collection(
     collection_id: str,
+    include_member_tallies: bool = Query(
+        False,
+        description="Include per-member citation tallies from /citation-stats.",
+    ),
     session: Session = Depends(db_session),
     principal: Principal = Depends(require_user),
 ) -> CollectionDetailView:
     try:
-        return collections.get_collection(session, collection_id, owner_id=principal.user_id)
+        return collections.get_collection(
+            session,
+            collection_id,
+            owner_id=principal.user_id,
+            include_member_tallies=include_member_tallies,
+        )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except NotAuthorized as exc:

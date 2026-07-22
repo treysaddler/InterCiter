@@ -67,6 +67,31 @@ def test_collection_members_work_id_and_identifier_batch(client, user_headers):
     assert detail.json()["member_count"] >= 3
 
 
+def test_collection_detail_can_include_member_citation_tallies(client, user_headers):
+    _submit(client, user_headers, "paper_b.xml")
+    paper = _submit(client, user_headers, "paper_a.xml")
+    work_id = paper["result"]["work_id"]
+
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    add = client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"work_ids": [work_id]},
+        headers=user_headers,
+    )
+    assert add.status_code == 200
+
+    detail = client.get(
+        f"/v1/collections/{collection_id}",
+        params={"include_member_tallies": "true"},
+        headers=user_headers,
+    )
+    assert detail.status_code == 200
+    members = detail.json()["members"]
+    assert len(members) == 1
+    assert members[0]["citation_tallies"] is not None
+    assert "total" in members[0]["citation_tallies"]
+
+
 def test_collection_ownership_is_enforced(client, make_user):
     _, owner_headers = make_user(name="owner")
     _, other_headers = make_user(name="other")

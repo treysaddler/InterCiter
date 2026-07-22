@@ -173,6 +173,7 @@ export interface CollectionMemberView {
   pmid: string | null
   year: number | null
   added_at: string
+  citation_tallies: CitationTallies | null
 }
 
 export interface CollectionView {

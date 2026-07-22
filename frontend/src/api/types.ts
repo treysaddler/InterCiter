@@ -229,3 +229,11 @@ export interface GraphExpansion {
   skipped_reason: string | null
   graph: GraphView
 }
+
+export interface ClaimExpansion {
+  interpretation_id: string
+  grounded_terms: number
+  resolved_terms: number
+  corroborating_edges: number
+  graph: GraphView
+}

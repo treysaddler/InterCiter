@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { api, ApiError } from '../api/client'
-import type { GraphExpansion, GraphNode, GraphView } from '../api/types'
+import type { ClaimExpansion, GraphExpansion, GraphNode, GraphView } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import NetworkGraph from '../components/NetworkGraph'
 import PageHeading from '../components/PageHeading'
@@ -29,6 +29,9 @@ export default function GraphPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [expanding, setExpanding] = useState(false)
   const [expandError, setExpandError] = useState<string | null>(null)
+  // A ROBOKOP claim expansion produces its own knowledge-graph view that temporarily
+  // replaces the citation/claim network until the user clears it.
+  const [robokopGraph, setRobokopGraph] = useState<GraphView | null>(null)
 
   const centered = Boolean(workId)
   const path = centered
@@ -38,11 +41,17 @@ export default function GraphPage() {
       : `/graph/claims`
 
   const graph = useApi<GraphView>(() => api.get<GraphView>(path), [path])
+  const displayed = robokopGraph ?? graph.data
 
   function onSelectNode(node: GraphNode) {
     setSelected(node)
     setNotice(null)
     setExpandError(null)
+  }
+
+  function clearRobokop() {
+    setRobokopGraph(null)
+    setNotice(null)
   }
 
   async function expandSelected() {
@@ -63,6 +72,29 @@ export default function GraphPage() {
         )
         graph.reload()
       }
+    } catch (e) {
+      setExpandError(e instanceof ApiError ? e.message : String(e))
+    } finally {
+      setExpanding(false)
+    }
+  }
+
+  async function expandClaimRobokop() {
+    if (!selected) return
+    setExpanding(true)
+    setExpandError(null)
+    setNotice(null)
+    try {
+      const result = await api.post<ClaimExpansion>(
+        `/graph/claims/${selected.id}/expand-robokop`,
+      )
+      setRobokopGraph(result.graph)
+      setNotice(
+        result.resolved_terms === 0
+          ? 'No entities on this claim could be grounded in ROBOKOP.'
+          : `Grounded ${result.resolved_terms} entity(ies) with ` +
+              `${result.corroborating_edges} knowledge-graph edge(s).`,
+      )
     } catch (e) {
       setExpandError(e instanceof ApiError ? e.message : String(e))
     } finally {
@@ -152,13 +184,31 @@ export default function GraphPage() {
         </div>
       )}
 
+      {robokopGraph && (
+        <div className="usa-alert usa-alert--warning usa-alert--slim margin-y-2">
+          <div className="usa-alert__body">
+            <p className="usa-alert__text">
+              Showing ROBOKOP knowledge-graph context (corroborating background
+              knowledge, not an extracted assertion).{' '}
+              <button
+                type="button"
+                className="usa-button usa-button--unstyled"
+                onClick={clearRobokop}
+              >
+                Back to the network
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
+
       {graph.loading && <Loading label="Building graph…" />}
       {graph.error && <ErrorAlert message={graph.error} />}
-      {graph.data && (
+      {displayed && (
         <div className="grid-row grid-gap">
           <div className="tablet:grid-col-8">
             <NetworkGraph
-              view={graph.data}
+              view={displayed}
               selectedId={selected?.id}
               onSelectNode={onSelectNode}
             />
@@ -217,8 +267,32 @@ export default function GraphPage() {
                       </ul>
                     )}
                     {selected.type === 'claim' && (
-                      <p>
-                        <Link to={`/claims/${selected.id}`}>Open claim</Link>
+                      <ul className="usa-list usa-list--unstyled">
+                        <li>
+                          <Link to={`/claims/${selected.id}`}>Open claim</Link>
+                        </li>
+                        <li className="margin-top-1">
+                          {status === 'authenticated' ? (
+                            <button
+                              type="button"
+                              className="usa-button usa-button--outline"
+                              onClick={expandClaimRobokop}
+                              disabled={expanding}
+                            >
+                              {expanding ? 'Exploring…' : 'Explore in ROBOKOP'}
+                            </button>
+                          ) : (
+                            <span className="font-body-3xs text-base">
+                              <Link to="/login">Sign in</Link> to explore this claim in
+                              ROBOKOP.
+                            </span>
+                          )}
+                        </li>
+                      </ul>
+                    )}
+                    {selected.type === 'entity' && selected.id.includes(':') && (
+                      <p className="font-body-3xs text-base">
+                        Knowledge-graph entity ({selected.id}).
                       </p>
                     )}
                     {expandError && <ErrorAlert message={expandError} />}

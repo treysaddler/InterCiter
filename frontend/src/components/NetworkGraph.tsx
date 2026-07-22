@@ -28,6 +28,7 @@ const TYPE_COLOR: Record<string, string> = {
   paper: '#005ea2', // primary blue
   author: '#00a91c', // green
   claim: '#c05600', // orange
+  entity: '#8168b3', // violet (ROBOKOP knowledge-graph entities)
 }
 
 function colorFor(type: string): string {
@@ -62,6 +63,10 @@ function stylesheet(): StylesheetStyle[] {
     {
       selector: 'node.type-claim',
       style: { 'background-color': TYPE_COLOR.claim, shape: 'round-rectangle' },
+    },
+    {
+      selector: 'node.type-entity',
+      style: { 'background-color': TYPE_COLOR.entity, shape: 'hexagon' },
     },
     {
       selector: 'node.selected',

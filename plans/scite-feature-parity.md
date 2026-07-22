@@ -241,6 +241,9 @@ Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 >
 > Continued: frontend add-members requests now send parsed `dois[]` and
 > `pmids[]` explicitly alongside raw `csv_text` for clearer payload semantics.
+>
+> Continued: collection member rows now include direct quick links to each
+> paper's Report and Graph views.
 
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)
 Goal: non-mutating enrichment flagging retracted / noticed works.

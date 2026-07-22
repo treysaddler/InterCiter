@@ -75,6 +75,14 @@ describe('CollectionDetailPage', () => {
       'href',
       '/papers/work_1',
     )
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
+      'href',
+      '/papers/work_1/report',
+    )
+    expect(screen.getByRole('link', { name: 'Graph' })).toHaveAttribute(
+      'href',
+      '/graph/papers/work_1',
+    )
     expect(screen.getByText(/citation tallies/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /collection citation summary/i })).toBeInTheDocument()
   })

@@ -327,6 +327,10 @@ export default function CollectionDetailPage() {
                         .join(' · ') || '—'}
                     </td>
                     <td>
+                      <Link to={`/papers/${member.work_id}/report`}>Report</Link>
+                      {' · '}
+                      <Link to={`/graph/papers/${member.work_id}`}>Graph</Link>
+                      {' · '}
                       <button
                         type="button"
                         className="usa-button usa-button--unstyled"

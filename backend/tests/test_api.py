@@ -62,6 +62,18 @@ def test_full_read_flow_and_trace(client, user_headers):
     assert found_claim_resolved
 
 
+def test_claim_clusters_endpoint(client, user_headers):
+    job = _submit(client, "paper_a.xml", user_headers)
+    work_id = job["result"]["work_id"]
+    claim_id = client.get(f"/v1/papers/{work_id}/claims").json()[0]["claim_id"]
+
+    resp = client.get(f"/v1/claims/{claim_id}/clusters")  # reads stay open
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)
+
+    assert client.get("/v1/claims/interp_nope/clusters").status_code == 404
+
+
 def test_relationship_filtering(client, user_headers):
     _submit(client, "paper_b.xml", user_headers)
     job_a = _submit(client, "paper_a.xml", user_headers)

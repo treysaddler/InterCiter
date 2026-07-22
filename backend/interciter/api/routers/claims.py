@@ -12,6 +12,7 @@ from ...schemas import (
     ClaimOccurrenceView,
     ClaimScores,
     ClaimView,
+    ClusterView,
     HumanClaimCreate,
     InterpretationRevision,
     PassageView,
@@ -136,5 +137,16 @@ def get_passage(passage_id: str, session: Session = Depends(db_session)) -> Pass
 def get_scores(claim_id: str, session: Session = Depends(db_session)) -> ClaimScores:
     try:
         return projection.claim_scores(session, claim_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/claims/{claim_id}/clusters", response_model=list[ClusterView])
+def get_claim_clusters(
+    claim_id: str, session: Session = Depends(db_session)
+) -> list[ClusterView]:
+    """Clusters this claim belongs to (makes clustering reviewable). Reads stay open."""
+    try:
+        return review.clusters_for_claim(session, claim_id)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

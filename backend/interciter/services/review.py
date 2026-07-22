@@ -208,6 +208,23 @@ def get_cluster(session: Session, cluster_id: str) -> ClusterView:
     )
 
 
+def clusters_for_claim(session: Session, claim_id: str) -> list[ClusterView]:
+    """Clusters an interpretation belongs to — makes clustering reviewable (US-3.5)."""
+    interp = session.get(models.ClaimInterpretation, claim_id)
+    if interp is None:
+        raise NotFound(f"claim {claim_id} not found")
+    cluster_ids = list(
+        dict.fromkeys(
+            session.scalars(
+                select(models.ClusterMembership.cluster_id).where(
+                    models.ClusterMembership.interpretation_id == claim_id
+                )
+            )
+        )
+    )
+    return [get_cluster(session, cid) for cid in cluster_ids]
+
+
 def remove_cluster_member(
     session: Session, cluster_id: str, interpretation_id: str, actor: Principal
 ) -> ClusterView:
@@ -225,8 +242,6 @@ def remove_cluster_member(
     membership.removed_at = datetime.now(timezone.utc)
     session.commit()
     return get_cluster(session, cluster_id)
-
-
 def _dominant_stance(
     session: Session, interpretation_id: str
 ) -> RelationStance | None:

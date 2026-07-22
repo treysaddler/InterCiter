@@ -250,6 +250,9 @@ Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 >
 > Continued: collection detail now supports exporting member identifiers as a
 > CSV (work_id, DOI, PMID, title) for external workflows.
+>
+> Continued: collection detail now supports exporting a filter-aware DOI/PMID
+> identifiers TXT for quick round-trip re-import and sharing.
 
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)
 Goal: non-mutating enrichment flagging retracted / noticed works.

@@ -198,6 +198,23 @@ export default function CollectionDetailPage() {
     URL.revokeObjectURL(url)
   }
 
+  function onExportIdentifiersTxt() {
+    if (filteredMembers.length === 0) return
+    const ids = Array.from(
+      new Set(
+        filteredMembers.flatMap((member) => [member.doi, member.pmid]).filter(Boolean),
+      ),
+    )
+    if (ids.length === 0) return
+    const blob = new Blob([ids.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${collectionId}-identifiers.txt`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       <p className="margin-top-4 margin-bottom-0">
@@ -326,6 +343,13 @@ export default function CollectionDetailPage() {
                   onClick={onExportMembers}
                 >
                   Export members CSV
+                </button>
+                <button
+                  type="button"
+                  className="usa-button usa-button--outline margin-top-1 margin-left-1"
+                  onClick={onExportIdentifiersTxt}
+                >
+                  Export identifiers TXT
                 </button>
               </div>
               <div className="maxw-card margin-bottom-2">

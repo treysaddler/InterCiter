@@ -457,4 +457,99 @@ describe('CollectionDetailPage', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
     anchorClick.mockRestore()
   })
+
+  it('exports filtered identifiers as TXT', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 2,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: {
+        total: 1,
+        by_stance: { support: 1 },
+        by_function: { direct_evidence: 1 },
+        by_resolution: { claim_resolved: 1 },
+        by_section: { Results: 1 },
+        abstained: 0,
+      },
+      members: [
+        {
+          collection_membership_id: 'cmem_1',
+          work_id: 'work_1',
+          title: 'A metformin trial',
+          doi: '10.1000/example-a',
+          pmid: '12345',
+          year: 2021,
+          added_at: '2026-01-01T00:00:00Z',
+          citation_tallies: {
+            total: 1,
+            by_stance: { support: 1 },
+            by_function: { direct_evidence: 1 },
+            by_resolution: { claim_resolved: 1 },
+            by_section: { Results: 1 },
+            abstained: 0,
+          },
+        },
+        {
+          collection_membership_id: 'cmem_2',
+          work_id: 'work_2',
+          title: 'A semaglutide trial',
+          doi: '10.1000/example-b',
+          pmid: null,
+          year: 2022,
+          added_at: '2026-01-02T00:00:00Z',
+          citation_tallies: {
+            total: 0,
+            by_stance: {},
+            by_function: {},
+            by_resolution: {},
+            by_section: {},
+            abstained: 0,
+          },
+        },
+      ],
+    })
+
+    const createObjectURL = vi.fn(() => 'blob:test')
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectURL,
+      configurable: true,
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectURL,
+      configurable: true,
+    })
+    const anchorClick = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('link', { name: /a metformin trial/i })
+    fireEvent.change(screen.getByLabelText('Filter members'), {
+      target: { value: 'example-a' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /export identifiers txt/i }))
+
+    const blob = createObjectURL.mock.calls[0][0] as Blob
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('failed to read blob text'))
+      reader.onload = () => resolve(String(reader.result ?? ''))
+      reader.readAsText(blob)
+    })
+    expect(text).toBe('10.1000/example-a\n12345\n')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
+    anchorClick.mockRestore()
+  })
 })

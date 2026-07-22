@@ -1,12 +1,17 @@
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { SearchResults } from '../api/types'
 import PageHeading from '../components/PageHeading'
 import SearchBox from '../components/SearchBox'
-import { ErrorAlert, Loading } from '../components/States'
+import { Loading, ErrorAlert } from '../components/States'
 import { EXAMPLE_QUERIES } from '../data/exampleQueries'
 import { useApi } from '../hooks/useApi'
+
+// The network view pulls in Cytoscape (large) so it is code-split and only fetched
+// once a search has results to explore.
+const SearchNetwork = lazy(() => import('../components/SearchNetwork'))
 
 /** Facet params that narrow a query (kept separate from the free-text `q`). */
 const FACET_KEYS = ['section', 'function', 'stance', 'resolution'] as const
@@ -41,6 +46,26 @@ export default function SearchPage() {
         : Promise.resolve(null),
     [query, hasQuery],
   )
+
+  // The paper whose citation network is shown inline. Defaults to the top result so a
+  // network appears with the results; a reader can re-focus it on any other hit.
+  const [focusWorkId, setFocusWorkId] = useState<string | null>(null)
+  const hits = results.data?.hits ?? []
+  const hitWorkKey = hits.map((h) => h.work_id).join(',')
+  useEffect(() => {
+    if (hits.length === 0) {
+      setFocusWorkId(null)
+      return
+    }
+    setFocusWorkId((current) =>
+      current && hits.some((h) => h.work_id === current) ? current : hits[0].work_id,
+    )
+    // Re-evaluate only when the set of result papers changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hitWorkKey])
+
+  const focusTitle =
+    hits.find((h) => h.work_id === focusWorkId)?.paper_title ?? null
 
   function toggleFacet(key: FacetKey, value: string) {
     const next = new URLSearchParams(params)
@@ -104,6 +129,17 @@ export default function SearchPage() {
                     results.data.total === 1 ? '' : 's'
                   }`}
             </p>
+
+            {focusWorkId && (
+              <Suspense fallback={<Loading label="Loading network…" />}>
+                <SearchNetwork
+                  workId={focusWorkId}
+                  title={focusTitle}
+                  onFocusPaper={setFocusWorkId}
+                />
+              </Suspense>
+            )}
+
             <ol className="usa-list usa-list--unstyled">
               {results.data.hits.map((hit) => (
                 <li
@@ -151,6 +187,22 @@ export default function SearchPage() {
                       ))}
                     </p>
                   )}
+
+                  <p className="margin-top-1 margin-bottom-0">
+                    {focusWorkId === hit.work_id ? (
+                      <span className="font-body-3xs text-base">
+                        ✓ Shown in the network above
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="usa-button usa-button--unstyled font-body-3xs"
+                        onClick={() => setFocusWorkId(hit.work_id)}
+                      >
+                        Focus this paper in the network
+                      </button>
+                    )}
+                  </p>
                 </li>
               ))}
             </ol>

@@ -14,11 +14,9 @@ import { useAuth } from '../auth/AuthContext'
 
 const NAV = [
   { to: '/search', label: 'Search' },
-  { to: '/papers', label: 'Papers' },
-  { to: '/graph', label: 'Explore' },
-  { to: '/ingest', label: 'Submit a paper' },
-  { to: '/review', label: 'Review' },
-  { to: '/account', label: 'Account' },
+  { to: '/ingest', label: 'Submit a paper', authOnly: true },
+  { to: '/review', label: 'Review', authOnly: true },
+  { to: '/account', label: 'Account', authOnly: true },
 ]
 
 export default function AppShell() {
@@ -32,19 +30,23 @@ export default function AppShell() {
     navigate('/')
   }
 
-  const navItems = NAV.map((item) => (
-    <NavLink
-      key={item.to}
-      to={item.to}
-      className="usa-nav__link"
-      onClick={() => setMobileNavOpen(false)}
-    >
-      <span>{item.label}</span>
-    </NavLink>
-  ))
+  const authenticated = status === 'authenticated' && Boolean(user)
+
+  const navItems = NAV.filter((item) => !item.authOnly || authenticated).map(
+    (item) => (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className="usa-nav__link"
+        onClick={() => setMobileNavOpen(false)}
+      >
+        <span>{item.label}</span>
+      </NavLink>
+    ),
+  )
 
   navItems.push(
-    status === 'authenticated' && user ? (
+    authenticated && user ? (
       <button
         key="signout"
         type="button"

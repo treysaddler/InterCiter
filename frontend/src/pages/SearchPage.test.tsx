@@ -10,6 +10,13 @@ vi.mock('../api/client', () => ({
   api: { get: vi.fn() },
 }))
 
+// The inline network is lazy + Cytoscape-heavy; stub it so the page tests stay light.
+vi.mock('../components/SearchNetwork', () => ({
+  default: ({ workId }: { workId: string }) => (
+    <div data-testid="search-network">network:{workId}</div>
+  ),
+}))
+
 const mockedGet = vi.mocked(api.get)
 
 function results(overrides: Partial<SearchResults> = {}): SearchResults {
@@ -93,6 +100,9 @@ describe('SearchPage', () => {
     // so both the facet panel and the result card render them.
     expect(screen.getAllByText('direct evidence').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('support').length).toBeGreaterThanOrEqual(1)
+
+    // The citation network for the top result appears inline with the results.
+    expect(await screen.findByTestId('search-network')).toHaveTextContent('work_1')
   })
 
   it('passes facet filters through to the search endpoint', async () => {

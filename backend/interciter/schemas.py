@@ -525,6 +525,67 @@ class SessionInfo(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Collections — curated user-owned sets of works (scite-parity WP4)
+# ---------------------------------------------------------------------------------
+
+
+class CollectionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+
+
+class CollectionUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+
+
+class CollectionMemberView(BaseModel):
+    collection_membership_id: str
+    work_id: str
+    title: str | None = None
+    doi: str | None = None
+    pmid: str | None = None
+    year: int | None = None
+    added_at: datetime
+
+
+class CollectionView(BaseModel):
+    collection_id: str
+    owner_id: str
+    name: str
+    description: str | None = None
+    member_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class CollectionDetailView(CollectionView):
+    members: list[CollectionMemberView] = Field(default_factory=list)
+
+
+class CollectionAddMembersRequest(BaseModel):
+    """Batch member intake by internal ids, identifiers, or CSV/plain-text blob."""
+
+    work_ids: list[str] = Field(default_factory=list)
+    dois: list[str] = Field(default_factory=list)
+    pmids: list[str] = Field(default_factory=list)
+    csv_text: str | None = Field(
+        default=None,
+        description=(
+            "Optional newline/comma-separated identifiers; DOIs and PMIDs are "
+            "auto-detected and merged with explicit arrays."
+        ),
+    )
+
+
+class CollectionAddMembersResult(BaseModel):
+    collection_id: str
+    added_count: int = 0
+    skipped_identifiers: list[str] = Field(default_factory=list)
+    members: list[CollectionMemberView] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------
 # Network graph — papers/authors/citations (and, later, ROBOKOP claims)
 # ---------------------------------------------------------------------------------
 

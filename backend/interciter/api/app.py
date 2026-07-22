@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from ..db import init_db
 from .routers import (
     claims,
+    collections,
     discovery,
     graph,
     papers,
@@ -45,6 +46,7 @@ app = FastAPI(
 
 app.include_router(papers.router, prefix="/v1", tags=["papers", "jobs"])
 app.include_router(claims.router, prefix="/v1", tags=["claims"])
+app.include_router(collections.router, prefix="/v1", tags=["collections"])
 app.include_router(search.router, prefix="/v1", tags=["search"])
 app.include_router(relations.router, prefix="/v1", tags=["relations"])
 app.include_router(review.router, prefix="/v1", tags=["review"])

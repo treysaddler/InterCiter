@@ -218,6 +218,12 @@ per-member WP1 tallies), batch-import form (paste DOIs / upload CSV). Nav entry.
 Tests: backend CRUD + batch import + ownership; frontend pages.
 Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 
+> Started: backend LinkML/ORM domain (`Collection`, `CollectionMembership`),
+> id prefixes (`coll_`, `cmem_`), `services/collections.py`, router endpoints
+> (`/v1/collections*` with ownership + auth), and backend tests
+> `tests/test_collections.py`. Initial frontend scaffolding landed:
+> `CollectionsPage`, `CollectionDetailPage`, routes, nav, and DTO types.
+
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)
 Goal: non-mutating enrichment flagging retracted / noticed works.
 Backend: extend `services/enrichment.py` (or new `services/integrity.py`) to

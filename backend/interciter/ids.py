@@ -25,6 +25,8 @@ _PREFIXES = {
     "ReviewDecision": "rev",
     "Assessment": "asmt",
     "EntityGrounding": "grnd",
+    "Collection": "coll",
+    "CollectionMembership": "cmem",
     "Job": "job",
     "User": "user",
     "UserSession": "sess",

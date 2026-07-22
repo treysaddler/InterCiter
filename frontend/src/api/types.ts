@@ -165,6 +165,44 @@ export interface PaperReport {
   statements: CitationStatement[]
 }
 
+export interface CollectionMemberView {
+  collection_membership_id: string
+  work_id: string
+  title: string | null
+  doi: string | null
+  pmid: string | null
+  year: number | null
+  added_at: string
+}
+
+export interface CollectionView {
+  collection_id: string
+  owner_id: string
+  name: string
+  description: string | null
+  member_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CollectionDetailView extends CollectionView {
+  members: CollectionMemberView[]
+}
+
+export interface CollectionAddMembersRequest {
+  work_ids?: string[]
+  dois?: string[]
+  pmids?: string[]
+  csv_text?: string
+}
+
+export interface CollectionAddMembersResult {
+  collection_id: string
+  added_count: number
+  skipped_identifiers: string[]
+  members: CollectionMemberView[]
+}
+
 export interface ClaimOccurrenceView {
   occurrence_id: string
   passage_id: string

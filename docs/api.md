@@ -104,6 +104,25 @@ Litmaps-style "dive deeper": given one or more seed works, rank the papers most 
 
 - `POST /v1/discovery/seeds` — body `{seed_work_ids, limit?, min_year?}`. Returns ranked `candidates` (title, year, `connection_score`, `supporting_seed_ids`, `is_influential`, `in_corpus`) plus `seeds_resolved` / `skipped_seed_ids`. Requires an authenticated principal (+ CSRF for cookie auth); `404` if a seed work id is unknown, `502` on a Semantic Scholar error.
 
+## Collections — curated user-owned sets of works
+
+Scite-style collections (F5): persist named sets of papers and batch-add members by
+internal work id, DOI/PMID arrays, or pasted CSV/plain-text identifiers. Collections
+are additive and non-mutating: they only store membership rows and can register
+metadata stubs for unknown identifiers through the existing ingest path.
+
+- `POST /v1/collections` — create a collection (`{name, description?}`).
+- `GET /v1/collections` — list the caller's collections.
+- `GET /v1/collections/{id}` — collection detail with member list.
+- `PATCH /v1/collections/{id}` — update `{name?, description?}`.
+- `DELETE /v1/collections/{id}` — delete a collection (and memberships).
+- `POST /v1/collections/{id}/members` — batch add members (`{work_ids[], dois[],
+  pmids[], csv_text?}`) and returns `{added_count, skipped_identifiers, members[]}`.
+- `DELETE /v1/collections/{id}/members/{work_id}` — remove one member.
+
+All collection endpoints are auth-scoped to the caller's own resources. Writes require
+CSRF when using cookie auth.
+
 ## Identity, sessions, and accounts (MVP)
 
 Every request resolves to a `Principal` from **either** an `Authorization: Bearer <token>` header (API/CLI clients) **or** a browser session cookie. Reads stay open; only writes require a principal, and some require `reviewer`/`admin` or ownership. The raw token is stored only as a SHA-256 hash.

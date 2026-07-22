@@ -379,6 +379,49 @@ class EntityGrounding(Base):
 
 
 # ---------------------------------------------------------------------------------
+# Collections — curated user-owned sets of works (scite-parity WP4)
+# ---------------------------------------------------------------------------------
+
+
+class Collection(Base):
+    __tablename__ = "collection"
+
+    collection_id: Mapped[str] = mapped_column(String, primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        String, ForeignKey("app_user.user_id"), index=True
+    )
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+    memberships: Mapped[list["CollectionMembership"]] = relationship(
+        back_populates="collection", cascade="all, delete-orphan"
+    )
+    owner: Mapped["User"] = relationship("User")
+
+
+class CollectionMembership(Base):
+    __tablename__ = "collection_membership"
+    __table_args__ = (
+        UniqueConstraint("collection_id", "work_id", name="uq_collection_membership"),
+    )
+
+    collection_membership_id: Mapped[str] = mapped_column(String, primary_key=True)
+    collection_id: Mapped[str] = mapped_column(
+        ForeignKey("collection.collection_id"), index=True
+    )
+    work_id: Mapped[str] = mapped_column(ForeignKey("paper_work.work_id"), index=True)
+    added_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    collection: Mapped[Collection] = relationship(back_populates="memberships")
+    work: Mapped[PaperWork] = relationship()
+
+
+# ---------------------------------------------------------------------------------
 # Jobs — first-class async work resources (docs/architecture.md, api.md)
 # ---------------------------------------------------------------------------------
 

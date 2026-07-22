@@ -17,6 +17,8 @@ import RunPage from './pages/RunPage'
 import ReviewPage from './pages/ReviewPage'
 import ClusterPage from './pages/ClusterPage'
 import AccountPage from './pages/AccountPage'
+import CollectionsPage from './pages/CollectionsPage'
+import CollectionDetailPage from './pages/CollectionDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // The graph view pulls in Cytoscape (a large canvas library) that no other screen
@@ -75,6 +77,22 @@ export default function App() {
           }
         />
         <Route path="clusters/:clusterId" element={<ClusterPage />} />
+        <Route
+          path="collections"
+          element={
+            <RequireAuth>
+              <CollectionsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="collections/:collectionId"
+          element={
+            <RequireAuth>
+              <CollectionDetailPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="account"
           element={

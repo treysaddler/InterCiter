@@ -507,6 +507,42 @@ classes:
         required: true
         description: The interpretation whose entity was grounded.
 
+  # ---------------------------------------------------------------------------------
+  # Collections layer — curated user-owned sets of works (scite-parity WP4)
+  # ---------------------------------------------------------------------------------
+
+  Collection:
+    description: >-
+      A curated, user-owned set of works to monitor and organize. Collections are
+      additive and non-authoritative: they do not mutate the scientific record.
+    slots:
+      - collection_id
+      - owner_id
+      - name
+      - description
+      - created_at
+      - updated_at
+
+  CollectionMembership:
+    description: A work's membership in a collection.
+    slots:
+      - collection_membership_id
+      - collection_id
+      - work_id
+      - added_by
+      - added_at
+    slot_usage:
+      collection_id:
+        identifier: false
+        range: Collection
+        required: true
+        description: The parent collection.
+      work_id:
+        identifier: false
+        range: PaperWork
+        required: true
+        description: The member work.
+
 # =====================================================================================
 # Slots
 # =====================================================================================
@@ -550,6 +586,12 @@ slots:
   grounding_id:
     identifier: true
     description: Stable identifier for an EntityGrounding.
+  collection_id:
+    identifier: true
+    description: Stable identifier for a Collection.
+  collection_membership_id:
+    identifier: true
+    description: Stable identifier for a CollectionMembership.
 
   # --- PaperWork ---
   title:
@@ -836,3 +878,15 @@ slots:
     multivalued: true
   grounding_source:
     description: The normalizer that produced the grounding (e.g. robokop).
+
+  # --- Collection ---
+  owner_id:
+    description: Owning user id for the collection.
+  name:
+    description: Human-readable collection name.
+    required: true
+  description:
+    description: Optional collection description.
+  updated_at:
+    range: datetime
+    description: When the record was last updated.

@@ -118,16 +118,47 @@ instead of hitting the network per paper.
 4. Incremental refresh: `GET /diffs/{start}/to/{end}/{name}` → per-diff `update_files`
    and `delete_files`; upsert/delete by `corpusid`.
 
-### Datasets to cache
+### Datasets available & their measured sizes
 
-| Dataset | Purpose | Scale (order of magnitude) |
-|---|---|---|
-| `papers` | Core metadata, externalIds | ~30 files |
-| `citations` | Citation-graph edges | large |
-| `abstracts` | Abstract text where licensed | ~30 × 1.8 GB |
-| `s2orc` | Full text + parsed structure | very large (100s GB) |
-| `embeddings` (specter_v2) | Paper-level vectors | large |
-| `tldrs` | One-line summaries | moderate |
+The Datasets API exposes **11 datasets**. The table below reports the *actual*
+compressed (`.gz`) download footprint, measured by summing every shard's object size
+for release **`2026-07-14`** (each shard's total was read from the S3 `Content-Range`
+of a ranged `GET`, since the pre-signed URLs reject `HEAD`). Sizes use binary units
+(1 GB = 1024 MB). Downloading the **entire corpus is ≈3.2 TB across 3,495 shards**; in
+practice InterCiter only pulls the datasets and shards it needs.
+
+| Dataset | Shards | Total size | Avg / shard | Purpose |
+|---|--:|--:|--:|---|
+| `papers` | 60 | 48.8 GB | 832.8 MB | Core paper attributes (title, authors, date, externalIds) |
+| `abstracts` | 30 | 26.4 GB | 900.2 MB | Abstract text where licensed |
+| `authors` | 30 | 3.2 GB | 109.7 MB | Core author attributes (name, affiliation, paper count) |
+| `paper-ids` | 30 | 15.3 GB | 523.4 MB | Mapping from sha-based ID to paper `corpusid` |
+| `citations` | 389 | 359.3 GB | 945.9 MB | Citation-graph edges (intent, influence, context) |
+| `embeddings-specter_v1` | 1,005 | 986.2 GB | 1004.9 MB | Paper-level SPECTER v1 dense vectors |
+| `embeddings-specter_v2` | 981 | 963.6 GB | 1005.9 MB | Paper-level SPECTER2 dense vectors |
+| `s2orc` | 636 | 611.6 GB | 984.7 MB | Full-body parsed open-access text (v1) |
+| `s2orc_v2` | 303 | 294.0 GB | 993.5 MB | Full-body parsed open-access text (v2) |
+| `tldrs` | 30 | 6.1 GB | 206.8 MB | One-line paper summaries |
+| `publication-venues` | 1 | 15.3 MB | 15.3 MB | Venue details |
+| **Total** | **3,495** | **≈3.2 TB** | — | |
+
+> Sizes are release-dependent and grow each snapshot; re-measure against the pinned
+> `release_id` when refreshing. Reproduce with `backend/_ds_sizes.py` (needs
+> `INTERCITER_S2_API_KEY`). The two `embeddings-*` datasets alone account for ~1.9 TB
+> (~55%) of the corpus, so pull them only for a targeted slice.
+
+**`s2orc` vs `s2orc_v2`.** Despite `s2orc_v2` being the newer parse, it is currently
+*smaller* (294 GB vs 611.6 GB) because it covers **fewer papers**, not because it
+encodes them more compactly. Sampling the head of one shard from each (release
+`2026-07-14`) gives near-identical per-shard sizes (~1 GB) and comparable per-record
+size (v2 is even ~12% smaller/record), so the ~2× total-size gap is ~2× fewer records:
+roughly **~33M** papers in `s2orc` vs **~18M** in `s2orc_v2` (order-of-magnitude
+estimate from a first-shard sample; the API's own description strings are stale here).
+The schemas also differ — v1 folds everything into one `content{text, annotations,
+source}` blob, while v2 has a richer top level (`title`, `authors[]`,
+`openaccessinfo{license, status, url, …}`) and splits `body` from `bibliography`, each
+with its own `text` + offset `annotations`. Prefer `s2orc_v2` for cleaner structure and
+explicit license metadata; fall back to `s2orc` when you need the broader coverage.
 
 Each file is newline-delimited JSON (`.gz`), one record per line keyed by `corpusid`.
 

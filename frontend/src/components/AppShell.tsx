@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  GovBanner,
   GridContainer,
   Header,
   NavMenuButton,
@@ -72,8 +71,6 @@ export default function AppShell() {
       <a className="usa-skipnav" href="#main-content">
         Skip to main content
       </a>
-
-      <GovBanner />
 
       <div
         className={`usa-overlay${mobileNavOpen ? ' is-visible' : ''}`}

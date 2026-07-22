@@ -25,6 +25,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    labels:
+      # No HTTP endpoint of its own — don't let exposedByDefault guess a router.
+      - "traefik.enable=false"
 
   backend:
     build:
@@ -33,8 +36,9 @@ services:
     environment:
       INTERCITER_DATABASE_URL: >-
         postgresql+psycopg://${POSTGRES_USER:-interciter}:${POSTGRES_PASSWORD:-interciter}@db:5432/${POSTGRES_DB:-interciter}
-      # http-only local stack: cookies can't be Secure or the browser drops them.
-      # Set this to true (and terminate TLS in front) for any real deployment.
+      # Defaults to false for a bare local `docker compose up` (http-only,
+      # cookies can't be Secure). This deployment sets it true in .env since
+      # Traefik terminates real TLS in front.
       INTERCITER_SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     # Scale request throughput with more uvicorn workers (or `docker compose up
     # --scale backend=N` behind a load balancer).
@@ -56,6 +60,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    labels:
+      # Reached only via nginx inside the frontend container — don't let
+      # exposedByDefault guess a router for it too.
+      - "traefik.enable=false"
 
   frontend:
     build:
@@ -67,6 +75,26 @@ services:
       - "${WEB_PORT:-8080}:8080"
     depends_on:
       - backend
+    # Also join the shinyserver stack's network so its Traefik can reach this
+    # container directly; `default` is kept so frontend can still reach backend.
+    networks:
+      - default
+      - shinyserver
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shinyserver_default"
+      - "traefik.http.routers.interciter.rule=Host(`interciter.com`)"
+      - "traefik.http.routers.interciter.entrypoints=websecure"
+      - "traefik.http.routers.interciter.tls.certresolver=cloudflare"
+      - "traefik.http.services.interciter.loadbalancer.server.port=8080"
+      - "traefik.http.routers.interciter-local.rule=Host(`interciter.home.arpa`)"
+      - "traefik.http.routers.interciter-local.entrypoints=websecure"
+      - "traefik.http.routers.interciter-local.tls=true"
+
+networks:
+  shinyserver:
+    external: true
+    name: shinyserver_default
 
 volumes:
   db-data:

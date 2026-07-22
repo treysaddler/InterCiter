@@ -142,3 +142,50 @@ export interface ExtractionRunView {
   inference_parameters: Record<string, unknown> | null
   timestamp: string
 }
+
+export interface ClaimInterpretationView {
+  interpretation_id: string
+  claim_occurrence_id: string
+  normalized_text: string
+  qualifiers: Record<string, unknown> | null
+  extraction_run_id: string | null
+  author_id: string | null
+  parent_interpretation_ids: string[]
+  created_by: string | null
+  created_at: string
+}
+
+export interface RevisionResult {
+  new_interpretation: ClaimInterpretationView
+  parent_interpretation_id: string
+  staled_assertion_ids: string[]
+}
+
+export interface ReviewDecisionView {
+  review_id: string
+  subject_type: string
+  subject_id: string
+  reviewer_id: string
+  decision_dimension: string
+  label: string | null
+  rationale: string | null
+  timestamp: string
+}
+
+export interface ClusterMemberView {
+  membership_id: string
+  interpretation_id: string
+  normalized_text: string
+  method: string
+  membership_confidence: number | null
+  status: string
+  stance_in_context: string | null
+}
+
+export interface ClusterView {
+  cluster_id: string
+  clustering_method: string | null
+  threshold_version: string | null
+  members: ClusterMemberView[]
+  conflicting_stances: boolean
+}

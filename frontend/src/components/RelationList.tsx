@@ -43,6 +43,11 @@ function RelationCard({ r }: { r: RelationAssertionView }) {
             {r.resolution}
           </Tag>
         </span>
+        {r.status !== 'active' && (
+          <span className="margin-left-1">
+            <Tag className="bg-gold text-ink">{r.status}</Tag>
+          </span>
+        )}
       </div>
 
       {r.target_link_score != null && (

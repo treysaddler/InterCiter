@@ -12,6 +12,7 @@ import type {
 import EvidencePane from '../components/EvidencePane'
 import PageHeading from '../components/PageHeading'
 import RelationList from '../components/RelationList'
+import ReviewerPanel from '../components/ReviewerPanel'
 import ScoreChips from '../components/ScoreChips'
 import { ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
@@ -86,6 +87,8 @@ export default function ClaimDetailPage() {
           <Provenance claim={c} occurrence={occurrence.data} />
         </div>
       </div>
+
+      <ReviewerPanel claim={c} />
     </>
   )
 }

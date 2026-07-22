@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from interciter import models
-from interciter.enums import AvailabilityState
+from interciter.enums import AvailabilityState, Manifestation, OccurrenceType
+from interciter.ingestion import robokop
 from interciter.ingestion.pipeline import ingest_paper
 from interciter.services import enrichment, graph
 
@@ -15,6 +16,81 @@ def _ingest_both(session):
     a = ingest_paper(session, xml=load_sample("paper_a.xml"))
     session.commit()
     return b, a
+
+
+def _claim_with_qualifiers(session, qualifiers):
+    """A minimal work→version→passage→occurrence→interpretation with qualifiers."""
+    session.add(models.ExtractionRun(run_id="run_c"))
+    session.add(
+        models.PaperWork(
+            work_id="work_c", availability_state=AvailabilityState.metadata_stub
+        )
+    )
+    session.add(
+        models.PaperVersion(
+            version_id="ver_c", work_id="work_c", manifestation=Manifestation.published
+        )
+    )
+    session.add(
+        models.Passage(
+            passage_id="pas_c", paper_version_id="ver_c", verbatim_text="text"
+        )
+    )
+    session.add(
+        models.ClaimOccurrence(
+            occurrence_id="occ_c",
+            passage_id="pas_c",
+            occurrence_type=OccurrenceType.reported_result,
+            extraction_run_id="run_c",
+        )
+    )
+    interp = models.ClaimInterpretation(
+        interpretation_id="interp_c",
+        claim_occurrence_id="occ_c",
+        normalized_text="metformin reduces HbA1c",
+        qualifiers=qualifiers,
+        parent_interpretation_ids=[],
+    )
+    session.add(interp)
+    session.commit()
+    return interp
+
+
+def _fake_ground(term, **kwargs):
+    table = {
+        "metformin": {
+            "id": {"identifier": "CHEBI:6801", "label": "metformin"},
+            "type": ["biolink:SmallMolecule"],
+        },
+        "HbA1c": {
+            "id": {"identifier": "CHEBI:145907", "label": "hemoglobin A1c"},
+            "type": ["biolink:ChemicalEntity"],
+        },
+    }
+    return table.get(term)
+
+
+def _fake_edges(subject, obj, **kwargs):
+    return [
+        {
+            "subject": subject,
+            "predicate": "biolink:treats",
+            "object": obj,
+            "sources": [
+                {"resource_role": "primary_knowledge_source", "resource_id": "infores:ctd"},
+                {"resource_role": "aggregator_knowledge_source", "resource_id": "infores:robokop"},
+            ],
+        }
+    ]
+
+
+def _first_claim_id(client):
+    """A claim id from the first ingested paper that has extracted claims."""
+    for paper in client.get("/v1/papers").json():
+        claims = client.get(f"/v1/papers/{paper['work_id']}/claims").json()
+        if claims:
+            return claims[0]["claim_id"]
+    raise AssertionError("no paper with claims found")
 
 
 def test_paper_graph_has_nodes_and_citation_edge(session):
@@ -174,15 +250,74 @@ def test_expand_requires_auth(client, user_headers):
     assert client.post(f"/v1/graph/papers/{work_id}/expand").status_code in (401, 403)
 
 
-def test_robokop_expansion_stubbed(client, user_headers):
-    _ingest = client.post(
-        "/v1/papers", json={"xml": load_sample("paper_a.xml")}, headers=user_headers
+# --- ROBOKOP claim expansion ------------------------------------------------------
+
+
+def test_expand_claim_robokop_builds_kg_graph(session, monkeypatch):
+    monkeypatch.setattr(robokop, "ground", _fake_ground)
+    monkeypatch.setattr(robokop, "query_edges", _fake_edges)
+    interp = _claim_with_qualifiers(session, {"intervention": "metformin", "outcome": "HbA1c"})
+
+    result = graph.expand_claim_robokop(session, interp, use_cache=False)
+
+    assert result.resolved_terms == 2
+    assert result.corroborating_edges >= 1
+    view = result.graph
+    assert view.center_id == interp.interpretation_id
+    types = {n.type for n in view.nodes}
+    assert {"claim", "entity"} <= types
+    # Claim is linked to each grounded entity.
+    grounds = [e for e in view.edges if e.type == "grounds"]
+    assert len(grounds) == 2
+    assert all(e.source == interp.interpretation_id for e in grounds)
+    # A background-knowledge edge carries provenance.
+    kg = [e for e in view.edges if e.type == "kg"]
+    assert kg and kg[0].data["primary_knowledge_source"] == "infores:ctd"
+    assert kg[0].data["aggregator_knowledge_source"] == ["infores:robokop"]
+    # Groundings are persisted as additive side rows.
+    assert session.query(models.EntityGrounding).count() == 2
+
+
+def test_expand_claim_robokop_no_groundings_is_claim_only(session, monkeypatch):
+    monkeypatch.setattr(robokop, "ground", lambda *a, **k: None)
+    interp = _claim_with_qualifiers(session, {"intervention": "unknownium"})
+
+    result = graph.expand_claim_robokop(session, interp, use_cache=False)
+
+    assert result.resolved_terms == 0
+    assert result.corroborating_edges == 0
+    assert [n.type for n in result.graph.nodes] == ["claim"]
+
+
+def test_expand_claim_robokop_endpoint(client, user_headers, monkeypatch):
+    monkeypatch.setattr(robokop, "ground", _fake_ground)
+    monkeypatch.setattr(robokop, "query_edges", _fake_edges)
+    client.post("/v1/papers", json={"xml": load_sample("paper_a.xml")}, headers=user_headers)
+    claim_id = _first_claim_id(client)
+
+    resp = client.post(
+        f"/v1/graph/claims/{claim_id}/expand-robokop",
+        headers=user_headers,
+        json={
+            "terms": [
+                {"role": "intervention", "term": "metformin"},
+                {"role": "outcome", "term": "HbA1c"},
+            ]
+        },
     )
-    assert _ingest.status_code == 202
-    # A real interpretation id is required to reach the 501 (else 404).
-    claims = client.get("/v1/graph/claims").json()["nodes"]
-    if claims:
-        resp = client.post(
-            f"/v1/graph/claims/{claims[0]['id']}/expand-robokop", headers=user_headers
-        )
-        assert resp.status_code == 501
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["resolved_terms"] == 2
+    assert body["graph"]["center_id"] == claim_id
+    assert any(e["type"] == "kg" for e in body["graph"]["edges"])
+
+
+def test_expand_claim_requires_auth_and_404(client, user_headers):
+    # Missing claim → 404 (authenticated).
+    missing = client.post("/v1/graph/claims/nope/expand-robokop", headers=user_headers)
+    assert missing.status_code == 404
+    # Unauthenticated write is rejected.
+    client.post("/v1/papers", json={"xml": load_sample("paper_a.xml")}, headers=user_headers)
+    claim_id = _first_claim_id(client)
+    assert client.post(f"/v1/graph/claims/{claim_id}/expand-robokop").status_code in (401, 403)
+

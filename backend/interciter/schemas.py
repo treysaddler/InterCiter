@@ -418,3 +418,31 @@ class GraphExpansion(BaseModel):
     edges_created: int = 0
     skipped_reason: str | None = None
     graph: GraphView
+
+
+class RobokopTerm(BaseModel):
+    """An explicit ``(role, term)`` to ground when a claim's qualifiers are empty."""
+
+    role: str
+    term: str
+
+
+class ClaimExpandRequest(BaseModel):
+    """Optional body for ROBOKOP claim expansion.
+
+    When the extractor has filled a claim's entity qualifiers they are grounded
+    automatically; ``terms`` lets a caller supply entities explicitly (useful while the
+    stub extractor abstains on qualifiers).
+    """
+
+    terms: list[RobokopTerm] = Field(default_factory=list)
+
+
+class ClaimExpansion(BaseModel):
+    """Result of expanding a claim's neighborhood via ROBOKOP grounding + KG edges."""
+
+    interpretation_id: str
+    grounded_terms: int = 0
+    resolved_terms: int = 0
+    corroborating_edges: int = 0
+    graph: GraphView

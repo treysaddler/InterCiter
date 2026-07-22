@@ -20,6 +20,7 @@ discriminator) so the same shape carries a ROBOKOP claim graph later.
 from __future__ import annotations
 
 import hashlib
+import itertools
 from dataclasses import dataclass, field
 
 from sqlalchemy import func, or_, select
@@ -29,8 +30,8 @@ from .. import models
 from ..config import Settings, get_settings
 from ..enums import AvailabilityState, RelationResolution
 from ..ids import new_id
-from ..schemas import GraphEdge, GraphExpansion, GraphNode, GraphView
-from . import enrichment
+from ..schemas import ClaimExpansion, GraphEdge, GraphExpansion, GraphNode, GraphView
+from . import enrichment, grounding
 
 # Bounds so a single request can never materialize an unbounded graph.
 DEFAULT_PAPER_LIMIT = 100
@@ -444,4 +445,129 @@ def expand_from_semantic_scholar(
         works_created=works_created,
         edges_created=edges_created,
         graph=paper_neighborhood(session, work.work_id, include_authors=include_authors),
+    )
+
+
+# ---------------------------------------------------------------------------------
+# On-demand expansion — ROBOKOP claim neighborhood
+# ---------------------------------------------------------------------------------
+
+
+def _short_predicate(predicate: str | None) -> str | None:
+    """Human-readable edge label from a BioLink predicate CURIE (drop the prefix)."""
+    if not predicate:
+        return None
+    return predicate.split(":", 1)[-1].replace("_", " ")
+
+
+def expand_claim_robokop(
+    session: Session,
+    interp: models.ClaimInterpretation,
+    *,
+    extra_terms: list[tuple[str, str]] | None = None,
+    persist: bool = True,
+    settings: Settings | None = None,
+    use_cache: bool = True,
+) -> ClaimExpansion:
+    """Explore a claim in the ROBOKOP knowledge graph.
+
+    Grounds the claim's entity qualifiers (plus any explicit ``extra_terms``) to
+    canonical CURIEs, then corroborates each pair of grounded entities against the
+    ROBOKOP KG. The returned graph places the claim at the center, connects it to each
+    grounded entity, and draws the background-knowledge edges between those entities —
+    with knowledge-source provenance on every KG edge. ROBOKOP is *context*, never a
+    truth oracle that overrides the source-grounded extraction.
+
+    Grounded entities are persisted as additive ``EntityGrounding`` side rows (idempotent
+    when ``persist``); KG edges are derived context and are not stored. Commits when it
+    persists.
+    """
+    settings = settings or get_settings()
+
+    result = grounding.ground_interpretation(
+        session, interp, extra_terms=extra_terms, settings=settings, use_cache=use_cache
+    )
+    if persist:
+        grounding.persist_grounding(session, result)
+        session.commit()
+
+    nodes: dict[str, GraphNode] = {
+        interp.interpretation_id: _claim_node(interp),
+    }
+    edges: list[GraphEdge] = []
+
+    resolved = result.resolved()
+    for term in resolved:
+        curie = term.curie
+        if curie is None:
+            continue
+        nodes.setdefault(
+            curie,
+            GraphNode(
+                id=curie,
+                type="entity",
+                label=term.label or term.term,
+                data={"role": term.role, "term": term.term, "types": term.types},
+            ),
+        )
+        edges.append(
+            GraphEdge(
+                id=f"grounds:{interp.interpretation_id}->{curie}",
+                source=interp.interpretation_id,
+                target=curie,
+                type="grounds",
+                label=term.role,
+            )
+        )
+
+    seen_edges: set[tuple[str, str, str]] = set()
+    corroborating = 0
+    for left, right in itertools.combinations(resolved, 2):
+        if left.curie is None or right.curie is None:
+            continue
+        for kg in grounding.corroborate(
+            left.curie, right.curie, settings=settings, use_cache=use_cache
+        ):
+            subject = kg.get("subject")
+            obj = kg.get("object")
+            predicate = kg.get("predicate") or "biolink:related_to"
+            if not subject or not obj:
+                continue
+            key = (subject, predicate, obj)
+            if key in seen_edges:
+                continue
+            seen_edges.add(key)
+            for endpoint in (subject, obj):
+                nodes.setdefault(
+                    endpoint,
+                    GraphNode(id=endpoint, type="entity", label=endpoint, data={}),
+                )
+            edges.append(
+                GraphEdge(
+                    id=f"kg:{subject}|{predicate}|{obj}",
+                    source=subject,
+                    target=obj,
+                    type="kg",
+                    label=_short_predicate(predicate),
+                    data={
+                        "predicate": predicate,
+                        "primary_knowledge_source": kg.get("primary_knowledge_source"),
+                        "aggregator_knowledge_source": kg.get(
+                            "aggregator_knowledge_source", []
+                        ),
+                    },
+                )
+            )
+            corroborating += 1
+
+    return ClaimExpansion(
+        interpretation_id=interp.interpretation_id,
+        grounded_terms=len(result.groundings),
+        resolved_terms=len(resolved),
+        corroborating_edges=corroborating,
+        graph=GraphView(
+            nodes=list(nodes.values()),
+            edges=edges,
+            center_id=interp.interpretation_id,
+        ),
     )

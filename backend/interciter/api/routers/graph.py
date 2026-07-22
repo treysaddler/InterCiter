@@ -7,13 +7,14 @@ authenticated principal and — for cookie auth — a CSRF token, exactly like i
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ... import models
 from ...auth import Principal
+from ...ingestion.robokop import RobokopError
 from ...ingestion.semantic_scholar import S2Error
-from ...schemas import GraphExpansion, GraphView
+from ...schemas import ClaimExpandRequest, ClaimExpansion, GraphExpansion, GraphView
 from ...services import graph
 from ..deps import db_session
 from ..security import require_user
@@ -78,21 +79,24 @@ def claim_graph(
     return graph.claim_graph(session, limit=limit)
 
 
-@router.post("/graph/claims/{interpretation_id}/expand-robokop", response_model=GraphView)
+@router.post("/graph/claims/{interpretation_id}/expand-robokop", response_model=ClaimExpansion)
 def expand_claim_robokop(
     interpretation_id: str,
+    body: ClaimExpandRequest | None = None,
     session: Session = Depends(db_session),
     principal: Principal = Depends(require_user),
-) -> GraphView:
-    """Expand a claim's neighborhood via ROBOKOP (planned).
+) -> ClaimExpansion:
+    """Explore a claim in the ROBOKOP knowledge graph.
 
-    The claim-graph envelope and grounding hooks exist (services/grounding.py); wiring
-    the TRAPI one-hop expansion into node/edge form is the next increment. Returns 501
-    until then so clients can detect and gate the feature.
+    Grounds the claim's entity qualifiers (or the explicit ``terms`` in the body) to
+    canonical CURIEs and draws the background-knowledge edges between them, with
+    knowledge-source provenance. Corroborating context, never a truth oracle.
     """
-    if session.get(models.ClaimInterpretation, interpretation_id) is None:
+    interp = session.get(models.ClaimInterpretation, interpretation_id)
+    if interp is None:
         raise HTTPException(status_code=404, detail="claim not found")
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="ROBOKOP claim expansion is not implemented yet",
-    )
+    extra = [(t.role, t.term) for t in (body.terms if body else [])]
+    try:
+        return graph.expand_claim_robokop(session, interp, extra_terms=extra)
+    except RobokopError as exc:
+        raise HTTPException(status_code=502, detail=f"ROBOKOP: {exc}") from exc

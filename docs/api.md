@@ -66,7 +66,7 @@ A derived, read-side projection (like the claim views): the immutable record is 
 - `GET /v1/graph/papers/{work_id}` — the citation neighborhood centered on one paper, BFS to `depth` hops (both directions), `include_authors` optional.
 - `POST /v1/graph/papers/{work_id}/expand` — grow the graph on demand from **Semantic Scholar**: pulls the paper's references, creates any missing cited works as metadata-only stubs, and persists each as a `semantic_scholar` `CitationEdge` (idempotent — re-expanding never duplicates). A write, so it requires an authenticated principal (+ CSRF for cookie auth). Returns counts plus the refreshed neighborhood.
 - `GET /v1/graph/claims` — the in-corpus claim-relationship network (nodes are interpretations; edges are `claim_resolved` `RelationAssertion`s carrying function/stance).
-- `POST /v1/graph/claims/{interpretation_id}/expand-robokop` — planned ROBOKOP one-hop claim expansion; returns `501 Not Implemented` until wired, so clients can gate the feature.
+- `POST /v1/graph/claims/{interpretation_id}/expand-robokop` — explore a claim in the **ROBOKOP knowledge graph**: grounds the claim's entity qualifiers (or explicit `terms` in the body) to canonical CURIEs, then draws the background-knowledge edges between them with `primary_knowledge_source` / `aggregator_knowledge_source` provenance. A write (persists additive `EntityGrounding` side rows; KG edges are derived context and are not stored), so it requires an authenticated principal (+ CSRF for cookie auth). Corroborating context, never a truth oracle that overrides a source-grounded extraction.
 
 ## Identity, sessions, and accounts (MVP)
 

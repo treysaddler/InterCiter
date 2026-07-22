@@ -100,6 +100,23 @@ Per-paper JSON responses cached under `pmc_cache_dir`'s sibling `s2_cache_dir`
 (gitignored), keyed by the normalized id. Embeddings stored as a compact `.npy`/JSON
 sidecar. Same 25 MiB response cap as PMC.
 
+### 1e. Snowball seed corpus (`interciter seed-corpus`)
+
+To exercise the Papers list, the network-graph explorer, and seed-based discovery at
+realistic scale, `interciter/ingestion/snowball.py` walks the Academic Graph's
+**references** breadth-first from a handful of committed seed DOIs
+(`interciter/data/seed_corpus/seeds.json`) until the corpus reaches a target size
+(default 1,000). Each resolved paper becomes a metadata-only `PaperWork`; each citation
+becomes a `semantic_scholar` `CitationEdge`. Idempotent — re-running never duplicates a
+work or edge.
+
+It deliberately produces **no claims, relations, or clusters**: those require the
+full-text extraction pipeline (JATS), and this path only pulls metadata + citation edges.
+Only identifiers are persisted (and written to a committable `manifest.json` for
+reproducibility); the raw JSON is cached locally and abstracts/full text are never
+fetched. Run with `make be-seed-corpus` (optionally `TARGET=250`) or
+`uv run interciter seed-corpus --target 1000`.
+
 ---
 
 ## 2. Semantic Scholar Datasets API (bulk, local cache component)

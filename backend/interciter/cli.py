@@ -134,6 +134,82 @@ def _cmd_seed(_: argparse.Namespace) -> int:
     return 0
 
 
+def _seed_corpus_dir():
+    from importlib import resources
+
+    return resources.files("interciter.data.seed_corpus")
+
+
+def _load_seeds(path: str | None) -> tuple[list[str], int]:
+    """Load seed ids + default target size from a JSON file (path or bundled default)."""
+    import json
+
+    if path:
+        text = Path(path).read_text(encoding="utf-8")
+    else:
+        text = _seed_corpus_dir().joinpath("seeds.json").read_text(encoding="utf-8")
+    data = json.loads(text)
+    seeds = list(data.get("seeds") or [])
+    target = int(data.get("target_size") or 0)
+    return seeds, target
+
+
+def _cmd_seed_corpus(args: argparse.Namespace) -> int:
+    import json
+    from datetime import datetime, timezone
+
+    from .ingestion import snowball
+
+    seeds, default_target = _load_seeds(args.seeds)
+    if not seeds:
+        print("error: no seed ids found (check seeds.json)", file=sys.stderr)
+        return 1
+    target = args.target or default_target or snowball.DEFAULT_TARGET_SIZE
+
+    init_db()
+    print(f"Snowballing ~{target} papers from {len(seeds)} seed(s) via Semantic Scholar…")
+    with SessionLocal() as session:
+        result = snowball.build_corpus(
+            session,
+            seeds,
+            target_size=target,
+            refs_per_paper=args.refs_per_paper,
+            use_cache=not args.no_cache,
+            progress=lambda msg: print(f"  {msg}"),
+        )
+
+    if result.seeds_missing:
+        print(f"  (unresolved seeds: {', '.join(result.seeds_missing)})")
+    print(
+        f"-- corpus: {result.works_total} papers "
+        f"({result.works_created} new), {result.edges_created} citation edges, "
+        f"{result.expansions} expansions, {result.papers_fetched} seed fetches --"
+    )
+
+    # Manifest = identifiers only, safe to commit for reproducibility.
+    manifest = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "seeds": seeds,
+        "target_size": target,
+        "works_total": result.works_total,
+        "works_created": result.works_created,
+        "edges_created": result.edges_created,
+        "papers": sorted(
+            (
+                {k: v for k, v in row.items() if k in ("corpus_id", "doi", "pmid")}
+                for row in result.corpus
+            ),
+            key=lambda r: (r.get("corpus_id") or "", r.get("doi") or ""),
+        ),
+    }
+    manifest_path = Path(args.manifest) if args.manifest else Path(
+        str(_seed_corpus_dir().joinpath("manifest.json"))
+    )
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    print(f"Wrote manifest ({len(manifest['papers'])} ids): {manifest_path}")
+    return 0
+
+
 def _cmd_useradd(args: argparse.Namespace) -> int:
     from .auth import create_user
     from .enums import Role
@@ -446,6 +522,25 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("seed", help="Seed the bundled sample corpus").set_defaults(
         func=_cmd_seed
     )
+
+    p_corpus = sub.add_parser(
+        "seed-corpus",
+        help="Build a large citation-graph corpus by snowballing Semantic Scholar",
+    )
+    p_corpus.add_argument(
+        "--target", type=int, default=None, help="Target number of papers (default from seeds.json)"
+    )
+    p_corpus.add_argument(
+        "--seeds", default=None, help="Path to a seeds JSON file (default: bundled seeds.json)"
+    )
+    p_corpus.add_argument(
+        "--refs-per-paper", type=int, default=50, help="Max references walked per paper"
+    )
+    p_corpus.add_argument(
+        "--manifest", default=None, help="Where to write the id manifest (default: next to seeds.json)"
+    )
+    p_corpus.add_argument("--no-cache", action="store_true", help="Bypass the local S2 cache")
+    p_corpus.set_defaults(func=_cmd_seed_corpus)
 
     p_user = sub.add_parser("useradd", help="Create a user and print its token")
     p_user.add_argument("display_name", help="Display name for the user")

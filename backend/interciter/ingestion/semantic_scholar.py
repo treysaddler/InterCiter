@@ -232,7 +232,7 @@ def get_references(
                 f"{urllib.parse.quote(pid, safe=':')}/references?{query}"
             )
             payload = _request(url, settings)
-            batch = payload.get("data", [])
+            batch = payload.get("data") or []
             out.extend(batch)
             nxt = payload.get("next")
             if not batch or nxt is None:

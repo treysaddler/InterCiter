@@ -56,6 +56,9 @@ be-test: ## Run the backend test suite
 be-seed: ## Seed the bundled sample corpus into the dev database
 	cd $(BACKEND) && uv run interciter seed
 
+be-seed-corpus: ## Snowball a large citation-graph corpus from Semantic Scholar (needs network; TARGET=1000)
+	cd $(BACKEND) && uv run interciter seed-corpus $(if $(TARGET),--target $(TARGET),)
+
 be-serve: ## Run the API with reload (http dev: cookies non-Secure so UI login works)
 	cd $(BACKEND) && INTERCITER_SESSION_COOKIE_SECURE=false uv run interciter serve --reload
 

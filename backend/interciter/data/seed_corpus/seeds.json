@@ -1,0 +1,12 @@
+{
+  "description": "Seed papers for the snowball corpus builder (interciter seed-corpus). These are arbitrary, well-cited Semantic Scholar ids across several fields; the builder walks their references breadth-first to assemble a citation graph of ~target_size papers. Edit freely. Only identifiers are stored here — fetched metadata is cached locally (gitignored) and never redistributed.",
+  "target_size": 1000,
+  "seeds": [
+    "DOI:10.1145/3065386",
+    "DOI:10.1109/CVPR.2016.90",
+    "DOI:10.1126/science.1225829",
+    "DOI:10.1371/journal.pmed.1000097",
+    "DOI:10.1056/NEJMoa2034577",
+    "DOI:10.1038/s41586-021-03819-2"
+  ]
+}

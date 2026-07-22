@@ -277,6 +277,32 @@ classes:
         required: true
         description: The passage containing the citation marker.
 
+  CitationEdge:
+    description: >-
+      A directed bibliographic citation between two works (citing → cited). Unlike a
+      CitationMention it is not anchored in a passage, so it can represent references for
+      metadata-only stubs (e.g. pulled on demand from Semantic Scholar). Additive and
+      non-authoritative — no scientific assertion depends on it.
+    slots:
+      - edge_id
+      - citing_work_id
+      - cited_work_id
+      - edge_source
+      - is_influential
+      - edge_metadata
+      - created_at
+    slot_usage:
+      citing_work_id:
+        identifier: false
+        range: PaperWork
+        required: true
+        description: The work that makes the citation.
+      cited_work_id:
+        identifier: false
+        range: PaperWork
+        required: true
+        description: The work being cited.
+
   # ---------------------------------------------------------------------------------
   # Extraction layer
   # ---------------------------------------------------------------------------------
@@ -605,6 +631,25 @@ slots:
     description: >-
       Serialized provenance/enrichment for the mention (e.g. Semantic Scholar citation
       intents and inline contexts). Weak supervision only — not InterCiter's ontology.
+
+  # --- CitationEdge ---
+  edge_id:
+    identifier: true
+    description: Stable identifier for a CitationEdge.
+  citing_work_id:
+    range: PaperWork
+    description: The work that makes the citation.
+  edge_source:
+    description: >-
+      Provenance of the edge — "extracted" (grounded in a passage mention) or an external
+      provider such as "semantic_scholar".
+  is_influential:
+    range: boolean
+    description: Whether the citing paper marks this reference as influential (per source).
+  edge_metadata:
+    description: >-
+      Serialized weak-supervision enrichment for the edge (e.g. Semantic Scholar intents
+      and inline contexts). Never mapped onto InterCiter's function/stance ontology.
 
   # --- ExtractionRun ---
   model:

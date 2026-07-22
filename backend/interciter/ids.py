@@ -15,6 +15,7 @@ _PREFIXES = {
     "PaperVersion": "ver",
     "Passage": "pas",
     "CitationMention": "cite",
+    "CitationEdge": "edge",
     "ExtractionRun": "run",
     "ClaimOccurrence": "occ",
     "ClaimInterpretation": "interp",

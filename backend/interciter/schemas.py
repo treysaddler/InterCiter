@@ -363,3 +363,58 @@ class SessionInfo(BaseModel):
     role: enums.Role
     csrf_token: str
     expires_at: datetime
+
+
+# ---------------------------------------------------------------------------------
+# Network graph — papers/authors/citations (and, later, ROBOKOP claims)
+# ---------------------------------------------------------------------------------
+
+
+class GraphNode(BaseModel):
+    """A node in an exploration graph.
+
+    ``type`` is an open discriminator (``paper``, ``author``, ``claim``, …) so the same
+    envelope serves the citation network today and ROBOKOP claim graphs later. ``data``
+    carries type-specific fields the UI may render without a second request.
+    """
+
+    id: str
+    type: str
+    label: str
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class GraphEdge(BaseModel):
+    """A directed edge (``source`` → ``target``) with an open ``type`` discriminator."""
+
+    id: str
+    source: str
+    target: str
+    type: str
+    label: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class GraphView(BaseModel):
+    """A node/edge set for a network view, plus provenance about how it was built."""
+
+    nodes: list[GraphNode] = Field(default_factory=list)
+    edges: list[GraphEdge] = Field(default_factory=list)
+    center_id: str | None = Field(
+        default=None, description="The focus node for a neighborhood view, if any."
+    )
+    truncated: bool = Field(
+        default=False,
+        description="True when a node/edge cap was hit and the view is partial.",
+    )
+
+
+class GraphExpansion(BaseModel):
+    """Result of an on-demand Semantic Scholar expansion around a work."""
+
+    work_id: str
+    references_fetched: int = 0
+    works_created: int = 0
+    edges_created: int = 0
+    skipped_reason: str | None = None
+    graph: GraphView

@@ -23,6 +23,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -129,6 +130,46 @@ class CitationMention(Base):
     # enforce FKs by default, which previously hid the missing ordering.
     passage: Mapped[Passage] = relationship()
     cited_work: Mapped[PaperWork | None] = relationship()
+
+
+class CitationEdge(Base):
+    """A directed bibliographic citation between two works (citing → cited).
+
+    Distinct from :class:`CitationMention`: a mention is an *inline marker anchored in a
+    passage* (it needs full text), whereas an edge is a purely bibliographic link and so
+    can be persisted for metadata-only stubs — e.g. references pulled on demand from
+    Semantic Scholar. This is what makes the citation-network view expandable beyond the
+    corpus we hold full text for. Additive and non-authoritative: no scientific
+    assertion depends on it.
+    """
+
+    __tablename__ = "citation_edge"
+    __table_args__ = (
+        UniqueConstraint(
+            "citing_work_id", "cited_work_id", "source", name="uq_citation_edge"
+        ),
+    )
+
+    edge_id: Mapped[str] = mapped_column(String, primary_key=True)
+    citing_work_id: Mapped[str] = mapped_column(
+        ForeignKey("paper_work.work_id"), index=True
+    )
+    cited_work_id: Mapped[str] = mapped_column(
+        ForeignKey("paper_work.work_id"), index=True
+    )
+    # Provenance of the edge: "extracted" (grounded in a passage-level mention) or an
+    # external provider such as "semantic_scholar".
+    source: Mapped[str] = mapped_column(String, default="extracted")
+    is_influential: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Weak-supervision enrichment (e.g. Semantic Scholar intents/contexts). Never mapped
+    # onto InterCiter's function/stance ontology.
+    edge_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    # relationship()s (not bare FK cols) so the unit-of-work orders inserts by
+    # dependency under strict-FK databases (PostgreSQL).
+    citing_work: Mapped[PaperWork] = relationship(foreign_keys=[citing_work_id])
+    cited_work: Mapped[PaperWork] = relationship(foreign_keys=[cited_work_id])
 
 
 # ---------------------------------------------------------------------------------

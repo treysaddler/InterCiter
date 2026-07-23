@@ -44,6 +44,51 @@ Synthesis. The WPs below are grouped to align with that pipeline.
 
 ---
 
+## 0b. Cross-plan status snapshot (all parity plans · updated 2026-07-23)
+
+Three parity plans (`scite`, `litmaps`, `bibliometrix`) share one codebase; check
+all three before starting a WP so shared work is built once.
+
+Shipped to origin/main:
+- scite: WP1 citation tallies · WP2 claim search · WP3 paper report · WP4
+  collections (+ watch / delta / integrity / bulk) · WP5 retraction+integrity
+  signal · WP8 saved searches + alerts.
+- litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
+  layouts + annotations · WP-L4 read-only map sharing.
+- bibliometrix: none yet (this plan drafted 2026-07-23).
+
+Not yet built:
+- scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check · WP9
+  Zotero/Mendeley import.
+- litmaps: WP-L5 map monitoring (extends scite WP8 — now unblocked) · WP-L6
+  Zotero seed import (extends scite WP9).
+- bibliometrix: WP-B1 … WP-B10 (all).
+
+Build-once shared WPs (one implementation serves several plans):
+- Import connectors — scite WP9 ⊇ litmaps WP-L6 ⊇ bibliometrix WP-B6. One
+  RIS/BibTeX/CSV (+ later OpenAlex/WoS/Scopus) importer targeting Collections,
+  Maps, and Corpora.
+- Alerts / monitoring — scite WP8 (DONE) ⊇ litmaps WP-L5 (add a "map" source).
+  One subsystem, never two.
+- Grounded LLM — scite WP6 ⊇ bibliometrix WP-B10 (Biblio-AI narration).
+- Graph rendering — the litmaps WP-L3 D3 `NetworkGraph` is the ONE renderer;
+  bibliometrix WP-B3/B5/B7 reuse it (no second graph library).
+- Saved-set membership — scite `Collection`, litmaps `Map`, bibliometrix `Corpus`
+  are siblings; unify the membership base before adding the third (open question
+  in every plan).
+
+Recommended next steps (highest cross-plan leverage first):
+1. scite WP9 import connectors — self-contained file parsing (no network) that
+   simultaneously unblocks litmaps WP-L6 and bibliometrix WP-B6.
+2. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
+   shipped; completes the litmaps monitoring story.
+3. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
+   surface with no schema/NLP/deps; foundation for WP-B2…B10.
+4. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+   exist; later extended by bibliometrix WP-B10.
+
+---
+
 ## 1. Feature catalog & gap analysis
 
 Legend: ✅ have · 🟡 partial · ⬜ missing

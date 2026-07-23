@@ -18,6 +18,51 @@ InterCiter's differentiators we must preserve while replicating scite:
 
 ---
 
+## 0. Cross-plan status snapshot (all parity plans · updated 2026-07-23)
+
+Three parity plans (`scite`, `litmaps`, `bibliometrix`) share one codebase; check
+all three before starting a WP so shared work is built once.
+
+Shipped to origin/main:
+- scite: WP1 citation tallies · WP2 claim search · WP3 paper report · WP4
+  collections (+ watch / delta / integrity / bulk) · WP5 retraction+integrity
+  signal · WP8 saved searches + alerts.
+- litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
+  layouts + annotations · WP-L4 read-only map sharing.
+- bibliometrix: none yet (plan drafted 2026-07-23).
+
+Not yet built:
+- scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check · WP9
+  Zotero/Mendeley import.
+- litmaps: WP-L5 map monitoring (extends scite WP8 — now unblocked) · WP-L6
+  Zotero seed import (extends scite WP9).
+- bibliometrix: WP-B1 … WP-B10 (all).
+
+Build-once shared WPs (one implementation serves several plans):
+- Import connectors — scite WP9 ⊇ litmaps WP-L6 ⊇ bibliometrix WP-B6. One
+  RIS/BibTeX/CSV (+ later OpenAlex/WoS/Scopus) importer targeting Collections,
+  Maps, and Corpora.
+- Alerts / monitoring — scite WP8 (DONE) ⊇ litmaps WP-L5 (add a "map" source).
+  One subsystem, never two.
+- Grounded LLM — scite WP6 ⊇ bibliometrix WP-B10 (Biblio-AI narration).
+- Graph rendering — the litmaps WP-L3 D3 `NetworkGraph` is the ONE renderer;
+  bibliometrix WP-B3/B5/B7 reuse it (no second graph library).
+- Saved-set membership — scite `Collection`, litmaps `Map`, bibliometrix `Corpus`
+  are siblings; unify the membership base before adding the third (open question
+  in every plan).
+
+Recommended next steps (highest cross-plan leverage first):
+1. scite WP9 import connectors — self-contained file parsing (no network) that
+   simultaneously unblocks litmaps WP-L6 and bibliometrix WP-B6.
+2. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
+   shipped; completes the litmaps monitoring story.
+3. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
+   surface with no schema/NLP/deps; foundation for WP-B2…B10.
+4. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+   exist; later extended by bibliometrix WP-B10.
+
+---
+
 ## 1. Feature catalog & gap analysis
 
 Legend: ✅ have · 🟡 partial · ⬜ missing
@@ -200,7 +245,7 @@ Deps: WP1. Soft-deps WP5 (retraction banner optional until WP5 lands).
 > from `PaperDetailPage`, with USWDS filter controls + timeline a11y table.
 > Tests: `backend/tests/test_report.py` (3) + `frontend/src/pages/ReportPage.test.tsx` (2).
 
-### WP4 — Collections  (F5)
+### WP4 — Collections  (F5)   ✅ DONE
 Goal: curated, monitored sets of works.
 Schema (LinkML-first): add `Collection` + `CollectionMembership` classes to
 `schema/interciter.yaml`; regenerate (`make pydantic sqlddl jsonschema`; note
@@ -218,41 +263,16 @@ per-member WP1 tallies), batch-import form (paste DOIs / upload CSV). Nav entry.
 Tests: backend CRUD + batch import + ownership; frontend pages.
 Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 
-> Started: backend LinkML/ORM domain (`Collection`, `CollectionMembership`),
-> id prefixes (`coll_`, `cmem_`), `services/collections.py`, router endpoints
-> (`/v1/collections*` with ownership + auth), and backend tests
-> `tests/test_collections.py`. Initial frontend scaffolding landed:
-> `CollectionsPage`, `CollectionDetailPage`, routes, nav, and DTO types.
->
-> Continued: `GET /v1/collections/{id}?include_member_tallies=true` now returns
-> per-member WP1 citation tallies and the collection detail UI renders those
-> tallies inline for each member.
->
-> Continued: collection detail now supports metadata management (rename/update
-> description, delete collection) and batch identifier upload from CSV/TXT file
-> in addition to pasted text.
->
-> Continued: collection detail now exposes aggregate citation tallies for the
-> whole collection and supports member sorting by recency or support/contradict
-> citation volume.
->
-> Continued: batch import now shows parsed DOI/PMID preview chips before submit
-> and richer import feedback (added/skipped + metadata-stub creations).
->
-> Continued: frontend add-members requests now send parsed `dois[]` and
-> `pmids[]` explicitly alongside raw `csv_text` for clearer payload semantics.
->
-> Continued: collection member rows now include direct quick links to each
-> paper's Report and Graph views.
->
-> Continued: collection detail now includes a client-side member filter (title,
-> DOI, PMID, work ID) for faster navigation in large sets.
->
-> Continued: collection detail now supports exporting member identifiers as a
-> CSV (work_id, DOI, PMID, title) for external workflows.
->
-> Continued: collection detail now supports exporting a filter-aware DOI/PMID
-> identifiers TXT for quick round-trip re-import and sharing.
+> Implemented: LinkML `Collection` + `CollectionMembership` (id prefixes `coll_` /
+> `cmem_`), `services/collections.py` CRUD + membership, router `/v1/collections*`
+> (ownership + auth), and `GET /v1/collections/{id}?include_member_tallies=true`
+> surfacing per-member WP1 tallies. Batch import resolves pasted or uploaded
+> CSV/TXT DOIs/PMIDs (parsed preview chips, added/skipped/stub feedback). Frontend
+> `CollectionsPage` + `CollectionDetailPage` (member tallies, aggregate tallies,
+> rename/describe/delete, member filter + sort, quick links to Report/Graph, CSV +
+> filter-aware identifiers-TXT export). Monitoring (watch / new-citation delta /
+> integrity badges / bulk-remove) landed via §5 — see below. Tests
+> `tests/test_collections.py` + `CollectionDetailPage.test.tsx`. COMMITTED+PUSHED.
 
 ### WP5 — Retraction / editorial-notice signal  (cross-cutting)   ✅ DONE
 Goal: non-mutating enrichment flagging retracted / noticed works.
@@ -287,8 +307,10 @@ Deps: none hard; consumed by WP3/WP4/WP7.
 > signal found" (depends on publisher deposits), not a guarantee of integrity.
 > Deferred: Reference Check surfacing (WP7 not built yet); optional second source.
 
-### WP6 — Grounded Assistant (RAG Q&A)  (F2)
+### WP6 — Grounded Assistant (RAG Q&A)  (F2)   → also serves bibliometrix WP-B10
 Goal: evidence-grounded Q&A over InterCiter claims, answers cite verbatim spans.
+Cross-plan: bibliometrix WP-B10 (Biblio-AI narration) EXTENDS this one assistant
+with bibliometric rollups as an extra grounded source — do not build a second.
 Backend: `services/assistant.py` — retrieve relevant claims/occurrences
 (reuse WP2 search + embedding rerank), build a source-grounded prompt (reuse
 `ingestion/llm_client.py`; injection-safe framing like LLMExtractor), require
@@ -347,8 +369,11 @@ Deps: WP2, WP4, WP5.
 > monitoring into this one subsystem. Deferred: email/SMTP delivery; a scheduled
 > (vs on-demand) runner.
 
-### WP9 — Zotero / Mendeley import connectors  (F5)
+### WP9 — Zotero / Mendeley import connectors  (F5)   → also serves litmaps WP-L6 + bibliometrix WP-B6
 Goal: import collections from reference managers.
+Cross-plan: this is the ONE import layer. litmaps WP-L6 extends it to seed a Map,
+and bibliometrix WP-B6 extends it to WoS/Scopus/Lens/Dimensions/OpenAlex + a
+completeness report. Build the RIS/BibTeX/CSV core here; the others layer on.
 Backend: connector(s) reading Zotero/Mendeley export (start with exported
 RIS/BibTeX/CSV files — no OAuth), map to DOIs/PMIDs, feed WP4 batch import.
 Endpoint `POST /v1/collections/{id}/import` (multipart). OAuth API sync is a

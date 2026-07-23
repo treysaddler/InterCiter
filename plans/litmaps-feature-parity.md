@@ -16,11 +16,57 @@ InterCiter differentiators to preserve while replicating Litmaps:
 - USWDS / Section-508 UI (a11y non-canvas fallbacks for any visualization).
 
 Litmaps' core value prop = accelerate literature reviews via connection-based
-discovery and interactive citation maps. InterCiter already ships a Cytoscape
-network graph (papers/authors/citations/claims + S2/ROBOKOP expansion), so the
-Visualize and citation-chaining pillars are substantially in place; the gaps are
-seed-based discovery, saveable/shareable maps, map annotation, custom
-layout axes/algorithms, monitoring, and Zotero sync.
+discovery and interactive citation maps. InterCiter already ships an interactive
+network graph (papers/authors/citations/claims + S2/ROBOKOP expansion; migrated
+from Cytoscape to a custom D3 SVG renderer in WP-L3a), so the Visualize and
+citation-chaining pillars are substantially in place; the gaps are seed-based
+discovery, saveable/shareable maps, map annotation, custom layout axes/algorithms,
+monitoring, and Zotero sync.
+
+---
+
+## 0. Cross-plan status snapshot (all parity plans · updated 2026-07-23)
+
+Three parity plans (`scite`, `litmaps`, `bibliometrix`) share one codebase; check
+all three before starting a WP so shared work is built once.
+
+Shipped to origin/main:
+- scite: WP1 citation tallies · WP2 claim search · WP3 paper report · WP4
+  collections (+ watch / delta / integrity / bulk) · WP5 retraction+integrity
+  signal · WP8 saved searches + alerts.
+- litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
+  layouts + annotations · WP-L4 read-only map sharing.
+- bibliometrix: none yet (plan drafted 2026-07-23).
+
+Not yet built:
+- scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check · WP9
+  Zotero/Mendeley import.
+- litmaps: WP-L5 map monitoring (extends scite WP8 — now unblocked) · WP-L6
+  Zotero seed import (extends scite WP9).
+- bibliometrix: WP-B1 … WP-B10 (all).
+
+Build-once shared WPs (one implementation serves several plans):
+- Import connectors — scite WP9 ⊇ litmaps WP-L6 ⊇ bibliometrix WP-B6. One
+  RIS/BibTeX/CSV (+ later OpenAlex/WoS/Scopus) importer targeting Collections,
+  Maps, and Corpora.
+- Alerts / monitoring — scite WP8 (DONE) ⊇ litmaps WP-L5 (add a "map" source).
+  One subsystem, never two.
+- Grounded LLM — scite WP6 ⊇ bibliometrix WP-B10 (Biblio-AI narration).
+- Graph rendering — the litmaps WP-L3 D3 `NetworkGraph` is the ONE renderer;
+  bibliometrix WP-B3/B5/B7 reuse it (no second graph library).
+- Saved-set membership — scite `Collection`, litmaps `Map`, bibliometrix `Corpus`
+  are siblings; unify the membership base before adding the third (open question
+  in every plan).
+
+Recommended next steps (highest cross-plan leverage first):
+1. scite WP9 import connectors — self-contained file parsing (no network) that
+   simultaneously unblocks litmaps WP-L6 and bibliometrix WP-B6.
+2. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
+   shipped; completes the litmaps monitoring story.
+3. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
+   surface with no schema/NLP/deps; foundation for WP-B2…B10.
+4. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+   exist; later extended by bibliometrix WP-B10.
 
 ---
 
@@ -63,39 +109,41 @@ Gap: `services/discovery.py` producing ranked candidates from a seed set.
 Litmaps: interactive citation map; dynamically change how papers are mapped
 using traditional + unique measures (e.g. year × citations); annotate articles.
 
-InterCiter mapping:
-- ✅ `components/NetworkGraph.tsx` (Cytoscape) + `GraphPage` with modes, hops,
-  authors toggle, S2/ROBOKOP expansion, a11y table fallback, legend.
-- 🟡 Layout is fixed (cose). No axis-based layouts (e.g. x=year, y=citation
-  count), no per-node annotations, no styling by metric.
-- ⬜ Configurable layout axes / node sizing by measure; per-node user
-  annotations/notes; saved map state.
+InterCiter mapping (updated — WP-L3a/b/c shipped):
+- ✅ `components/NetworkGraph.tsx` (custom D3 SVG renderer) + `GraphPage` with
+  modes, hops, authors toggle, S2/ROBOKOP expansion, a11y table fallback, legend.
+- ✅ Axis layouts (x=year, y=citation count / degree via `d3-scale`) + node sizing
+  by measure (WP-L3b); per-node annotations persisted on a saved map (WP-L3c).
+- ✅ Saved map state (seed set + layout_config) via WP-L2.
 
-Gap: axis-layout + node-metric styling in NetworkGraph; annotation model;
-map persistence (see L4).
+Gap: CLOSED for L3 (axis layout + node-metric styling + annotations + persistence
+all shipped). Remaining Litmaps-flavored polish (animated diachronic networks) is
+optional and tracked with bibliometrix WP-B (Synthesis) rather than here.
 
 ### L4. Share / Save maps (Litmaps + Workspaces)
 Litmaps: save named "Litmaps" and Workspaces; share with colleagues/students;
 collaborate.
 
-InterCiter mapping:
-- ⬜ No saved-map / workspace concept. Graph state is ephemeral (URL params only).
-- ✅ Auth + ownership primitives (principal, roles) ready to own saved maps.
+InterCiter mapping (updated — WP-L2 + WP-L4 shipped):
+- ✅ Saved `Map` domain (LinkML) = named seed set + layout_config + per-member
+  annotations; owner-scoped CRUD (WP-L2).
+- ✅ Read-only sharing via a capability `share_token` + public `/shared/:token`
+  viewer, owner PII excluded (WP-L4).
 
-Gap: `Map`/`Workspace` domain (LinkML), persistence of seed set + layout +
-annotations, and a share mechanism (shareable read-only link/token).
+Gap: CLOSED. (Real-time multi-user collaboration is out of scope / deferred.)
 
 ### L5. Monitor (alerts on new papers)
 Litmaps: automatic (weekly) email alerts when new papers on your topic appear;
 works off your existing maps.
 
 InterCiter mapping:
-- ⬜ No alerting. Shares design with scite-parity WP8 (saved searches & alerts).
-- ✅ Jobs pattern (`services/jobs.py`) to run periodic re-checks.
+- ✅ Alerts subsystem SHIPPED (scite-parity WP8: saved searches + watched
+  collections → in-app alert feed). `services/jobs.py` + `services/alerts.py`.
+- ⬜ A "map" alert source (diff a saved map's discovered neighbors vs last-seen)
+  is not yet wired in — that is WP-L5 below (small).
 
-Gap: monitor a saved map / seed set; diff new connected papers vs last-seen.
-CONSOLIDATE with scite-parity WP8 (single alerts subsystem for searches, maps,
-and collections). Email delivery out of scope initially (in-app notifications).
+Gap: add a map source to the EXISTING WP8 subsystem; diff new connected papers vs
+last-seen. Email delivery out of scope initially (in-app notifications).
 
 ### L6. Zotero sync
 Litmaps: sync a Zotero library/collection; keep it updated.
@@ -118,6 +166,10 @@ Gap: covered by scite-parity WP9; extend it to seed a Map, not just a Collection
   seed a Map/seed-set.
 - Collections (scite WP4) and Maps/Workspaces (Litmaps L4) are siblings; consider
   a shared "saved set of works" base so Collections and Maps reuse membership.
+- Graph rendering → the WP-L3 D3 `NetworkGraph` renderer is reused by bibliometrix
+  WP-B3/B5/B7 (co-citation / coupling / historiograph networks). One renderer.
+- Saved-set membership → Map (WP-L2) is also a sibling of bibliometrix `Corpus`
+  (WP-B7); unify the base before building the third membership table.
 
 ---
 
@@ -261,7 +313,8 @@ Do NOT build a separate alerts system. In scite-parity WP8's alerts subsystem,
 add a "map" alert source: periodically re-run WP-L1 discovery for the map's seed
 set, diff candidates against last-seen, surface new connected papers as alert
 rows. In-app notifications first; email later/out of scope.
-Deps: WP-L1, WP-L2, scite-parity WP8.
+Deps: WP-L1, WP-L2, scite-parity WP8 — ALL SHIPPED, so WP-L5 is unblocked and is
+the smallest remaining litmaps package (add a source to the existing subsystem).
 
 ### WP-L6 — Zotero seed import  (L6) → EXTEND scite-parity WP9
 Goal: import a Zotero library/collection as a seed set / Map.

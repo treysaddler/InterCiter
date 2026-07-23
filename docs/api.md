@@ -55,6 +55,12 @@ Search *inside* citation statements, not just titles and abstracts (scite F3). A
 
 - `GET /v1/search/claims` — query params `q` (keyword), `section`, `function`, `stance`, `resolution`, `min_year`, `max_year`, `limit` (1–100, default 25), `offset`. Returns `{query, total, limit, offset, hits[], facets}`. Each hit carries `claim_id`, `normalized_text`, `work_id`, `paper_title`, `year`, `section`, `function[]`, `stance[]`, `resolution[]`, and an `evidence` ref. `facets` gives counts per section/function/stance/resolution over the text/year-matched set (before the categorical facets are applied), so every narrowing option a query allows stays visible. A `function`/`stance`/`resolution` filter matches a claim with *at least one* relation of that value.
 
+## Corpus bibliometrics — descriptive analytics (bibliometrix-parity WP-B1)
+
+Corpus-level "Main Information": aggregate descriptive statistics over the whole collection's metadata (bibliometrix). A derived, non-mutating rollup over the existing `PaperWork` authors / venue / year plus the citation graph — the metadata lens that complements, and never replaces, InterCiter's claim-level function + stance + provenance. Reads stay open (no auth).
+
+- `GET /v1/bibliometrics/summary` — query params `work_ids` (repeatable; omit for the whole corpus), `min_year`, `max_year` (year bounds exclude documents with no year), `top_k` (1–50, default 10). Returns `{document_count, source_count, author_count, author_appearances, co_authors_per_doc, single_authored_count, min_year, max_year, annual_growth_rate, avg_citations_per_doc, total_citations, documents_without_year, annual_production[], top_authors[], top_sources[], top_cited_documents[]}`. `annual_production` is a dense year → document-count series; `annual_growth_rate` is the compound annual growth rate (%) of production (null over a single year); `avg_citations_per_doc` / `total_citations` come from global citation in-degree (distinct citing works) restricted to the cohort; `top_cited_documents` ranks the cohort by that in-degree.
+
 ## Revisions (MVP)
 
 Revising is creating, so it's a `POST`, not a `PATCH`:

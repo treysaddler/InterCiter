@@ -55,12 +55,12 @@ Shipped to origin/main:
   signal · WP8 saved searches + alerts · WP9 Zotero/Mendeley (RIS/BibTeX) import.
 - litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
   layouts + annotations · WP-L4 read-only map sharing · WP-L5 map monitoring.
-- bibliometrix: none yet (this plan drafted 2026-07-23).
+- bibliometrix: WP-B1 corpus descriptive analytics + "Main Information" dashboard.
 
 Not yet built:
 - scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check.
 - litmaps: WP-L6 Zotero seed import (extends the shipped scite WP9 importer).
-- bibliometrix: WP-B1 … WP-B10 (all).
+- bibliometrix: WP-B2 … WP-B10.
 
 Build-once shared WPs (one implementation serves several plans):
 - Import connectors — scite WP9 ⊇ litmaps WP-L6 ⊇ bibliometrix WP-B6. One
@@ -76,10 +76,11 @@ Build-once shared WPs (one implementation serves several plans):
   in every plan).
 
 Recommended next steps (highest cross-plan leverage first):
-1. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
-   surface with no schema/NLP/deps; foundation for WP-B2…B10.
-2. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+1. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
    exist; later extended by bibliometrix WP-B10.
+2. bibliometrix WP-B2 author/source/country analytics — laws + impact indices;
+   builds directly on the shipped WP-B1 rollup (first schema touch: affiliation/
+   country).
 3. scite WP7 Reference Check — reuses WP1 tallies + WP5 integrity over a paper's
    reference list (identifier intake first, PDF later).
 4. litmaps WP-L6 / bibliometrix WP-B6 — layer Map-seed + WoS/Scopus/OpenAlex onto
@@ -299,21 +300,25 @@ in Wave B. Wave C is the data-in / synthesis-out bookends.
 Follow repo conventions (see §5 checklist). Verify with `make be-test` +
 `make fe-typecheck && make fe-test`. Update `docs/api.md`.
 
-### WP-B1 — Corpus descriptive analytics + "Main Information"  (B3)
+### WP-B1 — Corpus descriptive analytics + "Main Information"  (B3) — ✅ DONE
 Goal: a corpus-wide descriptive summary (bibliometrix "Main Information" +
 annual production + top authors/sources/countries/documents).
-Backend: NEW `services/bibliometrics.py` (derived/non-mutating, projection style).
-Input: optional `work_ids` cohort (else whole DB) + year filters. Compute: timespan,
-#sources (distinct venue), #documents, annual production series + annual growth rate,
-avg citations/doc (from CitationEdge in-degree or S2 counts), #authors, co-authors/
-doc, top-k productive authors (count over `authors` list), top-k sources, top-k cited
-documents (by in-degree), document-type + keyword counts if available. Endpoint
-`GET /v1/bibliometrics/summary` (reads OPEN; body/query for cohort + filters).
-Frontend: NEW `pages/AnalyticsPage.tsx` — "Main Information" dashboard (indicator
-cards + annual-production a11y table/bar + top-k tables). Nav "Analytics".
-Tests: backend rollup over the sample + snowball corpus (counts, growth-rate math,
-top-k ordering); frontend dashboard render.
-Deps: none (uses existing models). Optional cohort object later.
+
+Shipped: `services/bibliometrics.py` `corpus_summary(session, *, work_ids=None,
+min_year=None, max_year=None, top_k=10)` — derived/non-mutating projection over a
+cohort (explicit `work_ids` else whole DB), year-filtered. Computes document/source/
+author counts, author appearances + co-authors/doc + single-authored count, dense
+annual-production series + compound annual growth rate, avg citations/doc + total
+citations (global citation in-degree over distinct citing works, restricted to the
+cohort), and top-k productive authors / sources / most-cited documents. Endpoint
+`GET /v1/bibliometrics/summary` (reads OPEN; router `api/routers/bibliometrics.py`).
+DTOs `BibliometricsSummary` + `AnnualProduction`/`AuthorProductivity`/
+`SourceProductivity`/`CitedDocument` in `schemas.py` + `frontend/src/api/types.ts`.
+Frontend `pages/AnalyticsPage.tsx` — "Main Information" indicator cards + annual-
+production a11y table (aria-hidden bars) + top-k tables, year filter, public nav
+"Analytics". Tests `tests/test_bibliometrics.py` (8: synthetic cohort math +
+sample-corpus rollup + endpoint) + `pages/AnalyticsPage.test.tsx` (3). Deferred:
+document-type + keyword counts (no such metadata yet); country column is WP-B2.
 
 ### WP-B2 — Author / Source / Country analytics (laws + indices)  (B4/B7)
 Goal: h-index, Lotka's law (author productivity distribution), Bradford's law

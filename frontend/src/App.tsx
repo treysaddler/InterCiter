@@ -19,6 +19,7 @@ import ClusterPage from './pages/ClusterPage'
 import AccountPage from './pages/AccountPage'
 import CollectionsPage from './pages/CollectionsPage'
 import CollectionDetailPage from './pages/CollectionDetailPage'
+import MapsPage from './pages/MapsPage'
 import AlertsPage from './pages/AlertsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
@@ -99,6 +100,14 @@ export default function App() {
           element={
             <RequireAuth>
               <AlertsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="maps"
+          element={
+            <RequireAuth>
+              <MapsPage />
             </RequireAuth>
           }
         />

@@ -400,6 +400,35 @@ export interface GraphView {
   truncated: boolean
 }
 
+// --- Saved maps (persisted seed set + layout; litmaps-parity WP-L2) ---
+
+export interface MapMemberView {
+  map_membership_id: string
+  work_id: string
+  title: string | null
+  doi: string | null
+  pmid: string | null
+  year: number | null
+  note: string | null
+  position: Record<string, number> | null
+  added_at: string
+}
+
+export interface MapView {
+  map_id: string
+  owner_id: string
+  name: string
+  description: string | null
+  layout_config: Record<string, unknown>
+  member_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface MapDetailView extends MapView {
+  members: MapMemberView[]
+}
+
 export interface GraphExpansion {
   work_id: string
   references_fetched: number

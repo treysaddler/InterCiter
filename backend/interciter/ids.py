@@ -27,6 +27,8 @@ _PREFIXES = {
     "EntityGrounding": "grnd",
     "Collection": "coll",
     "CollectionMembership": "cmem",
+    "Map": "map",
+    "MapMembership": "mmem",
     "SavedSearch": "ssch",
     "Alert": "alrt",
     "Job": "job",

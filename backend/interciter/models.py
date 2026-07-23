@@ -433,6 +433,53 @@ class CollectionMembership(Base):
     work: Mapped[PaperWork] = relationship()
 
 
+# ---------------------------------------------------------------------------------
+# Saved maps — persisted citation-map seed sets + layout (litmaps-parity WP-L2)
+# ---------------------------------------------------------------------------------
+
+
+class Map(Base):
+    __tablename__ = "saved_map"
+
+    map_id: Mapped[str] = mapped_column(String, primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        String, ForeignKey("app_user.user_id"), index=True
+    )
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Persisted visualization state (layout mode, hops, axis/size measures, author
+    # toggle, center work) as a JSON object. Derived UI state only.
+    layout_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+    memberships: Mapped[list["MapMembership"]] = relationship(
+        back_populates="map", cascade="all, delete-orphan"
+    )
+    owner: Mapped["User"] = relationship("User")
+
+
+class MapMembership(Base):
+    __tablename__ = "saved_map_membership"
+    __table_args__ = (
+        UniqueConstraint("map_id", "work_id", name="uq_map_membership"),
+    )
+
+    map_membership_id: Mapped[str] = mapped_column(String, primary_key=True)
+    map_id: Mapped[str] = mapped_column(ForeignKey("saved_map.map_id"), index=True)
+    work_id: Mapped[str] = mapped_column(ForeignKey("paper_work.work_id"), index=True)
+    # Optional per-node annotation (litmaps-parity WP-L3c) and pinned {x, y}.
+    member_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    member_position: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    added_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    map: Mapped[Map] = relationship(back_populates="memberships")
+    work: Mapped[PaperWork] = relationship()
+
+
 class SavedSearch(Base):
     __tablename__ = "saved_search"
 

@@ -549,6 +549,46 @@ classes:
         description: The member work.
 
   # ---------------------------------------------------------------------------------
+  # Saved maps — persisted citation-map seed sets + layout (litmaps-parity WP-L2)
+  # ---------------------------------------------------------------------------------
+
+  Map:
+    description: >-
+      A saved citation map: a named seed set of works plus the visualization layout
+      configuration used to render it. Additive and non-authoritative — it never
+      mutates the scientific record.
+    slots:
+      - map_id
+      - owner_id
+      - name
+      - description
+      - layout_config
+      - created_at
+      - updated_at
+
+  MapMembership:
+    description: A work's membership in a saved map, with an optional annotation.
+    slots:
+      - map_membership_id
+      - map_id
+      - work_id
+      - member_note
+      - member_position
+      - added_by
+      - added_at
+    slot_usage:
+      map_id:
+        identifier: false
+        range: Map
+        required: true
+        description: The parent map.
+      work_id:
+        identifier: false
+        range: PaperWork
+        required: true
+        description: The member work.
+
+  # ---------------------------------------------------------------------------------
   # Monitoring layer — saved searches + alerts (scite-parity WP8, F3/F5)
   # ---------------------------------------------------------------------------------
 
@@ -638,6 +678,12 @@ slots:
   collection_membership_id:
     identifier: true
     description: Stable identifier for a CollectionMembership.
+  map_id:
+    identifier: true
+    description: Stable identifier for a Map.
+  map_membership_id:
+    identifier: true
+    description: Stable identifier for a MapMembership.
 
   # --- PaperWork ---
   title:
@@ -958,6 +1004,18 @@ slots:
   updated_at:
     range: datetime
     description: When the record was last updated.
+
+  # --- Map (saved citation maps) ---
+  layout_config:
+    description: >-
+      Persisted visualization state for a saved map (layout mode, hops, axis/size
+      measures, author toggle, center work) as a structured object.
+  member_note:
+    description: An optional free-text annotation on a map member (per-node note).
+  member_position:
+    description: >-
+      Optional pinned {x, y} position for a map member, used to restore a manually
+      arranged layout.
 
   # --- SavedSearch / Alert (monitoring) ---
   saved_search_id:

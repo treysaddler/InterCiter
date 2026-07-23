@@ -158,6 +158,29 @@ All collection endpoints are auth-scoped to the caller's own resources; a
 collection owned by another user is indistinguishable from a missing one (`404`).
 Writes require CSRF when using cookie auth.
 
+## Saved maps — persisted citation-map seed sets + layout
+
+Litmaps-style saved maps (WP-L2): a named seed set of works plus the visualization
+`layout_config` (layout mode, axis/size measures, author toggle, center work) used to
+render it. Additive and non-mutating — maps only store membership rows and UI state.
+Members carry an optional `note` (per-node annotation) and `position` (pinned `{x, y}`).
+All map endpoints are owner-scoped; a map owned by another user is reported as missing
+(`404`). Writes require CSRF when using cookie auth.
+
+- `POST /v1/maps` — create a map (`{name, description?, layout_config?, work_ids?}`);
+  an optional `work_ids` seed set is populated from existing works. Returns the detail
+  view (with members).
+- `GET /v1/maps` — list the caller's maps.
+- `GET /v1/maps/{id}` — map detail with members.
+- `GET /v1/maps/{id}/graph` — render the map's seed set as a citation `GraphView`
+  (nodes = the surviving members, `cites` edges between them, with node-degree
+  measures). `include_authors` optional.
+- `PATCH /v1/maps/{id}` — update `name` / `description` / `layout_config`.
+- `DELETE /v1/maps/{id}` — delete the map (cascades memberships).
+- `POST /v1/maps/{id}/members` — add existing works (`{work_ids}`), idempotent.
+- `DELETE /v1/maps/{id}/members/{work_id}` — remove a member (`404` if not a member).
+- `PATCH /v1/maps/{id}/members/{work_id}` — annotate a member (`{note?, position?}`).
+
 ## Monitoring — saved searches & alerts
 
 Persist claim searches and turn watched collections + saved searches into an in-app

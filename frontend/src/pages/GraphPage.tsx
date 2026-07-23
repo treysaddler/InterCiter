@@ -1,8 +1,14 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { api, ApiError } from '../api/client'
-import type { ClaimExpansion, GraphExpansion, GraphNode, GraphView } from '../api/types'
+import type {
+  ClaimExpansion,
+  GraphExpansion,
+  GraphNode,
+  GraphView,
+  MapDetailView,
+} from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import NetworkGraph, {
   MEASURE_LABELS,
@@ -27,6 +33,8 @@ export default function GraphPage() {
   const { workId } = useParams()
   const navigate = useNavigate()
   const { status } = useAuth()
+  const [searchParams] = useSearchParams()
+  const mapId = searchParams.get('map')
 
   const [mode, setMode] = useState<Mode>('papers')
   const [includeAuthors, setIncludeAuthors] = useState(false)
@@ -35,6 +43,7 @@ export default function GraphPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [expanding, setExpanding] = useState(false)
   const [expandError, setExpandError] = useState<string | null>(null)
+  const [savingMap, setSavingMap] = useState(false)
   // Litmaps-style dynamic mapping: force layout by default, or map papers onto
   // quantitative axes (e.g. year × citation count) and size nodes by a measure.
   const [layout, setLayout] = useState<LayoutMode>('force')
@@ -46,18 +55,69 @@ export default function GraphPage() {
   const [robokopGraph, setRobokopGraph] = useState<GraphView | null>(null)
 
   const centered = Boolean(workId)
-  const path = centered
-    ? `/graph/papers/${workId}?depth=${depth}&include_authors=${includeAuthors}`
-    : mode === 'papers'
-      ? `/graph/papers?include_authors=${includeAuthors}`
-      : `/graph/claims`
+  const path = mapId
+    ? `/maps/${mapId}/graph?include_authors=${includeAuthors}`
+    : centered
+      ? `/graph/papers/${workId}?depth=${depth}&include_authors=${includeAuthors}`
+      : mode === 'papers'
+        ? `/graph/papers?include_authors=${includeAuthors}`
+        : `/graph/claims`
 
   const graph = useApi<GraphView>(() => api.get<GraphView>(path), [path])
+  // When loading a saved map, fetch its metadata to hydrate the layout controls.
+  const mapMeta = useApi<MapDetailView | null>(
+    () => (mapId ? api.get<MapDetailView>(`/maps/${mapId}`) : Promise.resolve(null)),
+    [mapId],
+  )
   const displayed = robokopGraph ?? graph.data
   // Axis/measure layout only makes sense for the paper/citation network (paper nodes
   // carry year + citation counts); claims and ROBOKOP overlays fall back to force.
-  const measureable = mode === 'papers' && !robokopGraph
+  const measureable = !robokopGraph && (Boolean(mapId) || mode === 'papers')
   const effectiveLayout: LayoutMode = measureable ? layout : 'force'
+
+  // Hydrate layout controls from a loaded map's saved layout_config (once).
+  useEffect(() => {
+    const cfg = mapMeta.data?.layout_config
+    if (!cfg) return
+    if (cfg.layout === 'force' || cfg.layout === 'axis') setLayout(cfg.layout)
+    if (typeof cfg.xMeasure === 'string') setXMeasure(cfg.xMeasure as GraphMeasure)
+    if (typeof cfg.yMeasure === 'string') setYMeasure(cfg.yMeasure as GraphMeasure)
+    if (typeof cfg.sizeMeasure === 'string')
+      setSizeMeasure(cfg.sizeMeasure as GraphMeasure | 'none')
+    if (typeof cfg.includeAuthors === 'boolean') setIncludeAuthors(cfg.includeAuthors)
+  }, [mapMeta.data])
+
+  async function saveAsMap() {
+    if (!displayed) return
+    const name = window.prompt('Name this map:')
+    if (!name || !name.trim()) return
+    const workIds = displayed.nodes
+      .filter((n) => n.type === 'paper')
+      .map((n) => n.id)
+    setSavingMap(true)
+    setNotice(null)
+    setExpandError(null)
+    try {
+      await api.post<MapDetailView>('/maps', {
+        name: name.trim(),
+        layout_config: {
+          layout,
+          xMeasure,
+          yMeasure,
+          sizeMeasure,
+          includeAuthors,
+          mode,
+          workId: workId ?? null,
+        },
+        work_ids: workIds,
+      })
+      setNotice(`Saved map “${name.trim()}” with ${workIds.length} paper(s).`)
+    } catch (e) {
+      setExpandError(e instanceof ApiError ? e.message : String(e))
+    } finally {
+      setSavingMap(false)
+    }
+  }
 
   function onSelectNode(node: GraphNode) {
     setSelected(node)
@@ -125,7 +185,20 @@ export default function GraphPage() {
           <Link to="/graph">← Full network</Link>
         </p>
       )}
-      <PageHeading>{centered ? 'Paper neighborhood' : 'Explore the network'}</PageHeading>
+      {mapId && (
+        <p className="margin-top-4 margin-bottom-0">
+          <Link to="/maps">← Saved maps</Link>
+        </p>
+      )}
+      <PageHeading>
+        {mapId
+          ? mapMeta.data
+            ? `Map: ${mapMeta.data.name}`
+            : 'Saved map'
+          : centered
+            ? 'Paper neighborhood'
+            : 'Explore the network'}
+      </PageHeading>
       <p className="text-base measure-5">
         Visualize papers, authors, and how they cite one another. Select any node to
         inspect it, recenter the graph, or grow a paper&rsquo;s neighborhood from
@@ -267,6 +340,19 @@ export default function GraphPage() {
               ))}
             </select>
           </div>
+
+          {status === 'authenticated' && displayed && (
+            <div className="margin-left-3">
+              <button
+                type="button"
+                className="usa-button usa-button--outline"
+                onClick={saveAsMap}
+                disabled={savingMap}
+              >
+                {savingMap ? 'Saving…' : 'Save as map'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

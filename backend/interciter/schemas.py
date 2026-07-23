@@ -636,6 +636,65 @@ class CollectionAddMembersResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Saved maps — persisted citation-map seed sets + layout (litmaps-parity WP-L2)
+# ---------------------------------------------------------------------------------
+
+
+class MapMemberView(BaseModel):
+    map_membership_id: str
+    work_id: str
+    title: str | None = None
+    doi: str | None = None
+    pmid: str | None = None
+    year: int | None = None
+    note: str | None = None
+    position: dict[str, Any] | None = None
+    added_at: datetime
+
+
+class MapView(BaseModel):
+    map_id: str
+    owner_id: str
+    name: str
+    description: str | None = None
+    layout_config: dict[str, Any] = Field(default_factory=dict)
+    member_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class MapDetailView(MapView):
+    members: list[MapMemberView] = Field(default_factory=list)
+
+
+class MapCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    layout_config: dict[str, Any] = Field(default_factory=dict)
+    # Optional seed set of existing works to populate the map on creation.
+    work_ids: list[str] = Field(default_factory=list, max_length=1000)
+
+
+class MapUpdate(BaseModel):
+    """PATCH payload; an explicitly-null description clears the stored value."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    layout_config: dict[str, Any] | None = None
+
+
+class MapAddMembersRequest(BaseModel):
+    work_ids: list[str] = Field(min_length=1, max_length=1000)
+
+
+class MapMemberUpdate(BaseModel):
+    """Annotate a map member; omitted fields are left unchanged."""
+
+    note: str | None = Field(default=None, max_length=2000)
+    position: dict[str, Any] | None = None
+
+
+# ---------------------------------------------------------------------------------
 # Monitoring — saved searches + alerts (scite-parity WP8)
 # ---------------------------------------------------------------------------------
 

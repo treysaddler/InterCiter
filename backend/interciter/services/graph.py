@@ -229,6 +229,38 @@ def build_paper_graph(
     )
 
 
+def graph_for_works(
+    session: Session,
+    work_ids: list[str],
+    *,
+    include_authors: bool = False,
+) -> GraphView:
+    """A citation graph over an explicit set of works (a saved map's seed set).
+
+    Nodes are exactly the works that exist; ``cites`` edges are those with *both*
+    endpoints in the set. Unknown ids are silently dropped so a stale saved map
+    still renders its surviving members. Never mutates.
+    """
+    unique_ids = list(dict.fromkeys(work_ids))
+    works = list(
+        session.scalars(
+            select(models.PaperWork).where(models.PaperWork.work_id.in_(unique_ids))
+        )
+    )
+    present = {w.work_id for w in works}
+    pairs = _citation_pairs(session)
+    nodes: dict[str, GraphNode] = {w.work_id: _paper_node(w) for w in works}
+    edges = [
+        _cite_edge(pair)
+        for pair in pairs.values()
+        if pair.citing in present and pair.cited in present
+    ]
+    _attach_citation_counts(nodes, pairs)
+    if include_authors:
+        _attach_authors(nodes, edges, works)
+    return GraphView(nodes=list(nodes.values()), edges=edges)
+
+
 def paper_neighborhood(
     session: Session,
     work_id: str,

@@ -6,11 +6,12 @@ import MapsPage from './MapsPage'
 import { api } from '../api/client'
 
 vi.mock('../api/client', () => ({
-  api: { get: vi.fn(), del: vi.fn() },
+  api: { get: vi.fn(), del: vi.fn(), post: vi.fn() },
 }))
 
 const mockedGet = vi.mocked(api.get)
 const mockedDel = vi.mocked(api.del)
+const mockedPost = vi.mocked(api.post)
 
 const MAPS = [
   {
@@ -20,6 +21,7 @@ const MAPS = [
     description: 'glycemic control',
     layout_config: { layout: 'axis' },
     member_count: 3,
+    share_token: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-02T00:00:00Z',
   },
@@ -63,4 +65,42 @@ it('shows an empty state when there are no maps', async () => {
     </MemoryRouter>,
   )
   expect(await screen.findByText(/no saved maps yet/i)).toBeInTheDocument()
+})
+
+it('mints a read-only share link and copies it to the clipboard', async () => {
+  mockedGet.mockResolvedValue(MAPS)
+  mockedPost.mockResolvedValue({ map_id: 'map_1', share_token: 'tok123' })
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  Object.assign(navigator, { clipboard: { writeText } })
+  render(
+    <MemoryRouter>
+      <MapsPage />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('link', { name: 'T2D core' })
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+  await waitFor(() =>
+    expect(mockedPost).toHaveBeenCalledWith('/maps/map_1/share'),
+  )
+  await waitFor(() =>
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/shared/tok123')),
+  )
+  // The list reloads so the newly-minted token surfaces the Copy link / Revoke pair.
+  expect(mockedGet).toHaveBeenCalledTimes(2)
+})
+
+it('revokes a share link after confirmation', async () => {
+  mockedGet.mockResolvedValue([{ ...MAPS[0], share_token: 'tok123' }])
+  mockedDel.mockResolvedValue(undefined)
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  render(
+    <MemoryRouter>
+      <MapsPage />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('link', { name: 'T2D core' })
+  fireEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+  await waitFor(() =>
+    expect(mockedDel).toHaveBeenCalledWith('/maps/map_1/share'),
+  )
 })

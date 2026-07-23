@@ -18,8 +18,10 @@ from ...schemas import (
     MapDetailView,
     MapMemberUpdate,
     MapMemberView,
+    MapShareView,
     MapUpdate,
     MapView,
+    SharedMapView,
 )
 from ...services import maps
 from ...services.projection import NotFound
@@ -139,6 +141,62 @@ def update_member(
     try:
         return maps.update_member(
             session, map_id, work_id, payload, owner_id=principal.user_id
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/maps/{map_id}/share", response_model=MapShareView)
+def share_map(
+    map_id: str,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> MapShareView:
+    try:
+        return maps.share_map(session, map_id, owner_id=principal.user_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/maps/{map_id}/share", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_share(
+    map_id: str,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> Response:
+    try:
+        maps.revoke_share(session, map_id, owner_id=principal.user_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------------
+# Public read-only shared-map routes (litmaps-parity WP-L4). The token is the sole
+# capability; these require NO auth and never expose owner identity.
+# ---------------------------------------------------------------------------------
+
+
+@router.get("/shared-maps/{token}", response_model=SharedMapView)
+def shared_map(
+    token: str,
+    session: Session = Depends(db_session),
+) -> SharedMapView:
+    try:
+        return maps.shared_map(session, token)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/shared-maps/{token}/graph", response_model=GraphView)
+def shared_map_graph(
+    token: str,
+    include_authors: bool = Query(False),
+    session: Session = Depends(db_session),
+) -> GraphView:
+    try:
+        return maps.shared_map_graph(
+            session, token, include_authors=include_authors
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

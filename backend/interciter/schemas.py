@@ -659,6 +659,8 @@ class MapView(BaseModel):
     description: str | None = None
     layout_config: dict[str, Any] = Field(default_factory=dict)
     member_count: int = 0
+    # Present only when the map has been shared; the owner uses it to build the link.
+    share_token: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -692,6 +694,30 @@ class MapMemberUpdate(BaseModel):
 
     note: str | None = Field(default=None, max_length=2000)
     position: dict[str, Any] | None = None
+
+
+class MapShareView(BaseModel):
+    """The capability token minted for a shared map (litmaps-parity WP-L4)."""
+
+    map_id: str
+    share_token: str
+
+
+class SharedMapView(BaseModel):
+    """Read-only projection of a shared map, reachable by token without auth.
+
+    Deliberately excludes the owner id and any other identity so a shared link never
+    leaks who created the map.
+    """
+
+    map_id: str
+    name: str
+    description: str | None = None
+    layout_config: dict[str, Any] = Field(default_factory=dict)
+    member_count: int = 0
+    members: list[MapMemberView] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
 
 
 # ---------------------------------------------------------------------------------

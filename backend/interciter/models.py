@@ -450,6 +450,11 @@ class Map(Base):
     # Persisted visualization state (layout mode, hops, axis/size measures, author
     # toggle, center work) as a JSON object. Derived UI state only.
     layout_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Read-only share capability (litmaps-parity WP-L4). Null = not shared; a non-null
+    # unique token grants unauthenticated read access via the shared-map route.
+    share_token: Mapped[str | None] = mapped_column(
+        String, nullable=True, unique=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow

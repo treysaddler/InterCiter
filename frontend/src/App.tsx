@@ -26,6 +26,8 @@ import NotFoundPage from './pages/NotFoundPage'
 // The graph view pulls in the d3 SVG renderer that no other screen needs, so it is
 // code-split and only fetched when a user opens /graph.
 const GraphPage = lazy(() => import('./pages/GraphPage'))
+// Public read-only shared-map viewer (WP-L4); also uses the d3 renderer, so lazy.
+const SharedMapPage = lazy(() => import('./pages/SharedMapPage'))
 
 /**
  * Route map mirrors the information architecture in docs/ui-design.md §5.
@@ -57,6 +59,14 @@ export default function App() {
           element={
             <Suspense fallback={<Loading label="Loading graph…" />}>
               <GraphPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="shared/:token"
+          element={
+            <Suspense fallback={<Loading label="Loading shared map…" />}>
+              <SharedMapPage />
             </Suspense>
           }
         />

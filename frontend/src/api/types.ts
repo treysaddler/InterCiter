@@ -421,12 +421,30 @@ export interface MapView {
   description: string | null
   layout_config: Record<string, unknown>
   member_count: number
+  share_token: string | null
   created_at: string
   updated_at: string
 }
 
 export interface MapDetailView extends MapView {
   members: MapMemberView[]
+}
+
+export interface MapShareView {
+  map_id: string
+  share_token: string
+}
+
+/** Read-only projection of a shared map, reachable by token without auth. */
+export interface SharedMapView {
+  map_id: string
+  name: string
+  description: string | null
+  layout_config: Record<string, unknown>
+  member_count: number
+  members: MapMemberView[]
+  created_at: string
+  updated_at: string
 }
 
 export interface GraphExpansion {

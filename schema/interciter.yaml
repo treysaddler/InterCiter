@@ -563,6 +563,7 @@ classes:
       - name
       - description
       - layout_config
+      - share_token
       - created_at
       - updated_at
 
@@ -1016,6 +1017,11 @@ slots:
     description: >-
       Optional pinned {x, y} position for a map member, used to restore a manually
       arranged layout.
+  share_token:
+    description: >-
+      Opaque capability token (litmaps-parity WP-L4). When set, anyone holding it may
+      read the map through the public shared-map route; clearing it revokes access.
+      Never leaks owner identity.
 
   # --- SavedSearch / Alert (monitoring) ---
   saved_search_id:

@@ -129,3 +129,69 @@ def test_map_is_owner_scoped(client, user_headers, make_user):
 def test_maps_require_auth(client):
     assert client.get("/v1/maps").status_code == 401
     assert client.post("/v1/maps", json={"name": "x"}).status_code == 401
+
+
+def test_share_mint_is_idempotent_and_grants_public_read(client, user_headers):
+    b = _submit(client, user_headers, "paper_b.xml")
+    a = _submit(client, user_headers, "paper_a.xml")
+    map_id = _create_map(
+        client, user_headers, work_ids=[a, b], layout_config={"layout": "force"}
+    )["map_id"]
+
+    minted = client.post(f"/v1/maps/{map_id}/share", headers=user_headers)
+    assert minted.status_code == 200
+    token = minted.json()["share_token"]
+    assert token
+    assert minted.json()["map_id"] == map_id
+
+    # Re-sharing returns the SAME token so links stay stable.
+    again = client.post(f"/v1/maps/{map_id}/share", headers=user_headers)
+    assert again.json()["share_token"] == token
+
+    # The owner sees the token on their own map view; anyone with the token can read
+    # it WITHOUT auth, and owner identity is never exposed.
+    owner_view = client.get(f"/v1/maps/{map_id}", headers=user_headers).json()
+    assert owner_view["share_token"] == token
+
+    public = client.get(f"/v1/shared-maps/{token}")
+    assert public.status_code == 200
+    body = public.json()
+    assert body["map_id"] == map_id
+    assert body["member_count"] == 2
+    assert "owner_id" not in body
+
+    graph = client.get(f"/v1/shared-maps/{token}/graph")
+    assert graph.status_code == 200
+    paper_ids = {n["id"] for n in graph.json()["nodes"] if n["type"] == "paper"}
+    assert paper_ids == {a, b}
+
+
+def test_share_revoke_makes_token_unresolvable(client, user_headers):
+    map_id = _create_map(client, user_headers)["map_id"]
+    token = client.post(f"/v1/maps/{map_id}/share", headers=user_headers).json()[
+        "share_token"
+    ]
+    assert client.get(f"/v1/shared-maps/{token}").status_code == 200
+
+    revoked = client.delete(f"/v1/maps/{map_id}/share", headers=user_headers)
+    assert revoked.status_code == 204
+    # The old link no longer resolves, and the owner view no longer carries a token.
+    assert client.get(f"/v1/shared-maps/{token}").status_code == 404
+    assert client.get(f"/v1/shared-maps/{token}/graph").status_code == 404
+    owner_view = client.get(f"/v1/maps/{map_id}", headers=user_headers).json()
+    assert owner_view["share_token"] is None
+
+
+def test_shared_map_unknown_token_is_404(client):
+    assert client.get("/v1/shared-maps/does-not-exist").status_code == 404
+    assert client.get("/v1/shared-maps/does-not-exist/graph").status_code == 404
+
+
+def test_share_is_owner_scoped_and_requires_auth(client, user_headers, make_user):
+    map_id = _create_map(client, user_headers)["map_id"]
+    other_headers = make_user(name="intruder")[1]
+    # A non-owner cannot mint or revoke a share for someone else's map.
+    assert client.post(f"/v1/maps/{map_id}/share", headers=other_headers).status_code == 404
+    assert client.delete(f"/v1/maps/{map_id}/share", headers=other_headers).status_code == 404
+    # And anonymous callers cannot share at all.
+    assert client.post(f"/v1/maps/{map_id}/share").status_code == 401

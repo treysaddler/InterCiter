@@ -9,6 +9,7 @@ missing (404) so ids never leak across accounts.
 
 from __future__ import annotations
 
+import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
@@ -23,8 +24,10 @@ from ..schemas import (
     MapDetailView,
     MapMemberUpdate,
     MapMemberView,
+    MapShareView,
     MapUpdate,
     MapView,
+    SharedMapView,
 )
 from . import graph
 from .projection import NotFound
@@ -64,6 +67,7 @@ def _map_view(
         description=saved_map.description,
         layout_config=saved_map.layout_config or {},
         member_count=member_count,
+        share_token=saved_map.share_token,
         created_at=saved_map.created_at,
         updated_at=saved_map.updated_at,
     )
@@ -268,6 +272,12 @@ def map_graph(
 ) -> GraphView:
     """Render the map's seed set as a citation graph (owner-scoped)."""
     saved_map = _load_owned_map(session, map_id, owner_id=owner_id)
+    return _map_graph(session, saved_map, include_authors=include_authors)
+
+
+def _map_graph(
+    session: Session, saved_map: models.Map, *, include_authors: bool
+) -> GraphView:
     work_ids = list(
         session.scalars(
             select(models.MapMembership.work_id).where(
@@ -276,3 +286,84 @@ def map_graph(
         )
     )
     return graph.graph_for_works(session, work_ids, include_authors=include_authors)
+
+
+# ---------------------------------------------------------------------------------
+# Read-only sharing (litmaps-parity WP-L4)
+# ---------------------------------------------------------------------------------
+
+
+def share_map(session: Session, map_id: str, *, owner_id: str) -> MapShareView:
+    """Mint (or return the existing) read-only share token for a map.
+
+    Idempotent: re-sharing an already-shared map returns the same token so links
+    stay stable. Revoking (``revoke_share``) clears it.
+    """
+    saved_map = _load_owned_map(session, map_id, owner_id=owner_id)
+    if not saved_map.share_token:
+        saved_map.share_token = secrets.token_urlsafe(24)
+        saved_map.updated_at = _utcnow()
+        session.commit()
+    return MapShareView(map_id=saved_map.map_id, share_token=saved_map.share_token)
+
+
+def revoke_share(session: Session, map_id: str, *, owner_id: str) -> None:
+    """Revoke a map's share token; the old link stops resolving (404)."""
+    saved_map = _load_owned_map(session, map_id, owner_id=owner_id)
+    if saved_map.share_token:
+        saved_map.share_token = None
+        saved_map.updated_at = _utcnow()
+        session.commit()
+
+
+def _load_shared_map(session: Session, token: str) -> models.Map:
+    """Resolve a map by its share token (the token IS the capability). Unknown or
+    revoked tokens are indistinguishable from a missing map (404)."""
+    if not token:
+        raise NotFound("shared map not found")
+    saved_map = session.scalar(
+        select(models.Map).where(models.Map.share_token == token)
+    )
+    if saved_map is None:
+        raise NotFound("shared map not found")
+    return saved_map
+
+
+def shared_map(session: Session, token: str) -> SharedMapView:
+    """Read-only projection of a shared map, without owner identity."""
+    saved_map = _load_shared_map(session, token)
+    memberships = list(
+        session.scalars(
+            select(models.MapMembership)
+            .where(models.MapMembership.map_id == saved_map.map_id)
+            .order_by(models.MapMembership.added_at.desc())
+        )
+    )
+    work_ids = [m.work_id for m in memberships]
+    works = {
+        w.work_id: w
+        for w in session.scalars(
+            select(models.PaperWork).where(models.PaperWork.work_id.in_(work_ids))
+        )
+    }
+    members = [
+        _member_view(m, works[m.work_id]) for m in memberships if m.work_id in works
+    ]
+    return SharedMapView(
+        map_id=saved_map.map_id,
+        name=saved_map.name,
+        description=saved_map.description,
+        layout_config=saved_map.layout_config or {},
+        member_count=len(memberships),
+        members=members,
+        created_at=saved_map.created_at,
+        updated_at=saved_map.updated_at,
+    )
+
+
+def shared_map_graph(
+    session: Session, token: str, *, include_authors: bool = False
+) -> GraphView:
+    """Render a shared map's seed set as a citation graph, resolved by token."""
+    saved_map = _load_shared_map(session, token)
+    return _map_graph(session, saved_map, include_authors=include_authors)

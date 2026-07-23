@@ -97,6 +97,10 @@ describe('ReportPage', () => {
     expect(screen.getByText(/2 of 2 citing statements shown/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /citations over time/i })).toBeInTheDocument()
     expect(screen.getByText('2021')).toBeInTheDocument()
+    // Filter options are derived from the report facets, not hardcoded lists.
+    expect(screen.getByRole('option', { name: 'Support' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Direct evidence' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Claim resolved' })).toBeInTheDocument()
   })
 
   it('passes filters in the request query', async () => {

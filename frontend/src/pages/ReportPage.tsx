@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
@@ -7,29 +8,21 @@ import PageHeading from '../components/PageHeading'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
-const STANCE_OPTIONS = [
-  { value: '', label: 'All stances' },
-  { value: 'support', label: 'Support' },
-  { value: 'contradict', label: 'Contradict' },
-  { value: 'neutral', label: 'Neutral' },
-  { value: 'unclear', label: 'Unclear' },
-]
+const YEAR_DEBOUNCE_MS = 400
 
-const FUNCTION_OPTIONS = [
-  { value: '', label: 'All functions' },
-  { value: 'direct_evidence', label: 'Direct evidence' },
-  { value: 'comparison', label: 'Comparison' },
-  { value: 'background', label: 'Background' },
-  { value: 'method', label: 'Method' },
-  { value: 'other', label: 'Other' },
-]
+function humanize(value: string): string {
+  const spaced = value.replaceAll('_', ' ')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
 
-const RESOLUTION_OPTIONS = [
-  { value: '', label: 'All resolutions' },
-  { value: 'claim_resolved', label: 'Claim resolved' },
-  { value: 'paper_resolved', label: 'Paper resolved' },
-  { value: 'unresolved', label: 'Unresolved' },
-]
+// Options come from the report's unfiltered facet counts, so they always match
+// the backend's live enum values; the applied value is kept selectable even if
+// it no longer matches any statement.
+function facetOptions(counts: Record<string, number>, current: string): string[] {
+  const values = Object.keys(counts)
+  if (current && !values.includes(current)) values.push(current)
+  return values.sort()
+}
 
 /**
  * Per-paper citation report (scite-parity WP3): tallies + timeline + conflicts
@@ -47,6 +40,28 @@ export default function ReportPage() {
   const endpoint = `/papers/${workId}/report${query.toString() ? `?${query.toString()}` : ''}`
 
   const report = useApi<PaperReport>(() => api.get<PaperReport>(endpoint), [endpoint])
+
+  // Year bounds are edited locally and pushed to the URL after a debounce so
+  // each keystroke doesn't refetch the report.
+  const [minYear, setMinYear] = useState(params.get('min_year') ?? '')
+  const [maxYear, setMaxYear] = useState(params.get('max_year') ?? '')
+
+  useEffect(() => {
+    setMinYear(params.get('min_year') ?? '')
+    setMaxYear(params.get('max_year') ?? '')
+  }, [params])
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const next = new URLSearchParams(params)
+      if (minYear) next.set('min_year', minYear)
+      else next.delete('min_year')
+      if (maxYear) next.set('max_year', maxYear)
+      else next.delete('max_year')
+      if (next.toString() !== params.toString()) setParams(next)
+    }, YEAR_DEBOUNCE_MS)
+    return () => clearTimeout(handle)
+  }, [minYear, maxYear, params, setParams])
 
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(params)
@@ -81,9 +96,12 @@ export default function ReportPage() {
                 value={params.get('stance') ?? ''}
                 onChange={(e) => updateFilter('stance', e.target.value)}
               >
-                {STANCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
+                <option value="">All stances</option>
+                {facetOptions(report.data.facets.stance, params.get('stance') ?? '').map(
+                  (value) => (
+                    <option key={value} value={value}>{humanize(value)}</option>
+                  ),
+                )}
               </select>
             </div>
 
@@ -95,9 +113,12 @@ export default function ReportPage() {
                 value={params.get('function') ?? ''}
                 onChange={(e) => updateFilter('function', e.target.value)}
               >
-                {FUNCTION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
+                <option value="">All functions</option>
+                {facetOptions(report.data.facets.function, params.get('function') ?? '').map(
+                  (value) => (
+                    <option key={value} value={value}>{humanize(value)}</option>
+                  ),
+                )}
               </select>
             </div>
 
@@ -109,9 +130,12 @@ export default function ReportPage() {
                 value={params.get('resolution') ?? ''}
                 onChange={(e) => updateFilter('resolution', e.target.value)}
               >
-                {RESOLUTION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
+                <option value="">All resolutions</option>
+                {facetOptions(report.data.facets.resolution, params.get('resolution') ?? '').map(
+                  (value) => (
+                    <option key={value} value={value}>{humanize(value)}</option>
+                  ),
+                )}
               </select>
             </div>
 
@@ -124,11 +148,11 @@ export default function ReportPage() {
                 onChange={(e) => updateFilter('section', e.target.value)}
               >
                 <option value="">All sections</option>
-                {Object.keys(report.data.facets.section)
-                  .sort()
-                  .map((name) => (
+                {facetOptions(report.data.facets.section, params.get('section') ?? '').map(
+                  (name) => (
                     <option key={name} value={name}>{name}</option>
-                  ))}
+                  ),
+                )}
               </select>
             </div>
           </div>
@@ -140,8 +164,8 @@ export default function ReportPage() {
                 id="report-min-year"
                 className="usa-input"
                 inputMode="numeric"
-                value={params.get('min_year') ?? ''}
-                onChange={(e) => updateFilter('min_year', e.target.value.replace(/[^0-9]/g, ''))}
+                value={minYear}
+                onChange={(e) => setMinYear(e.target.value.replace(/[^0-9]/g, ''))}
               />
             </div>
             <div className="tablet:grid-col-3">
@@ -150,8 +174,8 @@ export default function ReportPage() {
                 id="report-max-year"
                 className="usa-input"
                 inputMode="numeric"
-                value={params.get('max_year') ?? ''}
-                onChange={(e) => updateFilter('max_year', e.target.value.replace(/[^0-9]/g, ''))}
+                value={maxYear}
+                onChange={(e) => setMaxYear(e.target.value.replace(/[^0-9]/g, ''))}
               />
             </div>
           </div>

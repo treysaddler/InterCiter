@@ -55,12 +55,13 @@ Shipped to origin/main:
   signal · WP8 saved searches + alerts · WP9 Zotero/Mendeley (RIS/BibTeX) import.
 - litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
   layouts + annotations · WP-L4 read-only map sharing · WP-L5 map monitoring.
-- bibliometrix: WP-B1 corpus descriptive analytics + "Main Information" dashboard.
+- bibliometrix: WP-B1 corpus descriptive analytics + "Main Information" dashboard ·
+  WP-B2 author/source/country analytics (h-index/Lotka/Bradford/SCP-MCP).
 
 Not yet built:
 - scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check.
 - litmaps: WP-L6 Zotero seed import (extends the shipped scite WP9 importer).
-- bibliometrix: WP-B2 … WP-B10.
+- bibliometrix: WP-B3 … WP-B10.
 
 Build-once shared WPs (one implementation serves several plans):
 - Import connectors — scite WP9 ⊇ litmaps WP-L6 ⊇ bibliometrix WP-B6. One
@@ -78,13 +79,13 @@ Build-once shared WPs (one implementation serves several plans):
 Recommended next steps (highest cross-plan leverage first):
 1. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
    exist; later extended by bibliometrix WP-B10.
-2. bibliometrix WP-B2 author/source/country analytics — laws + impact indices;
-   builds directly on the shipped WP-B1 rollup (first schema touch: affiliation/
-   country).
+2. bibliometrix WP-B3 network matrices — co-citation / coupling / co-word /
+   collaboration; REUSES the litmaps WP-L3 D3 renderer + discovery.py coupling,
+   so cheap and high-impact.
 3. scite WP7 Reference Check — reuses WP1 tallies + WP5 integrity over a paper's
    reference list (identifier intake first, PDF later).
 4. litmaps WP-L6 / bibliometrix WP-B6 — layer Map-seed + WoS/Scopus/OpenAlex onto
-   the shipped scite WP9 import core.
+   the shipped scite WP9 import core (also backfills WP-B2 affiliation/country).
 
 ---
 
@@ -320,23 +321,30 @@ production a11y table (aria-hidden bars) + top-k tables, year filter, public nav
 sample-corpus rollup + endpoint) + `pages/AnalyticsPage.test.tsx` (3). Deferred:
 document-type + keyword counts (no such metadata yet); country column is WP-B2.
 
-### WP-B2 — Author / Source / Country analytics (laws + indices)  (B4/B7)
+### WP-B2 — Author / Source / Country analytics (laws + indices)  (B4/B7) — ✅ DONE
 Goal: h-index, Lotka's law (author productivity distribution), Bradford's law
 (source zones), country SCP/MCP + international co-authorship %.
-Schema (LinkML-first, additive): add `affiliation` + `country` to authorship (either
-slots on a new `Authorship` link class, or parse from existing metadata). Prefer a
-first-class `Author` + `Authorship` (work↔author with position/affiliation/country)
-if authors graduate from hashed nodes to entities; otherwise derive country from
-S2/OpenAlex affiliation strings. Regenerate; mirror in `models.py` + `ids.py`
-(`relationship()` on insert-ordered FK cols).
-Backend: extend `services/bibliometrics.py` — `author_metrics` (productivity,
-h-index from citation counts, Lotka fit), `source_metrics` (Bradford zones,
-impact), `country_metrics` (SCP/MCP, collaboration). Endpoints under
-`/v1/bibliometrics/{authors,sources,countries}`.
-Frontend: AnalyticsPage tabs for Authors / Sources / Countries (ranked a11y tables +
-law-fit summaries). Country map is WP-B3/its own; here tabular only.
-Tests: h-index + Lotka/Bradford math on a fixture; SCP/MCP counts.
-Deps: WP-B1. Needs affiliation/country metadata (schema).
+
+Shipped: additive LinkML slot `PaperWork.author_affiliations` (multivalued raw
+affiliation strings; NOT a first-class Author/Authorship — hashed author names kept,
+country parsed from affiliation tails). Regenerated (`make jsonschema`), mirrored in
+`models.py` (JSON col default list). `services/bibliometrics.py` extended:
+`author_metrics` (per-author document_count + total_citations + h-index over the
+citation graph, + `_lotka_fit` OLS exponent/constant of the productivity
+distribution), `source_metrics` (per-venue document_count/total_citations/h-index +
+`_bradford_zone_map` three-zone partition), `country_metrics` (`_parse_country`
+lexicon + alias heuristic over affiliation strings → SCP/MCP split + international
+co-authorship %). Endpoints `GET /v1/bibliometrics/{authors,sources,countries}`
+(reads OPEN; shared work_ids/min_year/max_year/top_k). Law fits use plain Python OLS
+(NO numpy/scipy dep). DTOs (`AuthorMetrics`/`AuthorMetric`/`LotkaFit`/`LotkaPoint`,
+`SourceMetrics`/`SourceMetric`/`BradfordZone`, `CountryMetrics`/`CountryMetric`) in
+`schemas.py` + `types.ts`. Frontend `AnalyticsPage.tsx` refactored into tabs
+(Overview / Authors / Sources / Countries via `?tab=`), each an a11y RankTable + law
+summary; year filter shared across tabs. Tests `test_bibliometrics.py` (+7:
+h-index, Lotka distribution, Bradford partition, SCP/MCP, empty-country, endpoints)
++ `AnalyticsPage.test.tsx` (+3 tab tests). Country analytics degrade to empty until
+an affiliation-bearing importer (WP-B6 OpenAlex) populates `author_affiliations`.
+Deferred: first-class Author/Authorship entity; country map (WP-B3).
 
 ### WP-B3 — Bibliometric network matrices  (B6/B7-networks)
 Goal: co-citation / bibliographic-coupling / keyword co-occurrence / co-authorship

@@ -19,6 +19,8 @@ from ...schemas import (
     CollectionCitationDelta,
     CollectionCreate,
     CollectionDetailView,
+    CollectionImportRequest,
+    CollectionImportResult,
     CollectionUpdate,
     CollectionView,
     CollectionWatchRequest,
@@ -123,6 +125,32 @@ def add_members(
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except BatchLimitError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/collections/{collection_id}/import",
+    response_model=CollectionImportResult,
+)
+def import_references(
+    collection_id: str,
+    payload: CollectionImportRequest,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> CollectionImportResult:
+    try:
+        return collections.import_references(
+            session,
+            collection_id,
+            text=payload.text,
+            fmt=payload.format,
+            owner_id=principal.user_id,
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except BatchLimitError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

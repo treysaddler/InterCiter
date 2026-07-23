@@ -212,6 +212,12 @@ export interface CollectionAddMembersResult {
   members: CollectionMemberView[]
 }
 
+export interface CollectionImportResult extends CollectionAddMembersResult {
+  format: string
+  entry_count: number
+  matched_count: number
+}
+
 export interface CollectionMemberDelta {
   work_id: string
   title: string | null

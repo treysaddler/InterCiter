@@ -426,3 +426,108 @@ def test_watch_and_delta_require_auth(client, user_headers):
         f"/v1/collections/{collection_id}/members/bulk-delete",
         json={"work_ids": ["work_x"]},
     ).status_code == 401
+
+
+# ---------------------------------------------------------------------------------
+# WP9 — reference-manager import (RIS / BibTeX)
+# ---------------------------------------------------------------------------------
+
+_RIS_LIBRARY = """TY  - JOUR
+AU  - Smith, J.
+TI  - Metformin and glycemic control
+DO  - 10.1000/ris-demo-doi
+DB  - PubMed
+AN  - 20000001
+ER  -
+
+TY  - JOUR
+TI  - A record with no identifiers
+AU  - Doe, A.
+ER  -
+"""
+
+_BIBTEX_LIBRARY = """@article{smith2020,
+  title = {Fasting glucose review},
+  author = {Smith, John},
+  doi = {10.1000/bibtex-demo-doi},
+  pmid = {20000002},
+}
+
+@article{jones2021,
+  title = {No identifiers here},
+  author = {Jones, Amy},
+}
+"""
+
+
+def test_reference_manager_parsers_extract_identifiers():
+    from interciter.ingestion import reference_managers as rm
+
+    assert rm.detect_format(_RIS_LIBRARY) == "ris"
+    assert rm.detect_format(_BIBTEX_LIBRARY) == "bibtex"
+    assert rm.detect_format("10.1/x 12345678") == "csv"
+    assert rm.detect_format("anything", filename="lib.bib") == "bibtex"
+
+    ris = rm.parse_references(_RIS_LIBRARY, "ris")
+    assert ris.dois == ["10.1000/ris-demo-doi"]
+    assert ris.pmids == ["20000001"]  # AN accession + PubMed hint
+    assert ris.entry_count == 2
+    assert ris.matched_count == 1
+
+    bib = rm.parse_references(_BIBTEX_LIBRARY, "bibtex")
+    assert bib.dois == ["10.1000/bibtex-demo-doi"]
+    assert bib.pmids == ["20000002"]
+    assert bib.entry_count == 2
+    assert bib.matched_count == 1
+
+
+def test_import_ris_and_bibtex_seed_collection(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+
+    ris = client.post(
+        f"/v1/collections/{collection_id}/import",
+        json={"text": _RIS_LIBRARY, "format": "ris"},
+        headers=user_headers,
+    )
+    assert ris.status_code == 200, ris.text
+    body = ris.json()
+    assert body["format"] == "ris"
+    assert body["entry_count"] == 2
+    assert body["matched_count"] == 1
+    assert body["added_count"] == 2  # one DOI stub + one PMID stub
+    assert len(body["created_stub_work_ids"]) == 2
+
+    # Auto-detected format (no explicit `format`) works too.
+    bib = client.post(
+        f"/v1/collections/{collection_id}/import",
+        json={"text": _BIBTEX_LIBRARY},
+        headers=user_headers,
+    )
+    assert bib.status_code == 200, bib.text
+    assert bib.json()["format"] == "bibtex"
+    assert bib.json()["added_count"] == 2
+
+    detail = client.get(f"/v1/collections/{collection_id}", headers=user_headers)
+    dois = {m["doi"] for m in detail.json()["members"] if m["doi"]}
+    assert {"10.1000/ris-demo-doi", "10.1000/bibtex-demo-doi"} <= dois
+
+
+def test_import_is_owner_scoped_and_requires_auth(client, user_headers, make_user):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    other_headers = make_user(name="intruder")[1]
+
+    assert (
+        client.post(
+            f"/v1/collections/{collection_id}/import",
+            json={"text": _RIS_LIBRARY, "format": "ris"},
+            headers=other_headers,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/v1/collections/{collection_id}/import",
+            json={"text": _RIS_LIBRARY},
+        ).status_code
+        == 401
+    )

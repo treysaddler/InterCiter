@@ -6,6 +6,7 @@ import type {
   CollectionAddMembersResult,
   CollectionCitationDelta,
   CollectionDetailView,
+  CollectionImportResult,
   CollectionMemberView,
 } from '../api/types'
 import CitationTallies from '../components/CitationTallies'
@@ -152,6 +153,7 @@ export default function CollectionDetailPage() {
   )
   const [csvText, setCsvText] = useState('')
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [message, setMessage] = useState<string | null>(null)
@@ -229,6 +231,42 @@ export default function CollectionDetailPage() {
       setError('Could not read the selected file.')
     } finally {
       setUploadingFile(false)
+    }
+  }
+
+  // Reference-manager import (WP9): read a Zotero/Mendeley RIS or BibTeX export,
+  // let the backend parse it to identifiers, and seed the collection directly.
+  async function onImportLibrary(file: File | null) {
+    if (!file) return
+    setImporting(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const text = await readFileText(file)
+      const lower = file.name.toLowerCase()
+      const format = lower.endsWith('.ris')
+        ? 'ris'
+        : lower.endsWith('.bib') || lower.endsWith('.bibtex')
+          ? 'bibtex'
+          : undefined
+      const result = await api.post<CollectionImportResult>(
+        `/collections/${collectionId}/import`,
+        { text, format },
+      )
+      const stubCount = result.created_stub_work_ids.length
+      const skippedCount = result.skipped_identifiers.length
+      setMessage(
+        `Imported ${result.matched_count} of ${result.entry_count} ` +
+          `${result.format.toUpperCase()} reference(s): added ${result.added_count} member(s)` +
+          (stubCount ? `; ${stubCount} created as metadata stubs` : '') +
+          (skippedCount ? `; ${skippedCount} skipped` : '') +
+          '.',
+      )
+      detail.reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -460,6 +498,32 @@ export default function CollectionDetailPage() {
               </button>
             </div>
           </form>
+
+          <h2>Import from a reference manager</h2>
+          <p className="font-body-3xs text-base margin-top-0">
+            Upload a Zotero or Mendeley export (RIS or BibTeX). DOIs and PMIDs are
+            extracted and added as members automatically.
+          </p>
+          <label className="usa-label" htmlFor="library-file">Upload RIS/BibTeX</label>
+          <input
+            id="library-file"
+            className="usa-file-input"
+            type="file"
+            accept=".ris,.bib,.bibtex,application/x-research-info-systems,application/x-bibtex"
+            disabled={importing}
+            onChange={(e) => {
+              const input = e.currentTarget
+              const file = input.files?.[0] ?? null
+              // Reset so re-selecting the same file fires another change event.
+              input.value = ''
+              void onImportLibrary(file)
+            }}
+          />
+          {importing && (
+            <p className="font-body-3xs text-base margin-top-05 margin-bottom-0">
+              Importing library…
+            </p>
+          )}
 
           <h2>Batch add members</h2>
           <p className="font-body-3xs text-base margin-top-0">

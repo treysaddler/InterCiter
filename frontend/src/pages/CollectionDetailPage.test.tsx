@@ -169,6 +169,51 @@ describe('CollectionDetailPage', () => {
     expect(screen.getByText(/ready to import: 1 doi\(s\), 1 pmid\(s\)/i)).toBeInTheDocument()
   })
 
+  it('imports a reference-manager library (RIS/BibTeX) via the import endpoint', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 0,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: null,
+      members: [],
+    })
+    mockedPost.mockResolvedValue({
+      collection_id: 'coll_1',
+      added_count: 2,
+      skipped_identifiers: [],
+      created_stub_work_ids: ['work_a', 'work_b'],
+      members: [],
+      format: 'ris',
+      entry_count: 3,
+      matched_count: 2,
+    })
+
+    const file = new File(['TY  - JOUR\nDO  - 10.1000/x\nER  -'], 'library.ris', {
+      type: 'application/x-research-info-systems',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const importInput = await screen.findByLabelText('Upload RIS/BibTeX')
+    fireEvent.change(importInput, { target: { files: [file] } })
+
+    await screen.findByText(/imported 2 of 3 ris reference/i)
+    expect(mockedPost).toHaveBeenCalledWith('/collections/coll_1/import', {
+      text: 'TY  - JOUR\nDO  - 10.1000/x\nER  -',
+      format: 'ris',
+    })
+  })
+
   it('keeps semicolon DOIs intact and skips year-like numbers in the preview', async () => {
     mockedGet.mockResolvedValue({
       collection_id: 'coll_1',

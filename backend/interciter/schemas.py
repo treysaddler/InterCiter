@@ -14,7 +14,7 @@ are the contract.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -633,6 +633,27 @@ class CollectionAddMembersResult(BaseModel):
     skipped_identifiers: list[str] = Field(default_factory=list)
     created_stub_work_ids: list[str] = Field(default_factory=list)
     members: list[CollectionMemberView] = Field(default_factory=list)
+
+
+class CollectionImportRequest(BaseModel):
+    """Import a reference-manager export (scite-parity WP9).
+
+    ``text`` is the raw contents of a Zotero/Mendeley RIS or BibTeX export (or a
+    CSV/plain-text identifier blob). ``format`` may be omitted to auto-detect from
+    the contents.
+    """
+
+    text: str = Field(min_length=1, max_length=5_000_000)
+    format: Literal["ris", "bibtex", "csv"] | None = None
+
+
+class CollectionImportResult(CollectionAddMembersResult):
+    """An add-members result plus how the source library parsed."""
+
+    format: str
+    entry_count: int = 0
+    matched_count: int = 0
+
 
 
 # ---------------------------------------------------------------------------------

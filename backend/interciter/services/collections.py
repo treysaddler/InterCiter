@@ -23,6 +23,7 @@ from ..schemas import (
     CollectionCitationDelta,
     CollectionCreate,
     CollectionDetailView,
+    CollectionImportResult,
     CollectionMemberDelta,
     CollectionMemberView,
     CitationTallies,
@@ -30,6 +31,7 @@ from ..schemas import (
     CollectionView,
     PaperSubmission,
 )
+from ..ingestion import reference_managers
 from . import citation_stats, jobs
 from .projection import NotFound
 
@@ -434,6 +436,63 @@ def add_members(
         skipped_identifiers=skipped,
         created_stub_work_ids=list(dict.fromkeys(created_stub_work_ids)),
         members=added_members,
+    )
+
+
+def import_references(
+    session: Session,
+    collection_id: str,
+    *,
+    text: str,
+    fmt: str | None = None,
+    owner_id: str,
+) -> CollectionImportResult:
+    """Seed a collection from a reference-manager export (scite-parity WP9).
+
+    Parses a Zotero/Mendeley RIS or BibTeX library (or a CSV/plain-text
+    identifier blob) into DOIs/PMIDs and routes them through ``add_members`` so
+    resolution, metadata-stub creation, dedupe, and the batch cap are shared with
+    the manual intake path. Raises ``NotFound`` for a missing/other-owner
+    collection and ``ValueError`` for an unknown ``fmt``.
+    """
+    resolved_fmt = fmt or reference_managers.detect_format(text)
+    if resolved_fmt not in reference_managers.FORMATS:
+        raise ValueError(f"unsupported import format {resolved_fmt!r}")
+
+    if resolved_fmt == "csv":
+        # Plain-text / CSV identifiers reuse the existing detector in add_members.
+        add = add_members(
+            session,
+            collection_id,
+            CollectionAddMembersRequest(csv_text=text),
+            owner_id=owner_id,
+        )
+        # One identifier ~ one "entry"; report added vs skipped for parity.
+        entry_count = add.added_count + len(add.skipped_identifiers)
+        return CollectionImportResult(
+            **add.model_dump(),
+            format=resolved_fmt,
+            entry_count=entry_count,
+            matched_count=add.added_count,
+        )
+
+    parsed = reference_managers.parse_references(text, resolved_fmt)
+    add = add_members(
+        session,
+        collection_id,
+        CollectionAddMembersRequest(
+            dois=parsed.dois,
+            # add_members validates PMIDs via a pmid:-prefixed token; wrap so the
+            # bare numeric ids we extracted are accepted (not read as CSV years).
+            pmids=[f"pmid:{pmid}" for pmid in parsed.pmids],
+        ),
+        owner_id=owner_id,
+    )
+    return CollectionImportResult(
+        **add.model_dump(),
+        format=resolved_fmt,
+        entry_count=parsed.entry_count,
+        matched_count=parsed.matched_count,
     )
 
 

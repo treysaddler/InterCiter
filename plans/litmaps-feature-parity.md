@@ -223,7 +223,7 @@ A pure swap that de-risks the rest.
 Tests: a11y table renders, node-select fires, truncation summary, legend scoped.
 Deps: none.
 
-**WP-L3b — Axis layouts + node-metric styling (mostly frontend).**
+**WP-L3b — Axis layouts + node-metric styling (mostly frontend).**   ✅ DONE
 Add layout modes to `NetworkGraph` + controls on `GraphPage`:
 - Axis layouts via `d3-scale` (+ rendered axes/gridlines): e.g. x = year,
   y = citation count or in-degree; keep `force` as a mode.

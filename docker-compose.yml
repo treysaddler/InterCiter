@@ -40,6 +40,14 @@ services:
       # cookies can't be Secure). This deployment sets it true in .env since
       # Traefik terminates real TLS in front.
       INTERCITER_SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      # Required for the Datasets API (bulk S2 snapshots); the Graph API works
+      # unauthenticated too but at a much lower rate limit without this.
+      INTERCITER_S2_API_KEY: ${S2_API_KEY:-}
+      # Bulk shards land here, bind-mounted onto the /truestorage NAS (40TB free)
+      # rather than the container/root filesystem (49GB free on this host).
+      INTERCITER_S2_DATASETS_DIR: /data/s2-datasets
+    volumes:
+      - /truestorage/interciter-data/s2-datasets:/data/s2-datasets
     # Scale request throughput with more uvicorn workers (or `docker compose up
     # --scale backend=N` behind a load balancer).
     command:

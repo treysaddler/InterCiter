@@ -135,7 +135,7 @@ Wave B:
   axis layouts + node-metric styling + annotations (L3). Split into WP-L3a (D3
   render-core swap), WP-L3b (axis layouts + metric styling), WP-L3c (annotations,
   needs WP-L2). WP-L3a/b need no persistence; WP-L3c depends on WP-L2.
-- WP-L4 Map sharing (read-only share token/link) (L4)
+- WP-L4 Map sharing (read-only share token/link) (L4)   ✅ DONE
 
 Wave C (consolidated with scite plan):
 - WP-L5 Map monitoring → extend scite-parity WP8 (L5)
@@ -241,7 +241,7 @@ Tests: annotation edit calls the WP-L2 endpoint; note appears in the a11y table.
 Deps: WP-L2, WP-L3a.
 
 
-### WP-L4 — Map sharing (read-only link)  (L4)
+### WP-L4 — Map sharing (read-only link)  (L4)   ✅ DONE
 Goal: share a saved map with others via a link, read-only.
 Schema: add a `share_token` (nullable, unique) + `visibility` enum to Map, or a
 `MapShare` side class (token, map_id, created_at, revoked). LinkML-first.

@@ -181,6 +181,23 @@ All map endpoints are owner-scoped; a map owned by another user is reported as m
 - `DELETE /v1/maps/{id}/members/{work_id}` — remove a member (`404` if not a member).
 - `PATCH /v1/maps/{id}/members/{work_id}` — annotate a member (`{note?, position?}`).
 
+### Sharing (read-only links, WP-L4)
+
+A map can be shared as a read-only link whose bearer needs no account — the opaque
+`share_token` **is** the capability. The public projection deliberately omits the
+owner id and any identity, so a shared link never leaks who built the map.
+
+- `POST /v1/maps/{id}/share` — mint (or return the existing) share token for a map
+  the caller owns. Idempotent: re-sharing returns the same token so links stay
+  stable. Returns `{map_id, share_token}`. The owner also sees `share_token` on their
+  own `GET /v1/maps/{id}` view.
+- `DELETE /v1/maps/{id}/share` — revoke the token; the old link stops resolving.
+- `GET /v1/shared-maps/{token}` — **no auth** — read-only `SharedMapView`
+  (`{map_id, name, description, layout_config, member_count, members[], …}`, no
+  `owner_id`). Unknown or revoked tokens are `404`.
+- `GET /v1/shared-maps/{token}/graph` — **no auth** — render the shared map's seed set
+  as a `GraphView`. `include_authors` optional.
+
 ## Monitoring — saved searches & alerts
 
 Persist claim searches and turn watched collections + saved searches into an in-app

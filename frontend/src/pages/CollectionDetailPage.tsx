@@ -13,6 +13,14 @@ import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
 const DOI_LIKE = /^10\.\d{4,9}\/\S+$/i
+const DOI_PREFIXES = [
+  'doi:',
+  'https://doi.org/',
+  'http://doi.org/',
+  'https://dx.doi.org/',
+  'http://dx.doi.org/',
+]
+const PMID_PREFIXED = /^pmid:?\s*(\d{1,8})$/i
 
 function readFileText(file: File): Promise<string> {
   if (typeof file.text === 'function') {
@@ -26,19 +34,96 @@ function readFileText(file: File): Promise<string> {
   })
 }
 
+// Mirrors the backend normalizer: unwrap doi.org / doi: forms, strip trailing
+// list punctuation (embedded semicolons in legacy Wiley DOIs are kept), and
+// lowercase (DOIs are case-insensitive by spec).
+function normalizeDoi(token: string): string | null {
+  let t = token.trim()
+  const lower = t.toLowerCase()
+  for (const prefix of DOI_PREFIXES) {
+    if (lower.startsWith(prefix)) {
+      t = t.slice(prefix.length)
+      break
+    }
+  }
+  t = t.replace(/[.,;:]+$/, '')
+  return DOI_LIKE.test(t) ? t.toLowerCase() : null
+}
+
+// Mirrors the backend heuristic: pmid:-prefixed numbers always count; a bare
+// 4-digit number in the publication-year range is ambiguous (CSV year columns)
+// and is not treated as a PMID.
+function pmidFromToken(token: string): string | null {
+  const prefixed = PMID_PREFIXED.exec(token)
+  if (prefixed) return prefixed[1]
+  if (!/^\d{1,8}$/.test(token)) return null
+  const year = Number(token)
+  if (token.length === 4 && year >= 1500 && year <= 2099) return null
+  return token
+}
+
 function parseIdentifiers(text: string): { dois: string[]; pmids: string[] } {
   const dois: string[] = []
   const pmids: string[] = []
-  for (const token of text.split(/[\s,;]+/)) {
+  // Split on whitespace and commas only — semicolons appear inside legacy DOIs.
+  for (const token of text.split(/[\s,]+/)) {
     const t = token.trim()
     if (!t) continue
-    if (DOI_LIKE.test(t)) dois.push(t)
-    else if (/^\d+$/.test(t)) pmids.push(t)
+    const doi = normalizeDoi(t)
+    if (doi) {
+      dois.push(doi)
+      continue
+    }
+    const pmid = pmidFromToken(t)
+    if (pmid) pmids.push(pmid)
   }
   return {
     dois: Array.from(new Set(dois)),
     pmids: Array.from(new Set(pmids)),
   }
+}
+
+function stanceCount(member: CollectionMemberView, stance: string): number {
+  return member.citation_tallies?.by_stance[stance] ?? 0
+}
+
+function sortMembers(
+  members: CollectionMemberView[],
+  sortKey: string,
+): CollectionMemberView[] {
+  const byAddedAsc = (a: CollectionMemberView, b: CollectionMemberView) =>
+    a.added_at.localeCompare(b.added_at)
+  const sorted = [...members]
+  if (sortKey === 'added_asc') return sorted.sort(byAddedAsc)
+  if (sortKey === 'support_desc') {
+    return sorted.sort(
+      (a, b) => stanceCount(b, 'support') - stanceCount(a, 'support') || byAddedAsc(b, a),
+    )
+  }
+  if (sortKey === 'contradict_desc') {
+    return sorted.sort(
+      (a, b) =>
+        stanceCount(b, 'contradict') - stanceCount(a, 'contradict') || byAddedAsc(b, a),
+    )
+  }
+  return sorted.sort((a, b) => byAddedAsc(b, a))
+}
+
+// RFC 4180 quoting for every cell, plus a guard against spreadsheet formula
+// injection for values starting with =, +, -, @, or a tab.
+function csvCell(value: string): string {
+  const guarded = /^[=+\-@\t]/.test(value) ? `'${value}` : value
+  return `"${guarded.replaceAll('"', '""')}"`
+}
+
+function downloadBlob(content: string, mimeType: string, filename: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
 /**
@@ -52,9 +137,9 @@ export default function CollectionDetailPage() {
   const detail = useApi<CollectionDetailView>(
     () =>
       api.get<CollectionDetailView>(
-        `/collections/${collectionId}?include_member_tallies=true&member_sort=${memberSort}`,
+        `/collections/${collectionId}?include_member_tallies=true`,
       ),
-    [collectionId, memberSort],
+    [collectionId],
   )
   const [csvText, setCsvText] = useState('')
   const [uploadingFile, setUploadingFile] = useState(false)
@@ -73,12 +158,17 @@ export default function CollectionDetailPage() {
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(normalizedFilter))
   }) ?? []
+  const visibleMembers = sortMembers(filteredMembers, memberSort)
 
+  const loadedCollectionId = detail.data?.collection_id
   useEffect(() => {
+    // Populate the metadata form only when a (different) collection loads, so
+    // refetches after member changes don't clobber in-progress edits.
     if (!detail.data) return
     setName(detail.data.name)
     setDescription(detail.data.description ?? '')
-  }, [detail.data])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedCollectionId])
 
   async function onAddMembers(e: FormEvent) {
     e.preventDefault()
@@ -176,43 +266,38 @@ export default function CollectionDetailPage() {
   }
 
   function onExportMembers() {
-    if (!detail.data || detail.data.members.length === 0) return
+    if (visibleMembers.length === 0) return
     const lines = ['work_id,doi,pmid,title']
-    for (const member of detail.data.members) {
-      const safeTitle = (member.title ?? '').replaceAll('"', '""')
+    for (const member of visibleMembers) {
       lines.push(
         [
-          member.work_id,
-          member.doi ?? '',
-          member.pmid ?? '',
-          `"${safeTitle}"`,
+          csvCell(member.work_id),
+          csvCell(member.doi ?? ''),
+          csvCell(member.pmid ?? ''),
+          csvCell(member.title ?? ''),
         ].join(','),
       )
     }
-    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${collectionId}-members.csv`
-    anchor.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(
+      lines.join('\n') + '\n',
+      'text/csv;charset=utf-8',
+      `${collectionId}-members.csv`,
+    )
   }
 
   function onExportIdentifiersTxt() {
-    if (filteredMembers.length === 0) return
+    if (visibleMembers.length === 0) return
     const ids = Array.from(
       new Set(
-        filteredMembers.flatMap((member) => [member.doi, member.pmid]).filter(Boolean),
+        visibleMembers.flatMap((member) => [member.doi, member.pmid]).filter(Boolean),
       ),
     )
     if (ids.length === 0) return
-    const blob = new Blob([ids.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${collectionId}-identifiers.txt`
-    anchor.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(
+      ids.join('\n') + '\n',
+      'text/plain;charset=utf-8',
+      `${collectionId}-identifiers.txt`,
+    )
   }
 
   return (
@@ -262,7 +347,7 @@ export default function CollectionDetailPage() {
 
           <h2>Batch add members</h2>
           <p className="font-body-3xs text-base margin-top-0">
-            Paste DOIs and PMIDs (comma, semicolon, whitespace, or newline separated).
+            Paste DOIs and PMIDs (comma, whitespace, or newline separated).
           </p>
           <label className="usa-label" htmlFor="identifiers-file">Upload CSV/TXT</label>
           <input
@@ -271,7 +356,10 @@ export default function CollectionDetailPage() {
             type="file"
             accept=".csv,.txt,text/csv,text/plain"
             onChange={(e) => {
-              const file = e.currentTarget.files?.[0] ?? null
+              const input = e.currentTarget
+              const file = input.files?.[0] ?? null
+              // Reset so re-selecting the same file fires another change event.
+              input.value = ''
               void onFileSelected(file)
             }}
           />
@@ -288,7 +376,7 @@ export default function CollectionDetailPage() {
               rows={5}
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              placeholder="10.1000/example-doi\n12345678"
+              placeholder={'10.1000/example-doi\n12345678'}
             />
             {(parsed.dois.length > 0 || parsed.pmids.length > 0) && (
               <div className="margin-top-1" aria-live="polite">
@@ -351,6 +439,9 @@ export default function CollectionDetailPage() {
                 >
                   Export identifiers TXT
                 </button>
+                <p className="font-body-3xs text-base margin-top-05 margin-bottom-0">
+                  Exports include only the members matching the current filter.
+                </p>
               </div>
               <div className="maxw-card margin-bottom-2">
                 <label className="usa-label" htmlFor="member-sort">Sort members</label>
@@ -377,7 +468,7 @@ export default function CollectionDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredMembers.map((member) => (
+                {visibleMembers.map((member) => (
                   <tr key={member.collection_membership_id}>
                     <td>
                       <Link to={`/papers/${member.work_id}`}>
@@ -415,7 +506,7 @@ export default function CollectionDetailPage() {
                 ))}
               </tbody>
               </table>
-              {filteredMembers.length === 0 && (
+              {visibleMembers.length === 0 && (
                 <p className="text-base margin-top-1 margin-bottom-0">
                   No members match this filter.
                 </p>

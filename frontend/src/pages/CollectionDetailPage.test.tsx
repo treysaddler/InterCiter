@@ -69,7 +69,7 @@ describe('CollectionDetailPage', () => {
     )
 
     expect(mockedGet).toHaveBeenCalledWith(
-      '/collections/coll_1?include_member_tallies=true&member_sort=added_desc',
+      '/collections/coll_1?include_member_tallies=true',
     )
     expect(await screen.findByRole('link', { name: /a metformin trial/i })).toHaveAttribute(
       'href',
@@ -169,6 +169,37 @@ describe('CollectionDetailPage', () => {
     expect(screen.getByText(/ready to import: 1 doi\(s\), 1 pmid\(s\)/i)).toBeInTheDocument()
   })
 
+  it('keeps semicolon DOIs intact and skips year-like numbers in the preview', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 0,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: null,
+      members: [],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const wileyDoi = '10.1002/(sici)1097-4636(199905)45:2<133::aid-jbm9>3.0.co;2-#'
+    fireEvent.change(await screen.findByLabelText('Identifiers'), {
+      target: { value: `${wileyDoi.toUpperCase()} 2021 pmid:123456` },
+    })
+
+    expect(screen.getByText(/ready to import: 1 doi\(s\), 1 pmid\(s\)/i)).toBeInTheDocument()
+    expect(screen.getByText(`DOI ${wileyDoi}`)).toBeInTheDocument()
+    expect(screen.getByText('PMID 123456')).toBeInTheDocument()
+  })
+
   it('shows rich import feedback after adding members', async () => {
     mockedGet.mockResolvedValue({
       collection_id: 'coll_1',
@@ -212,80 +243,60 @@ describe('CollectionDetailPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('changes member sort and requests updated ordering', async () => {
-    mockedGet
-      .mockResolvedValueOnce({
-        collection_id: 'coll_1',
-        owner_id: 'user_1',
-        name: 'Core diabetes papers',
-        description: 'priority evidence set',
-        member_count: 1,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-        aggregate_citation_tallies: {
-          total: 1,
-          by_stance: { support: 1 },
-          by_function: { direct_evidence: 1 },
-          by_resolution: { claim_resolved: 1 },
-          by_section: { Results: 1 },
-          abstained: 0,
-        },
-        members: [
-          {
-            collection_membership_id: 'cmem_1',
-            work_id: 'work_1',
-            title: 'A metformin trial',
-            doi: '10.1000/example',
-            pmid: null,
-            year: 2021,
-            added_at: '2026-01-01T00:00:00Z',
-            citation_tallies: {
-              total: 1,
-              by_stance: { support: 1 },
-              by_function: { direct_evidence: 1 },
-              by_resolution: { claim_resolved: 1 },
-              by_section: { Results: 1 },
-              abstained: 0,
-            },
+  it('sorts members client-side without refetching', async () => {
+    mockedGet.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: 'priority evidence set',
+      member_count: 2,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      aggregate_citation_tallies: {
+        total: 2,
+        by_stance: { support: 2 },
+        by_function: { direct_evidence: 2 },
+        by_resolution: { claim_resolved: 2 },
+        by_section: { Results: 2 },
+        abstained: 0,
+      },
+      members: [
+        {
+          collection_membership_id: 'cmem_1',
+          work_id: 'work_1',
+          title: 'A metformin trial',
+          doi: '10.1000/example-a',
+          pmid: null,
+          year: 2021,
+          added_at: '2026-01-03T00:00:00Z',
+          citation_tallies: {
+            total: 0,
+            by_stance: {},
+            by_function: {},
+            by_resolution: {},
+            by_section: {},
+            abstained: 0,
           },
-        ],
-      })
-      .mockResolvedValueOnce({
-        collection_id: 'coll_1',
-        owner_id: 'user_1',
-        name: 'Core diabetes papers',
-        description: 'priority evidence set',
-        member_count: 1,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-        aggregate_citation_tallies: {
-          total: 1,
-          by_stance: { support: 1 },
-          by_function: { direct_evidence: 1 },
-          by_resolution: { claim_resolved: 1 },
-          by_section: { Results: 1 },
-          abstained: 0,
         },
-        members: [
-          {
-            collection_membership_id: 'cmem_1',
-            work_id: 'work_1',
-            title: 'A metformin trial',
-            doi: '10.1000/example',
-            pmid: null,
-            year: 2021,
-            added_at: '2026-01-01T00:00:00Z',
-            citation_tallies: {
-              total: 1,
-              by_stance: { support: 1 },
-              by_function: { direct_evidence: 1 },
-              by_resolution: { claim_resolved: 1 },
-              by_section: { Results: 1 },
-              abstained: 0,
-            },
+        {
+          collection_membership_id: 'cmem_2',
+          work_id: 'work_2',
+          title: 'A semaglutide trial',
+          doi: '10.1000/example-b',
+          pmid: null,
+          year: 2022,
+          added_at: '2026-01-01T00:00:00Z',
+          citation_tallies: {
+            total: 2,
+            by_stance: { support: 2 },
+            by_function: { direct_evidence: 2 },
+            by_resolution: { claim_resolved: 2 },
+            by_section: { Results: 2 },
+            abstained: 0,
           },
-        ],
-      })
+        },
+      ],
+    })
 
     render(
       <MemoryRouter initialEntries={['/collections/coll_1']}>
@@ -296,13 +307,18 @@ describe('CollectionDetailPage', () => {
     )
 
     await screen.findByLabelText('Sort members')
+    // Default order: most recently added first.
+    let titles = screen.getAllByRole('link', { name: /trial/i })
+    expect(titles[0]).toHaveTextContent('A metformin trial')
+
     fireEvent.change(screen.getByLabelText('Sort members'), {
       target: { value: 'support_desc' },
     })
 
-    expect(mockedGet).toHaveBeenCalledWith(
-      '/collections/coll_1?include_member_tallies=true&member_sort=support_desc',
-    )
+    titles = screen.getAllByRole('link', { name: /trial/i })
+    expect(titles[0]).toHaveTextContent('A semaglutide trial')
+    // Sorting is client-side: no additional fetch beyond the initial load.
+    expect(mockedGet).toHaveBeenCalledTimes(1)
   })
 
   it('filters members by identifier text', async () => {
@@ -403,7 +419,7 @@ describe('CollectionDetailPage', () => {
         {
           collection_membership_id: 'cmem_1',
           work_id: 'work_1',
-          title: 'A metformin trial',
+          title: 'A metformin trial, "phase 3"',
           doi: '10.1000/example-a',
           pmid: '12345',
           year: 2021,
@@ -414,6 +430,23 @@ describe('CollectionDetailPage', () => {
             by_function: { direct_evidence: 1 },
             by_resolution: { claim_resolved: 1 },
             by_section: { Results: 1 },
+            abstained: 0,
+          },
+        },
+        {
+          collection_membership_id: 'cmem_2',
+          work_id: 'work_2',
+          title: '=SUM(A1:A9)',
+          doi: null,
+          pmid: '67890',
+          year: 2022,
+          added_at: '2026-01-02T00:00:00Z',
+          citation_tallies: {
+            total: 0,
+            by_stance: {},
+            by_function: {},
+            by_resolution: {},
+            by_section: {},
             abstained: 0,
           },
         },
@@ -453,7 +486,12 @@ describe('CollectionDetailPage', () => {
       reader.readAsText(blob)
     })
     expect(text).toContain('work_id,doi,pmid,title')
-    expect(text).toContain('work_1,10.1000/example-a,12345,"A metformin trial"')
+    // Every cell is quoted; embedded quotes are doubled per RFC 4180.
+    expect(text).toContain(
+      '"work_1","10.1000/example-a","12345","A metformin trial, ""phase 3"""',
+    )
+    // Titles that would execute as spreadsheet formulas are prefixed.
+    expect(text).toContain('"work_2","","67890","\'=SUM(A1:A9)"')
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
     anchorClick.mockRestore()
   })

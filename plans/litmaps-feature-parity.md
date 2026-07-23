@@ -131,8 +131,10 @@ Wave A:
 - WP-L2 Saved Maps / seed-set persistence (L4)
 
 Wave B:
-- WP-L3 Map visualization upgrades: axis layouts + node-metric styling +
-  annotations (L3)
+- WP-L3 Map visualization upgrades — migrate the renderer to custom D3 and add
+  axis layouts + node-metric styling + annotations (L3). Split into WP-L3a (D3
+  render-core swap), WP-L3b (axis layouts + metric styling), WP-L3c (annotations,
+  needs WP-L2). WP-L3a/b need no persistence; WP-L3c depends on WP-L2.
 - WP-L4 Map sharing (read-only share token/link) (L4)
 
 Wave C (consolidated with scite plan):
@@ -189,21 +191,55 @@ seed set + layout_config); "Save map" from GraphPage.
 Tests: backend CRUD + membership + ownership; frontend save/load round-trip.
 Deps: none. Unblocks WP-L3, WP-L4, WP-L5.
 
-### WP-L3 — Map visualization upgrades  (L3)
-Goal: Litmaps-style dynamic mapping + annotation.
-Frontend (primary): extend `components/NetworkGraph.tsx`:
-- Axis layouts: preset layouts mapping node data → position, e.g. x = year,
-  y = citation count (or in-degree). Use Cytoscape preset positions computed from
-  node.data; keep cose as default. Controls on GraphPage to pick x/y measures.
-- Node-metric styling: size/color nodes by a measure (citation count, stance
-  mix). Keep a11y table fallback in sync (already present).
-- Annotations: per-node note editing when a Map is loaded (persist via WP-L2
-  membership note). Show note in the node summary box + a11y table.
-Backend: only if a measure needs a new aggregate (e.g. citation count) — reuse
-scite-parity WP1 tallies / graph degree; avoid new endpoints if possible.
-Tests: NetworkGraph layout/style props (a11y table reflects measure), annotation
-edit calls WP-L2 endpoint.
-Deps: WP-L2 (for annotation persistence); axis/style layout can land without it.
+### WP-L3 — Map visualization upgrades (D3 migration)  (L3)
+Goal: Litmaps-style dynamic mapping + annotation, on a custom D3 renderer.
+
+DECISION: replace the Cytoscape renderer with a custom **D3 (SVG)** visualization.
+Rationale: the Litmaps-defining interactions — mapping papers by a measure
+(e.g. x = year, y = citation count), sizing/coloring nodes by a metric, and
+smooth zoom/pan/transitions — are first-class in D3 and awkward in Cytoscape.
+Modular d3 (`d3-selection` + `d3-scale` + `d3-zoom` + `d3-force`) is ~50–80 KB vs
+the current ~447 KB Cytoscape chunk, so this is a bundle *win*. Use **SVG** (not
+canvas): neighborhoods are capped at 250 nodes and the global graph is bounded, so
+SVG stays performant and keeps the DOM inspectable for a11y. Only revisit canvas if
+we later render the full ~1000-paper snowball corpus at once.
+
+Hard constraints (unchanged):
+- Section-508: the SVG canvas stays `aria-hidden`, wrapped in try/catch for jsdom;
+  the `<details>` node/edge table + legend remains the accessible representation and
+  MUST stay in sync with whatever measure/layout is shown (tests assert on it).
+- Same component contract: keep `NetworkGraph.tsx`'s existing props/interface so the
+  two consumers (`GraphPage`, `SearchNetwork`) keep working; migrate internals only.
+
+Split into three independently-shippable steps:
+
+**WP-L3a — D3 render core (no backend change).**
+Replace `NetworkGraph.tsx` internals with a d3 SVG renderer behind the SAME
+props/interface. Keep a force layout (`d3-force`) as the default, node-select
+buttons, legend, and the a11y table/fallback + jsdom try/catch. Add `d3` (modular)
+dep; drop `cytoscape`/`@types/cytoscape` once no consumer references them. Update the
+existing `NetworkGraph.test.tsx` (mock d3 or assert on the a11y table, not the SVG).
+A pure swap that de-risks the rest.
+Tests: a11y table renders, node-select fires, truncation summary, legend scoped.
+Deps: none.
+
+**WP-L3b — Axis layouts + node-metric styling (mostly frontend).**
+Add layout modes to `NetworkGraph` + controls on `GraphPage`:
+- Axis layouts via `d3-scale` (+ rendered axes/gridlines): e.g. x = year,
+  y = citation count or in-degree; keep `force` as a mode.
+- Node sizing/coloring by a measure (citation count, in/out-degree, stance mix).
+- Keep the a11y table in sync — surface the active measure as table columns.
+Backend: reuse scite-parity WP1 tallies / graph degree for measures; avoid new
+endpoints (add node.data measures in `services/graph.py` only if not already there).
+Tests: layout/style props reflect in the a11y table; axis mode positions nodes.
+Deps: WP-L3a.
+
+**WP-L3c — Per-node annotations (needs persistence).**
+When a saved Map is loaded (WP-L2), allow editing a per-node note; persist via the
+WP-L2 membership `note`. Show the note in the node summary box + a11y table.
+Tests: annotation edit calls the WP-L2 endpoint; note appears in the a11y table.
+Deps: WP-L2, WP-L3a.
+
 
 ### WP-L4 — Map sharing (read-only link)  (L4)
 Goal: share a saved map with others via a link, read-only.
@@ -254,6 +290,10 @@ Deps: WP9 (scite plan), WP-L2.
   building the second one to avoid divergence.
 - Discovery ranking: pure connection-degree vs SPECTER2-boosted — start with
   degree, make the embedding boost a config flag (embeddings already sidecar).
-- Cytoscape bundle is already lazy-loaded; axis layouts add no new deps.
+- Renderer: WP-L3 migrates from Cytoscape to custom **D3 (SVG)** — modular d3 is a
+  net bundle *reduction* vs the ~447 KB Cytoscape chunk, and axis/metric layouts are
+  first-class in D3. SVG is sufficient at the current node caps (≤250/neighborhood);
+  revisit canvas only for full-corpus rendering. The Section-508 a11y table/legend
+  fallback stays the source of truth and must track the active measure/layout.
 - Sharing PII: shared-map projection must exclude owner identity/tokens.
 - Email alert delivery deferred (no SMTP infra); in-app notifications only.

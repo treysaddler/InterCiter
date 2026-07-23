@@ -174,6 +174,8 @@ export interface CollectionMemberView {
   year: number | null
   added_at: string
   citation_tallies: CitationTallies | null
+  is_retracted: boolean | null
+  integrity_notice: string | null
 }
 
 export interface CollectionView {
@@ -182,6 +184,8 @@ export interface CollectionView {
   name: string
   description: string | null
   member_count: number
+  is_watched: boolean
+  watch_snapshot_at: string | null
   created_at: string
   updated_at: string
 }
@@ -204,6 +208,28 @@ export interface CollectionAddMembersResult {
   skipped_identifiers: string[]
   created_stub_work_ids: string[]
   members: CollectionMemberView[]
+}
+
+export interface CollectionMemberDelta {
+  work_id: string
+  title: string | null
+  new_support: number
+  new_contradict: number
+}
+
+export interface CollectionCitationDelta {
+  collection_id: string
+  has_snapshot: boolean
+  snapshot_at: string | null
+  new_support_total: number
+  new_contradict_total: number
+  members: CollectionMemberDelta[]
+}
+
+export interface CollectionBulkRemoveResult {
+  collection_id: string
+  removed_count: number
+  removed_work_ids: string[]
 }
 
 export interface ClaimOccurrenceView {

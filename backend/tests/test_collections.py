@@ -242,3 +242,187 @@ def test_get_collection_rejects_unknown_member_sort(client, user_headers):
         headers=user_headers,
     )
     assert resp.status_code == 422
+
+
+def test_watch_toggle_captures_snapshot_and_state(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+
+    created = client.get(f"/v1/collections/{collection_id}", headers=user_headers)
+    assert created.json()["is_watched"] is False
+    assert created.json()["watch_snapshot_at"] is None
+
+    watched = client.post(
+        f"/v1/collections/{collection_id}/watch",
+        json={"watch": True},
+        headers=user_headers,
+    )
+    assert watched.status_code == 200
+    assert watched.json()["is_watched"] is True
+    assert watched.json()["watch_snapshot_at"] is not None
+
+    unwatched = client.post(
+        f"/v1/collections/{collection_id}/watch",
+        json={"watch": False},
+        headers=user_headers,
+    )
+    assert unwatched.status_code == 200
+    assert unwatched.json()["is_watched"] is False
+
+
+def test_new_citation_delta_reports_signals_after_snapshot(client, user_headers):
+    # paper_a cites paper_b, producing a supporting citation targeting paper_b.
+    paper_b = _submit(client, user_headers, "paper_b.xml")
+    work_b = paper_b["result"]["work_id"]
+
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"work_ids": [work_b]},
+        headers=user_headers,
+    )
+
+    # Baseline BEFORE the citing paper exists: no support recorded yet.
+    watched = client.post(
+        f"/v1/collections/{collection_id}/watch",
+        json={"watch": True},
+        headers=user_headers,
+    )
+    assert watched.status_code == 200
+
+    # A new citing paper arrives after the snapshot.
+    _submit(client, user_headers, "paper_a.xml")
+
+    delta = client.get(
+        f"/v1/collections/{collection_id}/new-citations", headers=user_headers
+    )
+    assert delta.status_code == 200
+    body = delta.json()
+    assert body["has_snapshot"] is True
+    assert body["new_support_total"] >= 1
+    assert any(m["work_id"] == work_b and m["new_support"] >= 1 for m in body["members"])
+
+    # Re-baselining clears the delta (the signals are now "seen").
+    client.post(
+        f"/v1/collections/{collection_id}/watch",
+        json={"watch": True},
+        headers=user_headers,
+    )
+    reseen = client.get(
+        f"/v1/collections/{collection_id}/new-citations", headers=user_headers
+    )
+    assert reseen.json()["new_support_total"] == 0
+    assert reseen.json()["members"] == []
+
+
+def test_new_citation_delta_without_snapshot(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    delta = client.get(
+        f"/v1/collections/{collection_id}/new-citations", headers=user_headers
+    )
+    assert delta.status_code == 200
+    assert delta.json()["has_snapshot"] is False
+    assert delta.json()["members"] == []
+
+
+def test_bulk_remove_members(client, user_headers):
+    paper_a = _submit(client, user_headers, "paper_a.xml")
+    paper_b = _submit(client, user_headers, "paper_b.xml")
+    work_a = paper_a["result"]["work_id"]
+    work_b = paper_b["result"]["work_id"]
+
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"work_ids": [work_a, work_b]},
+        headers=user_headers,
+    )
+
+    removed = client.post(
+        f"/v1/collections/{collection_id}/members/bulk-delete",
+        json={"work_ids": [work_a, work_b, "work_does_not_exist"]},
+        headers=user_headers,
+    )
+    assert removed.status_code == 200
+    body = removed.json()
+    assert body["removed_count"] == 2
+    assert set(body["removed_work_ids"]) == {work_a, work_b}
+
+    detail = client.get(f"/v1/collections/{collection_id}", headers=user_headers)
+    assert detail.json()["member_count"] == 0
+
+
+def test_bulk_remove_requires_non_empty_list(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    resp = client.post(
+        f"/v1/collections/{collection_id}/members/bulk-delete",
+        json={"work_ids": []},
+        headers=user_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_member_view_surfaces_integrity_flags(client, user_headers, session):
+    from interciter import models
+
+    paper = _submit(client, user_headers, "paper_b.xml")
+    work_id = paper["result"]["work_id"]
+
+    work = session.get(models.PaperWork, work_id)
+    work.is_retracted = True
+    work.integrity_notice = "expression_of_concern"
+    session.commit()
+
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"work_ids": [work_id]},
+        headers=user_headers,
+    )
+
+    detail = client.get(f"/v1/collections/{collection_id}", headers=user_headers)
+    member = detail.json()["members"][0]
+    assert member["is_retracted"] is True
+    assert member["integrity_notice"] == "expression_of_concern"
+
+
+def test_watch_and_delta_enforce_ownership(client, make_user):
+    _, owner_headers = make_user(name="owner2")
+    _, other_headers = make_user(name="other2")
+    collection_id = _create_collection(client, owner_headers)["collection_id"]
+
+    assert (
+        client.post(
+            f"/v1/collections/{collection_id}/watch",
+            json={"watch": True},
+            headers=other_headers,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/v1/collections/{collection_id}/new-citations", headers=other_headers
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/v1/collections/{collection_id}/members/bulk-delete",
+            json={"work_ids": ["work_x"]},
+            headers=other_headers,
+        ).status_code
+        == 404
+    )
+
+
+def test_watch_and_delta_require_auth(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    assert client.post(
+        f"/v1/collections/{collection_id}/watch", json={"watch": True}
+    ).status_code == 401
+    assert client.get(
+        f"/v1/collections/{collection_id}/new-citations"
+    ).status_code == 401
+    assert client.post(
+        f"/v1/collections/{collection_id}/members/bulk-delete",
+        json={"work_ids": ["work_x"]},
+    ).status_code == 401

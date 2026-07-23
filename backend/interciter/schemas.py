@@ -550,6 +550,10 @@ class CollectionMemberView(BaseModel):
     year: int | None = None
     added_at: datetime
     citation_tallies: CitationTallies | None = None
+    # Additive integrity flags (scite-parity WP5 starter); null until an
+    # integrity source has been consulted.
+    is_retracted: bool | None = None
+    integrity_notice: str | None = None
 
 
 class CollectionView(BaseModel):
@@ -558,6 +562,8 @@ class CollectionView(BaseModel):
     name: str
     description: str | None = None
     member_count: int = 0
+    is_watched: bool = False
+    watch_snapshot_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -565,6 +571,40 @@ class CollectionView(BaseModel):
 class CollectionDetailView(CollectionView):
     aggregate_citation_tallies: CitationTallies | None = None
     members: list[CollectionMemberView] = Field(default_factory=list)
+
+
+class CollectionWatchRequest(BaseModel):
+    """Toggle monitoring. Enabling (re)captures the new-citation baseline."""
+
+    watch: bool
+
+
+class CollectionMemberDelta(BaseModel):
+    work_id: str
+    title: str | None = None
+    new_support: int = 0
+    new_contradict: int = 0
+
+
+class CollectionCitationDelta(BaseModel):
+    """Newly observed support/contradict signals vs the last watch snapshot."""
+
+    collection_id: str
+    has_snapshot: bool = False
+    snapshot_at: datetime | None = None
+    new_support_total: int = 0
+    new_contradict_total: int = 0
+    members: list[CollectionMemberDelta] = Field(default_factory=list)
+
+
+class CollectionBulkRemoveRequest(BaseModel):
+    work_ids: list[str] = Field(min_length=1, max_length=500)
+
+
+class CollectionBulkRemoveResult(BaseModel):
+    collection_id: str
+    removed_count: int = 0
+    removed_work_ids: list[str] = Field(default_factory=list)
 
 
 class CollectionAddMembersRequest(BaseModel):

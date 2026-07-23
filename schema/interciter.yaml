@@ -217,6 +217,8 @@ classes:
       - pmid
       - s2_corpus_id
       - availability_state
+      - is_retracted
+      - integrity_notice
 
   PaperVersion:
     description: >-
@@ -520,6 +522,9 @@ classes:
       - owner_id
       - name
       - description
+      - is_watched
+      - watch_snapshot
+      - watch_snapshot_at
       - created_at
       - updated_at
 
@@ -613,6 +618,15 @@ slots:
   availability_state:
     range: AvailabilityState
     description: Explicit availability state of the paper.
+  is_retracted:
+    range: boolean
+    description: >-
+      Additive integrity flag: whether the work has been retracted. Null when no
+      integrity source has been consulted (scite-parity WP5 starter).
+  integrity_notice:
+    description: >-
+      Additive integrity flag: a free-text editorial/integrity notice label
+      (e.g. expression of concern), or null when none is known.
 
   # --- PaperVersion ---
   manifestation:
@@ -887,6 +901,19 @@ slots:
     required: true
   description:
     description: Optional collection description.
+  is_watched:
+    range: boolean
+    description: >-
+      Whether the owner is monitoring this collection for new citation signals
+      (scite-parity WP4->WP8 bridge). State only; no delivery channel yet.
+  watch_snapshot:
+    description: >-
+      Internal monitoring baseline: per-member support/contradict citation counts
+      captured when watching was last (re)enabled. Used to derive new-citation
+      deltas; never part of the scientific record.
+  watch_snapshot_at:
+    range: datetime
+    description: When the watch_snapshot baseline was captured.
   updated_at:
     range: datetime
     description: When the record was last updated.

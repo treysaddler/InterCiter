@@ -331,26 +331,53 @@ Deps: WP4.
 
 ## 5. Immediate next execution order
 
-1. Collection-level watch setup (WP4 to WP8 bridge)
+Status: ✅ all five items below implemented (backend + frontend + tests + docs).
+
+1. Collection-level watch setup (WP4 to WP8 bridge)  ✅ DONE
 - Add a simple "Watch this collection" toggle in collection detail.
 - Persist watch metadata backend-side first (state only, no delivery channel yet).
+- Implemented: `Collection.is_watched` + `watch_snapshot` (per-member
+  support/contradict baseline) + `watch_snapshot_at` (LinkML + ORM). Service
+  `collections.set_watch` (enabling re-captures the baseline). Endpoint
+  `POST /v1/collections/{id}/watch` ({watch}). UI: Monitoring summary box with a
+  watch/stop-watch toggle.
 
-2. New-citation delta endpoint for collections
+2. New-citation delta endpoint for collections  ✅ DONE
 - Add a backend derived read that compares current member citation tallies against
   a last-seen snapshot.
 - Return only newly observed support/contradict signals per member and aggregate.
+- Implemented: `collections.citation_delta` (clamped at zero; members added after
+  the snapshot contribute full counts). Endpoint
+  `GET /v1/collections/{id}/new-citations` returns
+  `{has_snapshot, snapshot_at, new_support_total, new_contradict_total, members[]}`.
+  UI renders the delta list inline in the Monitoring box.
 
-3. Retraction/integrity badges on collection members (WP5 starter)
+3. Retraction/integrity badges on collection members (WP5 starter)  ✅ DONE
 - Add nullable integrity flags to collection member views.
 - Render badges in collection detail and include integrity signal in exports.
+- Implemented: additive nullable `PaperWork.is_retracted` + `integrity_notice`
+  (LinkML + ORM), surfaced on `CollectionMemberView`. UI `IntegrityBadges`
+  (retracted + notice tags) on member rows; CSV export gains `is_retracted` /
+  `integrity_notice` columns. No integrity feed yet (WP5 proper) — flags stay
+  null until an enrichment source populates them.
 
-4. Bulk actions on filtered members
+4. Bulk actions on filtered members  ✅ DONE
 - Add a bulk remove action for current filtered members with explicit confirmation.
 - Make CSV export filter-aware to align with the identifiers TXT export behavior.
+- Implemented: `collections.bulk_remove_members` + endpoint
+  `POST /v1/collections/{id}/members/bulk-delete` ({work_ids}, 1–500, unknown ids
+  ignored). UI "Remove N filtered member(s)" button (confirmation) operating on the
+  current filter; CSV + identifiers TXT exports were already filter-aware.
 
-5. Collection regression coverage expansion
+5. Collection regression coverage expansion  ✅ DONE
 - Add backend tests for delta calculation and ownership/authorization rules.
 - Add frontend tests for watch toggle, bulk remove flow, and integrity badge render.
+- Implemented: backend `tests/test_collections.py` +9 (watch toggle+snapshot,
+  delta after snapshot + re-baseline, delta without snapshot, bulk remove +
+  empty-list 422, integrity flag surfacing, watch/delta/bulk ownership 404 +
+  auth 401). Frontend `CollectionDetailPage.test.tsx` +3 (integrity badges, watch
+  toggle+baseline delta panel, bulk-remove filtered flow). Full backend suite
+  green (5 pre-existing skips); 44 frontend vitest pass; build clean.
 
 ## 6. Notes / open questions
 - Retraction feed choice (S2 vs Crossref vs Retraction Watch) — decide in WP5.

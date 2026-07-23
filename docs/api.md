@@ -117,7 +117,9 @@ metadata stubs for unknown identifiers through the existing ingest path.
   `include_member_tallies=true` adds each member's WP1 citation tallies inline and
   `aggregate_citation_tallies` for the whole collection. Optional `member_sort`:
   `added_desc` (default), `added_asc`, `support_desc`, `contradict_desc`
-  (unknown values are rejected with `422`).
+  (unknown values are rejected with `422`). Each member also carries additive
+  integrity flags `is_retracted` and `integrity_notice` (both `null` until an
+  integrity source has been consulted — scite WP5 starter).
 - `PATCH /v1/collections/{id}` — update `{name?, description?}`. An explicitly
   `null` description clears the stored value; an omitted field is left unchanged.
 - `DELETE /v1/collections/{id}` — delete a collection (and memberships).
@@ -134,6 +136,21 @@ metadata stubs for unknown identifiers through the existing ingest path.
   identifiers per request (`400` beyond that). Stub registration commits per
   identifier; membership rows are written in a single transaction at the end.
 - `DELETE /v1/collections/{id}/members/{work_id}` — remove one member.
+- `POST /v1/collections/{id}/members/bulk-delete` — remove several members at once
+  (`{work_ids[]}`, 1–500 ids; `422` on an empty list). Unknown work ids are
+  ignored; returns `{removed_count, removed_work_ids[]}`. The UI wires this to a
+  filter-aware "remove filtered members" action behind a confirmation.
+- `POST /v1/collections/{id}/watch` — toggle monitoring (`{watch: bool}`, scite
+  WP4→WP8 bridge). Enabling (or re-enabling) captures a per-member
+  support/contradict baseline snapshot and stamps `watch_snapshot_at`. State only —
+  no delivery channel yet. Returns the updated `CollectionView` (`is_watched`,
+  `watch_snapshot_at`).
+- `GET /v1/collections/{id}/new-citations` — derived read comparing current member
+  support/contradict tallies against the last watch snapshot. Returns
+  `{has_snapshot, snapshot_at, new_support_total, new_contradict_total, members[]}`
+  where each member row lists only newly observed `new_support` / `new_contradict`
+  signals (clamped at zero; members added after the snapshot contribute their full
+  counts). Re-enabling the watch re-baselines and clears the delta.
 
 All collection endpoints are auth-scoped to the caller's own resources; a
 collection owned by another user is indistinguishable from a missing one (`404`).

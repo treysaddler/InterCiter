@@ -317,8 +317,9 @@ describe('CollectionDetailPage', () => {
 
     titles = screen.getAllByRole('link', { name: /trial/i })
     expect(titles[0]).toHaveTextContent('A semaglutide trial')
-    // Sorting is client-side: no additional fetch beyond the initial load.
-    expect(mockedGet).toHaveBeenCalledTimes(1)
+    // Sorting is client-side: no additional fetch beyond the initial load
+    // (the collection detail plus the new-citations delta).
+    expect(mockedGet).toHaveBeenCalledTimes(2)
   })
 
   it('filters members by identifier text', async () => {
@@ -589,5 +590,208 @@ describe('CollectionDetailPage', () => {
     expect(text).toBe('10.1000/example-a\n12345\n')
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
     anchorClick.mockRestore()
+  })
+
+  it('renders integrity badges for flagged members', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.includes('/new-citations')) {
+        return Promise.resolve({
+          collection_id: 'coll_1',
+          has_snapshot: false,
+          snapshot_at: null,
+          new_support_total: 0,
+          new_contradict_total: 0,
+          members: [],
+        })
+      }
+      return Promise.resolve({
+        collection_id: 'coll_1',
+        owner_id: 'user_1',
+        name: 'Core diabetes papers',
+        description: null,
+        member_count: 1,
+        is_watched: false,
+        watch_snapshot_at: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        aggregate_citation_tallies: null,
+        members: [
+          {
+            collection_membership_id: 'cmem_1',
+            work_id: 'work_1',
+            title: 'A retracted trial',
+            doi: '10.1000/example',
+            pmid: null,
+            year: 2021,
+            added_at: '2026-01-01T00:00:00Z',
+            citation_tallies: null,
+            is_retracted: true,
+            integrity_notice: 'expression_of_concern',
+          },
+        ],
+      })
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Retracted')).toBeInTheDocument()
+    expect(screen.getByText('expression of concern')).toBeInTheDocument()
+  })
+
+  it('toggles watch state and captures a baseline', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.includes('/new-citations')) {
+        return Promise.resolve({
+          collection_id: 'coll_1',
+          has_snapshot: true,
+          snapshot_at: '2026-01-02T00:00:00Z',
+          new_support_total: 2,
+          new_contradict_total: 0,
+          members: [
+            {
+              work_id: 'work_1',
+              title: 'A metformin trial',
+              new_support: 2,
+              new_contradict: 0,
+            },
+          ],
+        })
+      }
+      return Promise.resolve({
+        collection_id: 'coll_1',
+        owner_id: 'user_1',
+        name: 'Core diabetes papers',
+        description: null,
+        member_count: 0,
+        is_watched: false,
+        watch_snapshot_at: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        aggregate_citation_tallies: null,
+        members: [],
+      })
+    })
+    mockedPost.mockResolvedValue({
+      collection_id: 'coll_1',
+      owner_id: 'user_1',
+      name: 'Core diabetes papers',
+      description: null,
+      member_count: 0,
+      is_watched: true,
+      watch_snapshot_at: '2026-01-03T00:00:00Z',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-03T00:00:00Z',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // The delta panel renders newly observed signals from the baseline.
+    expect(await screen.findByText(/new since baseline/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /a metformin trial/i }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /watch this collection/i }),
+    )
+    expect(mockedPost).toHaveBeenCalledWith('/collections/coll_1/watch', {
+      watch: true,
+    })
+    expect(
+      await screen.findByText(/now watching this collection/i),
+    ).toBeInTheDocument()
+  })
+
+  it('bulk-removes the filtered members after confirmation', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.includes('/new-citations')) {
+        return Promise.resolve({
+          collection_id: 'coll_1',
+          has_snapshot: false,
+          snapshot_at: null,
+          new_support_total: 0,
+          new_contradict_total: 0,
+          members: [],
+        })
+      }
+      return Promise.resolve({
+        collection_id: 'coll_1',
+        owner_id: 'user_1',
+        name: 'Core diabetes papers',
+        description: null,
+        member_count: 2,
+        is_watched: false,
+        watch_snapshot_at: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        aggregate_citation_tallies: null,
+        members: [
+          {
+            collection_membership_id: 'cmem_1',
+            work_id: 'work_1',
+            title: 'A metformin trial',
+            doi: '10.1000/example-a',
+            pmid: null,
+            year: 2021,
+            added_at: '2026-01-01T00:00:00Z',
+            citation_tallies: null,
+            is_retracted: null,
+            integrity_notice: null,
+          },
+          {
+            collection_membership_id: 'cmem_2',
+            work_id: 'work_2',
+            title: 'A semaglutide trial',
+            doi: '10.1000/example-b',
+            pmid: null,
+            year: 2022,
+            added_at: '2026-01-02T00:00:00Z',
+            citation_tallies: null,
+            is_retracted: null,
+            integrity_notice: null,
+          },
+        ],
+      })
+    })
+    mockedPost.mockResolvedValue({
+      collection_id: 'coll_1',
+      removed_count: 1,
+      removed_work_ids: ['work_1'],
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(
+      <MemoryRouter initialEntries={['/collections/coll_1']}>
+        <Routes>
+          <Route path="/collections/:collectionId" element={<CollectionDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('link', { name: /a metformin trial/i })
+    fireEvent.change(screen.getByLabelText('Filter members'), {
+      target: { value: 'example-a' },
+    })
+    // Only one member matches the filter now.
+    fireEvent.click(
+      screen.getByRole('button', { name: /remove 1 filtered member/i }),
+    )
+
+    expect(mockedPost).toHaveBeenCalledWith('/collections/coll_1/members/bulk-delete', {
+      work_ids: ['work_1'],
+    })
+    expect(await screen.findByText(/removed 1 member/i)).toBeInTheDocument()
   })
 })

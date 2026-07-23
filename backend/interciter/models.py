@@ -63,6 +63,10 @@ class PaperWork(Base):
         _enum(enums.AvailabilityState),
         default=enums.AvailabilityState.metadata_stub,
     )
+    # Additive integrity flags (scite-parity WP5 starter). Null = no integrity
+    # source consulted; never mutates the scientific record.
+    is_retracted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    integrity_notice: Mapped[str | None] = mapped_column(String, nullable=True)
 
     versions: Mapped[list["PaperVersion"]] = relationship(
         back_populates="work", cascade="all, delete-orphan"
@@ -392,6 +396,14 @@ class Collection(Base):
     )
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Monitoring state (scite-parity WP4->WP8 bridge). watch_snapshot holds the
+    # per-member support/contradict baseline captured when watching was last
+    # (re)enabled, used to derive new-citation deltas. Derived state only.
+    is_watched: Mapped[bool] = mapped_column(Boolean, default=False)
+    watch_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    watch_snapshot_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow

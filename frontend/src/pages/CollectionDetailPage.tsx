@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type {
   CollectionAddMembersResult,
+  CollectionCitationDelta,
   CollectionDetailView,
   CollectionMemberView,
 } from '../api/types'
@@ -87,6 +88,26 @@ function stanceCount(member: CollectionMemberView, stance: string): number {
   return member.citation_tallies?.by_stance[stance] ?? 0
 }
 
+// Renders integrity badges (scite-parity WP5 starter). Null flags render
+// nothing, so unenriched works stay visually quiet.
+function IntegrityBadges({ member }: { member: CollectionMemberView }) {
+  if (!member.is_retracted && !member.integrity_notice) return null
+  return (
+    <span className="margin-left-1">
+      {member.is_retracted && (
+        <span className="usa-tag bg-secondary-dark text-white margin-right-05">
+          Retracted
+        </span>
+      )}
+      {member.integrity_notice && (
+        <span className="usa-tag bg-accent-warm-dark text-white">
+          {member.integrity_notice.replaceAll('_', ' ')}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function sortMembers(
   members: CollectionMemberView[],
   sortKey: string,
@@ -141,6 +162,13 @@ export default function CollectionDetailPage() {
       ),
     [collectionId],
   )
+  const delta = useApi<CollectionCitationDelta>(
+    () =>
+      api.get<CollectionCitationDelta>(
+        `/collections/${collectionId}/new-citations`,
+      ),
+    [collectionId],
+  )
   const [csvText, setCsvText] = useState('')
   const [uploadingFile, setUploadingFile] = useState(false)
   const [name, setName] = useState('')
@@ -150,6 +178,8 @@ export default function CollectionDetailPage() {
   const [saving, setSaving] = useState(false)
   const [savingMeta, setSavingMeta] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [watchBusy, setWatchBusy] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
   const parsed = parseIdentifiers(csvText)
   const normalizedFilter = memberFilter.trim().toLowerCase()
   const filteredMembers = detail.data?.members.filter((member) => {
@@ -231,6 +261,53 @@ export default function CollectionDetailPage() {
     }
   }
 
+  async function onToggleWatch() {
+    const next = !detail.data?.is_watched
+    setWatchBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await api.post(`/collections/${collectionId}/watch`, { watch: next })
+      setMessage(
+        next
+          ? 'Now watching this collection. New-citation baseline captured.'
+          : 'Stopped watching this collection.',
+      )
+      detail.reload()
+      delta.reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setWatchBusy(false)
+    }
+  }
+
+  async function onBulkRemove() {
+    if (visibleMembers.length === 0) return
+    if (
+      !window.confirm(
+        `Remove ${visibleMembers.length} member(s) matching the current filter?`,
+      )
+    ) {
+      return
+    }
+    setBulkBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const result = await api.post<{ removed_count: number }>(
+        `/collections/${collectionId}/members/bulk-delete`,
+        { work_ids: visibleMembers.map((member) => member.work_id) },
+      )
+      setMessage(`Removed ${result.removed_count} member(s).`)
+      detail.reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   async function onSaveMetadata(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
@@ -267,7 +344,7 @@ export default function CollectionDetailPage() {
 
   function onExportMembers() {
     if (visibleMembers.length === 0) return
-    const lines = ['work_id,doi,pmid,title']
+    const lines = ['work_id,doi,pmid,title,is_retracted,integrity_notice']
     for (const member of visibleMembers) {
       lines.push(
         [
@@ -275,6 +352,8 @@ export default function CollectionDetailPage() {
           csvCell(member.doi ?? ''),
           csvCell(member.pmid ?? ''),
           csvCell(member.title ?? ''),
+          csvCell(member.is_retracted ? 'true' : ''),
+          csvCell(member.integrity_notice ?? ''),
         ].join(','),
       )
     }
@@ -312,6 +391,62 @@ export default function CollectionDetailPage() {
 
       {detail.data && (
         <>
+          <section className="usa-summary-box margin-bottom-2" aria-labelledby="monitoring-heading">
+            <div className="usa-summary-box__body">
+              <h2 className="usa-summary-box__heading" id="monitoring-heading">
+                Monitoring
+              </h2>
+              <div className="usa-summary-box__text">
+                <button
+                  type="button"
+                  className={
+                    detail.data.is_watched
+                      ? 'usa-button usa-button--outline'
+                      : 'usa-button'
+                  }
+                  onClick={onToggleWatch}
+                  disabled={watchBusy}
+                  aria-pressed={detail.data.is_watched}
+                >
+                  {detail.data.is_watched
+                    ? 'Watching ✓ — stop watching'
+                    : 'Watch this collection'}
+                </button>
+                {delta.data?.has_snapshot ? (
+                  <div className="margin-top-2" aria-live="polite">
+                    <p className="margin-y-05">
+                      New since baseline:{' '}
+                      <strong>{delta.data.new_support_total}</strong> supporting,{' '}
+                      <strong>{delta.data.new_contradict_total}</strong> contradicting.
+                    </p>
+                    {delta.data.members.length > 0 ? (
+                      <ul className="usa-list">
+                        {delta.data.members.map((row) => (
+                          <li key={row.work_id}>
+                            <Link to={`/papers/${row.work_id}`}>
+                              {row.title ?? row.work_id}
+                            </Link>{' '}
+                            — +{row.new_support} supporting, +{row.new_contradict}{' '}
+                            contradicting
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-base margin-y-05">
+                        No new citation signals since the last baseline.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-base margin-top-1 margin-bottom-0">
+                    Start watching to capture a baseline and track new supporting
+                    or contradicting citations.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+
           <h2>Manage collection</h2>
           <form className="usa-form maxw-tablet" onSubmit={onSaveMetadata}>
             <label className="usa-label" htmlFor="collection-name">Name</label>
@@ -439,8 +574,19 @@ export default function CollectionDetailPage() {
                 >
                   Export identifiers TXT
                 </button>
+                <button
+                  type="button"
+                  className="usa-button usa-button--secondary margin-top-1 margin-left-1"
+                  onClick={onBulkRemove}
+                  disabled={bulkBusy || visibleMembers.length === 0}
+                >
+                  {bulkBusy
+                    ? 'Removing…'
+                    : `Remove ${visibleMembers.length} filtered member(s)`}
+                </button>
                 <p className="font-body-3xs text-base margin-top-05 margin-bottom-0">
-                  Exports include only the members matching the current filter.
+                  Exports and bulk removal apply only to the members matching the
+                  current filter.
                 </p>
               </div>
               <div className="maxw-card margin-bottom-2">
@@ -474,6 +620,7 @@ export default function CollectionDetailPage() {
                       <Link to={`/papers/${member.work_id}`}>
                         {member.title ?? member.work_id}
                       </Link>
+                      <IntegrityBadges member={member} />
                       {member.citation_tallies && (
                         <details className="margin-top-1">
                           <summary className="font-body-3xs">

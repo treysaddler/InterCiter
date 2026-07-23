@@ -19,8 +19,11 @@ from ..ids import new_id
 from ..schemas import (
     CollectionAddMembersRequest,
     CollectionAddMembersResult,
+    CollectionBulkRemoveResult,
+    CollectionCitationDelta,
     CollectionCreate,
     CollectionDetailView,
+    CollectionMemberDelta,
     CollectionMemberView,
     CitationTallies,
     CollectionUpdate,
@@ -115,6 +118,8 @@ def _member_view(
         year=work.year,
         added_at=member.added_at,
         citation_tallies=tallies,
+        is_retracted=work.is_retracted,
+        integrity_notice=work.integrity_notice,
     )
 
 
@@ -131,6 +136,8 @@ def _collection_view(
         name=collection.name,
         description=collection.description,
         member_count=member_count,
+        is_watched=collection.is_watched,
+        watch_snapshot_at=collection.watch_snapshot_at,
         created_at=collection.created_at,
         updated_at=collection.updated_at,
     )
@@ -445,6 +452,141 @@ def remove_member(
     session.delete(member)
     collection.updated_at = _utcnow()
     session.commit()
+
+
+def bulk_remove_members(
+    session: Session, collection_id: str, work_ids: list[str], *, owner_id: str
+) -> CollectionBulkRemoveResult:
+    """Remove several members at once; unknown work_ids are silently ignored."""
+    collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
+    unique_ids = list(dict.fromkeys(work_ids))
+    members = list(
+        session.scalars(
+            select(models.CollectionMembership).where(
+                models.CollectionMembership.collection_id == collection.collection_id,
+                models.CollectionMembership.work_id.in_(unique_ids),
+            )
+        )
+    )
+    removed_work_ids = [m.work_id for m in members]
+    for member in members:
+        session.delete(member)
+    if members:
+        collection.updated_at = _utcnow()
+    session.commit()
+    return CollectionBulkRemoveResult(
+        collection_id=collection.collection_id,
+        removed_count=len(removed_work_ids),
+        removed_work_ids=removed_work_ids,
+    )
+
+
+def _member_stance_counts(session: Session, work_id: str) -> tuple[int, int]:
+    """(support, contradict) citing-statement counts for a work; (0, 0) if none."""
+    try:
+        tallies = citation_stats.citation_stats_for_work(session, work_id).tallies
+    except KeyError:
+        return (0, 0)
+    return (
+        tallies.by_stance.get("support", 0),
+        tallies.by_stance.get("contradict", 0),
+    )
+
+
+def _current_stance_snapshot(session: Session, collection_id: str) -> dict[str, dict[str, int]]:
+    """Per-member {work_id: {support, contradict}} for the whole collection."""
+    work_ids = list(
+        session.scalars(
+            select(models.CollectionMembership.work_id).where(
+                models.CollectionMembership.collection_id == collection_id
+            )
+        )
+    )
+    snapshot: dict[str, dict[str, int]] = {}
+    for work_id in work_ids:
+        support, contradict = _member_stance_counts(session, work_id)
+        snapshot[work_id] = {"support": support, "contradict": contradict}
+    return snapshot
+
+
+def set_watch(
+    session: Session, collection_id: str, *, owner_id: str, watch: bool
+) -> CollectionView:
+    """Toggle monitoring. Enabling (re)captures the new-citation baseline."""
+    collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
+    collection.is_watched = watch
+    if watch:
+        collection.watch_snapshot = _current_stance_snapshot(
+            session, collection.collection_id
+        )
+        collection.watch_snapshot_at = _utcnow()
+    session.commit()
+    return _collection_view(session, collection)
+
+
+def citation_delta(
+    session: Session, collection_id: str, *, owner_id: str
+) -> CollectionCitationDelta:
+    """Newly observed support/contradict signals vs the last watch snapshot.
+
+    Members added after the snapshot (absent from the baseline) contribute their
+    full current counts as new. Members whose counts dropped contribute nothing
+    (clamped at zero). Only members with a positive delta are returned.
+    """
+    collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
+    baseline = collection.watch_snapshot or {}
+
+    memberships = list(
+        session.scalars(
+            select(models.CollectionMembership).where(
+                models.CollectionMembership.collection_id == collection.collection_id
+            )
+        )
+    )
+    works = {
+        w.work_id: w
+        for w in session.scalars(
+            select(models.PaperWork).where(
+                models.PaperWork.work_id.in_([m.work_id for m in memberships])
+            )
+        )
+    }
+
+    member_deltas: list[CollectionMemberDelta] = []
+    new_support_total = 0
+    new_contradict_total = 0
+    for member in memberships:
+        work = works.get(member.work_id)
+        if work is None:
+            continue
+        support, contradict = _member_stance_counts(session, member.work_id)
+        prior = baseline.get(member.work_id, {})
+        new_support = max(0, support - int(prior.get("support", 0)))
+        new_contradict = max(0, contradict - int(prior.get("contradict", 0)))
+        if new_support == 0 and new_contradict == 0:
+            continue
+        new_support_total += new_support
+        new_contradict_total += new_contradict
+        member_deltas.append(
+            CollectionMemberDelta(
+                work_id=work.work_id,
+                title=work.title,
+                new_support=new_support,
+                new_contradict=new_contradict,
+            )
+        )
+
+    member_deltas.sort(
+        key=lambda d: (d.new_support + d.new_contradict), reverse=True
+    )
+    return CollectionCitationDelta(
+        collection_id=collection.collection_id,
+        has_snapshot=collection.watch_snapshot is not None,
+        snapshot_at=collection.watch_snapshot_at,
+        new_support_total=new_support_total,
+        new_contradict_total=new_contradict_total,
+        members=member_deltas,
+    )
 
 
 def _membership_exists(session: Session, collection_id: str, work_id: str) -> bool:

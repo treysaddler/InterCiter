@@ -14,10 +14,14 @@ from ...auth import Principal
 from ...schemas import (
     CollectionAddMembersRequest,
     CollectionAddMembersResult,
+    CollectionBulkRemoveRequest,
+    CollectionBulkRemoveResult,
+    CollectionCitationDelta,
     CollectionCreate,
     CollectionDetailView,
     CollectionUpdate,
     CollectionView,
+    CollectionWatchRequest,
 )
 from ...services import collections
 from ...services.collections import BatchLimitError, MemberSort
@@ -139,3 +143,54 @@ def remove_member(
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/collections/{collection_id}/members/bulk-delete",
+    response_model=CollectionBulkRemoveResult,
+)
+def bulk_remove_members(
+    collection_id: str,
+    payload: CollectionBulkRemoveRequest,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> CollectionBulkRemoveResult:
+    try:
+        return collections.bulk_remove_members(
+            session, collection_id, payload.work_ids, owner_id=principal.user_id
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/collections/{collection_id}/watch", response_model=CollectionView)
+def set_watch(
+    collection_id: str,
+    payload: CollectionWatchRequest,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> CollectionView:
+    try:
+        return collections.set_watch(
+            session, collection_id, owner_id=principal.user_id, watch=payload.watch
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get(
+    "/collections/{collection_id}/new-citations",
+    response_model=CollectionCitationDelta,
+)
+def new_citations(
+    collection_id: str,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> CollectionCitationDelta:
+    try:
+        return collections.citation_delta(
+            session, collection_id, owner_id=principal.user_id
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+

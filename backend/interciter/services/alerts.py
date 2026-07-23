@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..config import Settings, get_settings
 from ..ids import new_id
+from ..ingestion.semantic_scholar import S2Error
 from ..schemas import (
     AlertRunResult,
     AlertView,
@@ -28,7 +29,7 @@ from ..schemas import (
     SavedSearchView,
     SearchQuery,
 )
-from . import collections, search
+from . import collections, discovery, maps, search
 from .projection import NotFound
 
 # Cap on hits considered when diffing a saved search (bounds the work per run).
@@ -278,11 +279,91 @@ def _run_collection(session: Session, collection: models.Collection) -> list[mod
     return created
 
 
+def _candidate_id(candidate) -> str | None:
+    """A stable dedup key for a discovery candidate (external id, else in-corpus id)."""
+    return candidate.external_id or candidate.work_id
+
+
+def _run_map(
+    session: Session,
+    saved_map: models.Map,
+    *,
+    settings: Settings,
+) -> list[models.Alert]:
+    """Re-run seed discovery for a watched map, diff newly connected papers vs the
+    last-seen candidate set, emit alerts, and advance the baseline (no commit).
+
+    The first run after watching (``last_checked_at is None``) only SEEDS the baseline
+    — it emits no alerts, so pre-existing connected papers never flood the feed. A
+    transient Semantic Scholar failure leaves the baseline untouched (no alerts, retry
+    next run).
+    """
+    member_ids = maps.member_work_ids(session, saved_map)
+    if not member_ids:
+        saved_map.last_seen_ids = []
+        saved_map.last_checked_at = _now()
+        return []
+
+    try:
+        result = discovery.discover_from_seeds(
+            session, member_ids, settings=settings
+        )
+    except S2Error:
+        return []  # transient network issue: do not advance the baseline
+
+    current_ids = [
+        cid for cid in (_candidate_id(c) for c in result.candidates) if cid
+    ]
+    first_run = saved_map.last_checked_at is None
+    seen = set(saved_map.last_seen_ids or [])
+    created: list[models.Alert] = []
+    if not first_run:
+        for candidate in result.candidates:
+            cid = _candidate_id(candidate)
+            if cid is None or cid in seen:
+                continue
+            label = candidate.title or cid
+            created.append(
+                _add_alert(
+                    session,
+                    owner_id=saved_map.owner_id,
+                    source_type="map",
+                    source_id=saved_map.map_id,
+                    alert_type="new_connected_paper",
+                    work_id=candidate.work_id,
+                    summary=(
+                        f'"{saved_map.name}": newly connected paper — {label} '
+                        f"(connected to {candidate.connection_score} seed(s))"
+                    ),
+                )
+            )
+    saved_map.last_seen_ids = current_ids
+    saved_map.last_checked_at = _now()
+    return created
+
+
 def run_saved_search(
     session: Session, saved_search_id: str, *, owner_id: str
 ) -> AlertRunResult:
     ss = _load_owned_search(session, saved_search_id, owner_id=owner_id)
     created = _run_saved_search(session, ss)
+    session.commit()
+    return AlertRunResult(
+        created_count=len(created), alerts=[_alert_view(a) for a in created]
+    )
+
+
+def run_map(
+    session: Session,
+    map_id: str,
+    *,
+    owner_id: str,
+    settings: Settings | None = None,
+) -> AlertRunResult:
+    """Run discovery monitoring for one owned map (litmaps-parity WP-L5)."""
+    settings = settings or get_settings()
+    saved_map = maps._load_owned_map(session, map_id, owner_id=owner_id)
+    created = _run_map(session, saved_map, settings=settings)
     session.commit()
     return AlertRunResult(
         created_count=len(created), alerts=[_alert_view(a) for a in created]
@@ -306,6 +387,13 @@ def run_all(
         )
     ):
         created.extend(_run_collection(session, collection))
+    for saved_map in session.scalars(
+        select(models.Map).where(
+            models.Map.owner_id == owner_id,
+            models.Map.is_watched.is_(True),
+        )
+    ):
+        created.extend(_run_map(session, saved_map, settings=settings))
     session.commit()
     return AlertRunResult(
         created_count=len(created), alerts=[_alert_view(a) for a in created]

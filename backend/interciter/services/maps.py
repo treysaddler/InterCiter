@@ -68,6 +68,8 @@ def _map_view(
         layout_config=saved_map.layout_config or {},
         member_count=member_count,
         share_token=saved_map.share_token,
+        is_watched=bool(saved_map.is_watched),
+        watch_last_checked_at=saved_map.last_checked_at,
         created_at=saved_map.created_at,
         updated_at=saved_map.updated_at,
     )
@@ -367,3 +369,37 @@ def shared_map_graph(
     """Render a shared map's seed set as a citation graph, resolved by token."""
     saved_map = _load_shared_map(session, token)
     return _map_graph(session, saved_map, include_authors=include_authors)
+
+
+# ---------------------------------------------------------------------------------
+# Monitoring (litmaps-parity WP-L5 — extends the scite WP8 alerts subsystem)
+# ---------------------------------------------------------------------------------
+
+
+def set_watch(session: Session, map_id: str, *, owner_id: str, watch: bool) -> MapView:
+    """Toggle monitoring for a saved map.
+
+    Enabling resets the discovery baseline (``last_seen_ids`` empty,
+    ``last_checked_at`` null) so the FIRST monitor run seeds it silently rather than
+    alerting for every already-connected paper. The actual discovery diffing lives in
+    the alerts subsystem (``services/alerts._run_map``) — this only flips state.
+    """
+    saved_map = _load_owned_map(session, map_id, owner_id=owner_id)
+    saved_map.is_watched = watch
+    if watch:
+        saved_map.last_seen_ids = []
+        saved_map.last_checked_at = None
+    saved_map.updated_at = _utcnow()
+    session.commit()
+    return _map_view(session, saved_map)
+
+
+def member_work_ids(session: Session, saved_map: models.Map) -> list[str]:
+    """The work ids that make up a map's seed set (order-stable)."""
+    return list(
+        session.scalars(
+            select(models.MapMembership.work_id).where(
+                models.MapMembership.map_id == saved_map.map_id
+            )
+        )
+    )

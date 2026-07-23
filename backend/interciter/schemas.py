@@ -682,6 +682,10 @@ class MapView(BaseModel):
     member_count: int = 0
     # Present only when the map has been shared; the owner uses it to build the link.
     share_token: str | None = None
+    # Monitoring state (litmaps-parity WP-L5). `watch_last_checked_at` is null until
+    # the first monitor run has seeded a baseline.
+    is_watched: bool = False
+    watch_last_checked_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -715,6 +719,13 @@ class MapMemberUpdate(BaseModel):
 
     note: str | None = Field(default=None, max_length=2000)
     position: dict[str, Any] | None = None
+
+
+class MapWatchRequest(BaseModel):
+    """Toggle map monitoring (litmaps-parity WP-L5). Enabling resets the baseline so
+    the next monitor run seeds it without flooding alerts for existing candidates."""
+
+    watch: bool
 
 
 class MapShareView(BaseModel):

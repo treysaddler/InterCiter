@@ -428,6 +428,8 @@ export interface MapView {
   layout_config: Record<string, unknown>
   member_count: number
   share_token: string | null
+  is_watched: boolean
+  watch_last_checked_at: string | null
   created_at: string
   updated_at: string
 }

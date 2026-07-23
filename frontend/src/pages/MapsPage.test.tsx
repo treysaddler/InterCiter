@@ -22,6 +22,8 @@ const MAPS = [
     layout_config: { layout: 'axis' },
     member_count: 3,
     share_token: null,
+    is_watched: false,
+    watch_last_checked_at: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-02T00:00:00Z',
   },
@@ -103,4 +105,35 @@ it('revokes a share link after confirmation', async () => {
   await waitFor(() =>
     expect(mockedDel).toHaveBeenCalledWith('/maps/map_1/share'),
   )
+})
+
+it('watches a map and then runs a monitor check', async () => {
+  mockedGet.mockResolvedValue(MAPS)
+  mockedPost.mockResolvedValue({ ...MAPS[0], is_watched: true })
+  render(
+    <MemoryRouter>
+      <MapsPage />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('link', { name: 'T2D core' })
+  fireEvent.click(screen.getByRole('button', { name: 'Watch' }))
+  await waitFor(() =>
+    expect(mockedPost).toHaveBeenCalledWith('/maps/map_1/watch', { watch: true }),
+  )
+})
+
+it('runs a monitor check for a watched map and surfaces the result', async () => {
+  mockedGet.mockResolvedValue([{ ...MAPS[0], is_watched: true }])
+  mockedPost.mockResolvedValue({ created_count: 2, alerts: [] })
+  render(
+    <MemoryRouter>
+      <MapsPage />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('link', { name: 'T2D core' })
+  fireEvent.click(screen.getByRole('button', { name: 'Check now' }))
+  await waitFor(() =>
+    expect(mockedPost).toHaveBeenCalledWith('/maps/map_1/monitor'),
+  )
+  expect(await screen.findByText(/2 newly connected paper/i)).toBeInTheDocument()
 })

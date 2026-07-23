@@ -564,6 +564,9 @@ classes:
       - description
       - layout_config
       - share_token
+      - is_watched
+      - last_seen_ids
+      - last_checked_at
       - created_at
       - updated_at
 

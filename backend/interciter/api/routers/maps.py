@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ...auth import Principal
 from ...schemas import (
+    AlertRunResult,
     GraphView,
     MapAddMembersRequest,
     MapCreate,
@@ -21,9 +22,10 @@ from ...schemas import (
     MapShareView,
     MapUpdate,
     MapView,
+    MapWatchRequest,
     SharedMapView,
 )
-from ...services import maps
+from ...services import alerts, maps
 from ...services.projection import NotFound
 from ..deps import db_session
 from ..security import require_user
@@ -169,6 +171,35 @@ def revoke_share(
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/maps/{map_id}/watch", response_model=MapView)
+def set_watch(
+    map_id: str,
+    payload: MapWatchRequest,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> MapView:
+    try:
+        return maps.set_watch(
+            session, map_id, owner_id=principal.user_id, watch=payload.watch
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/maps/{map_id}/monitor", response_model=AlertRunResult)
+def run_monitor(
+    map_id: str,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> AlertRunResult:
+    """Re-run seed discovery for the map and surface newly connected papers as alerts
+    (litmaps-parity WP-L5). Performs a Semantic Scholar read, so it requires auth."""
+    try:
+        return alerts.run_map(session, map_id, owner_id=principal.user_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------------

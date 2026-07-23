@@ -455,6 +455,15 @@ class Map(Base):
     share_token: Mapped[str | None] = mapped_column(
         String, nullable=True, unique=True, index=True
     )
+    # Monitoring (litmaps-parity WP-L5, extends scite WP8 alerts). When watched, the
+    # alerts subsystem re-runs seed discovery and diffs newly connected papers against
+    # last_seen_ids. last_checked_at is null until the first monitor run seeds a
+    # baseline (so the first run never floods alerts for pre-existing candidates).
+    is_watched: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_seen_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    last_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow

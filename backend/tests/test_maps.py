@@ -195,3 +195,131 @@ def test_share_is_owner_scoped_and_requires_auth(client, user_headers, make_user
     assert client.delete(f"/v1/maps/{map_id}/share", headers=other_headers).status_code == 404
     # And anonymous callers cannot share at all.
     assert client.post(f"/v1/maps/{map_id}/share").status_code == 401
+
+
+# ---------------------------------------------------------------------------------
+# WP-L5 — map monitoring (extends the scite WP8 alerts subsystem)
+# ---------------------------------------------------------------------------------
+
+
+def test_map_watch_toggle_state(client, user_headers):
+    map_id = _create_map(client, user_headers)["map_id"]
+
+    on = client.post(
+        f"/v1/maps/{map_id}/watch", json={"watch": True}, headers=user_headers
+    )
+    assert on.status_code == 200
+    assert on.json()["is_watched"] is True
+    assert on.json()["watch_last_checked_at"] is None
+    assert client.get(f"/v1/maps/{map_id}", headers=user_headers).json()["is_watched"] is True
+
+    off = client.post(
+        f"/v1/maps/{map_id}/watch", json={"watch": False}, headers=user_headers
+    )
+    assert off.status_code == 200
+    assert off.json()["is_watched"] is False
+
+
+def test_map_monitor_seeds_then_alerts_on_new_connection(
+    client, session, make_user, monkeypatch
+):
+    from interciter import models
+    from interciter.enums import AvailabilityState
+    from interciter.services import enrichment
+
+    _owner_id, headers = make_user(name="map-watcher")
+
+    # Two seed works with DOIs so discovery resolves a Semantic Scholar id for each.
+    for wid, doi in (("seed_a", "10.1/a"), ("seed_b", "10.1/b")):
+        session.add(
+            models.PaperWork(
+                work_id=wid,
+                availability_state=AvailabilityState.metadata_stub,
+                doi=doi,
+            )
+        )
+    session.commit()
+
+    refs = {
+        "DOI:10.1/a": [
+            {
+                "cited_corpus_id": "100",
+                "cited_doi": None,
+                "cited_pmid": None,
+                "cited_title": "Shared reference",
+                "cited_year": 2020,
+                "is_influential": True,
+            }
+        ],
+        "DOI:10.1/b": [
+            {
+                "cited_corpus_id": "100",
+                "cited_doi": None,
+                "cited_pmid": None,
+                "cited_title": "Shared reference",
+                "cited_year": 2020,
+                "is_influential": False,
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        enrichment, "reference_links", lambda pid, **kw: list(refs.get(pid, []))
+    )
+
+    map_id = _create_map(client, headers, work_ids=["seed_a", "seed_b"])["map_id"]
+    watched = client.post(
+        f"/v1/maps/{map_id}/watch", json={"watch": True}, headers=headers
+    )
+    assert watched.json()["is_watched"] is True
+
+    # First monitor run only seeds the baseline — no alerts for existing candidates.
+    first = client.post(f"/v1/maps/{map_id}/monitor", headers=headers)
+    assert first.status_code == 200
+    assert first.json()["created_count"] == 0
+    # The run stamps a checked-at timestamp.
+    assert client.get(f"/v1/maps/{map_id}", headers=headers).json()[
+        "watch_last_checked_at"
+    ] is not None
+
+    # An unchanged second run surfaces nothing new.
+    assert client.post(f"/v1/maps/{map_id}/monitor", headers=headers).json()[
+        "created_count"
+    ] == 0
+
+    # A newly connected paper appears in discovery → one alert on the next run.
+    refs["DOI:10.1/a"].append(
+        {
+            "cited_corpus_id": "200",
+            "cited_doi": None,
+            "cited_pmid": None,
+            "cited_title": "Brand new connection",
+            "cited_year": 2023,
+            "is_influential": False,
+        }
+    )
+    third = client.post(f"/v1/maps/{map_id}/monitor", headers=headers)
+    assert third.json()["created_count"] == 1
+    assert "Brand new connection" in third.json()["alerts"][0]["summary"]
+
+    # And it is visible in the shared alert feed as a map source.
+    feed = client.get("/v1/alerts", headers=headers).json()
+    assert any(
+        a["source_type"] == "map" and a["alert_type"] == "new_connected_paper"
+        for a in feed
+    )
+
+
+def test_map_watch_and_monitor_are_owner_scoped_and_require_auth(
+    client, user_headers, make_user
+):
+    map_id = _create_map(client, user_headers)["map_id"]
+    other_headers = make_user(name="intruder")[1]
+
+    assert client.post(
+        f"/v1/maps/{map_id}/watch", json={"watch": True}, headers=other_headers
+    ).status_code == 404
+    assert client.post(
+        f"/v1/maps/{map_id}/monitor", headers=other_headers
+    ).status_code == 404
+    assert client.post(f"/v1/maps/{map_id}/watch", json={"watch": True}).status_code == 401
+    assert client.post(f"/v1/maps/{map_id}/monitor").status_code == 401

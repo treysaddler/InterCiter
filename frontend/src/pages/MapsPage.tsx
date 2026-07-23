@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { MapShareView, MapView } from '../api/types'
+import type { AlertRunResult, MapShareView, MapView } from '../api/types'
 import PageHeading from '../components/PageHeading'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
@@ -14,13 +14,14 @@ function shareUrl(token: string): string {
 /**
  * Saved maps list (litmaps-parity WP-L2). Maps are created by saving the current
  * view from the network explorer ("Save as map" on /graph); here you can reopen,
- * share (read-only link, WP-L4), or delete them. Opening a map hydrates its seed set
- * + layout into the explorer.
+ * share (read-only link, WP-L4), monitor (WP-L5), or delete them. Opening a map
+ * hydrates its seed set + layout into the explorer.
  */
 export default function MapsPage() {
   const maps = useApi<MapView[]>(() => api.get('/maps'), [])
   const [notice, setNotice] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [busyMapId, setBusyMapId] = useState<string | null>(null)
 
   async function copyLink(token: string) {
     const url = shareUrl(token)
@@ -63,6 +64,39 @@ export default function MapsPage() {
     maps.reload()
   }
 
+  async function onToggleWatch(map: MapView) {
+    setActionError(null)
+    setNotice(null)
+    setBusyMapId(map.map_id)
+    try {
+      await api.post(`/maps/${map.map_id}/watch`, { watch: !map.is_watched })
+      maps.reload()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyMapId(null)
+    }
+  }
+
+  async function onCheckNow(mapId: string) {
+    setActionError(null)
+    setNotice(null)
+    setBusyMapId(mapId)
+    try {
+      const result = await api.post<AlertRunResult>(`/maps/${mapId}/monitor`)
+      setNotice(
+        result.created_count > 0
+          ? `Found ${result.created_count} newly connected paper(s) — see Alerts.`
+          : 'No newly connected papers since the last check.',
+      )
+      maps.reload()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyMapId(null)
+    }
+  }
+
   return (
     <>
       <PageHeading>Saved maps</PageHeading>
@@ -92,6 +126,7 @@ export default function MapsPage() {
               <th scope="col">Name</th>
               <th scope="col">Papers</th>
               <th scope="col">Sharing</th>
+              <th scope="col">Monitoring</th>
               <th scope="col">Actions</th>
             </tr>
           </thead>
@@ -132,6 +167,26 @@ export default function MapsPage() {
                       onClick={() => onShare(m.map_id)}
                     >
                       Share
+                    </button>
+                  )}
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="usa-button usa-button--unstyled"
+                    onClick={() => onToggleWatch(m)}
+                    disabled={busyMapId === m.map_id}
+                  >
+                    {m.is_watched ? 'Unwatch' : 'Watch'}
+                  </button>
+                  {m.is_watched && (
+                    <button
+                      type="button"
+                      className="usa-button usa-button--unstyled margin-left-2"
+                      onClick={() => onCheckNow(m.map_id)}
+                      disabled={busyMapId === m.map_id}
+                    >
+                      Check now
                     </button>
                   )}
                 </td>

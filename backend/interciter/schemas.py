@@ -531,12 +531,14 @@ class SessionInfo(BaseModel):
 
 class CollectionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class CollectionUpdate(BaseModel):
+    """PATCH payload; an explicitly-null description clears the stored value."""
+
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class CollectionMemberView(BaseModel):
@@ -568,11 +570,12 @@ class CollectionDetailView(CollectionView):
 class CollectionAddMembersRequest(BaseModel):
     """Batch member intake by internal ids, identifiers, or CSV/plain-text blob."""
 
-    work_ids: list[str] = Field(default_factory=list)
-    dois: list[str] = Field(default_factory=list)
-    pmids: list[str] = Field(default_factory=list)
+    work_ids: list[str] = Field(default_factory=list, max_length=500)
+    dois: list[str] = Field(default_factory=list, max_length=500)
+    pmids: list[str] = Field(default_factory=list, max_length=500)
     csv_text: str | None = Field(
         default=None,
+        max_length=200_000,
         description=(
             "Optional newline/comma-separated identifiers; DOIs and PMIDs are "
             "auto-detected and merged with explicit arrays."

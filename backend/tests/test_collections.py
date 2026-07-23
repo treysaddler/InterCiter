@@ -131,18 +131,114 @@ def test_collection_ownership_is_enforced(client, make_user):
 
     collection_id = _create_collection(client, owner_headers)["collection_id"]
 
-    assert client.get(f"/v1/collections/{collection_id}", headers=other_headers).status_code == 403
+    # Another user's collection must be indistinguishable from a missing one so
+    # collection ids don't leak across accounts.
+    assert client.get(f"/v1/collections/{collection_id}", headers=other_headers).status_code == 404
     assert (
         client.patch(
             f"/v1/collections/{collection_id}",
             json={"name": "hijack"},
             headers=other_headers,
         ).status_code
-        == 403
+        == 404
     )
-    assert client.delete(f"/v1/collections/{collection_id}", headers=other_headers).status_code == 403
+    assert client.delete(f"/v1/collections/{collection_id}", headers=other_headers).status_code == 404
+    # And the owner still sees it untouched.
+    owner_view = client.get(f"/v1/collections/{collection_id}", headers=owner_headers)
+    assert owner_view.status_code == 200
+    assert owner_view.json()["name"] == "T2D Core"
 
 
 def test_collection_endpoints_require_auth(client):
     assert client.get("/v1/collections").status_code == 401
     assert client.post("/v1/collections", json={"name": "anon"}).status_code == 401
+
+
+def test_collection_description_can_be_cleared(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+
+    cleared = client.patch(
+        f"/v1/collections/{collection_id}",
+        json={"description": None},
+        headers=user_headers,
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["description"] is None
+    # Omitting the field leaves the (cleared) value untouched.
+    renamed = client.patch(
+        f"/v1/collections/{collection_id}",
+        json={"name": "Renamed"},
+        headers=user_headers,
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["description"] is None
+
+
+def test_identifier_parsing_normalizes_and_skips_ambiguous_tokens(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+
+    wiley_doi = "10.1002/(sici)1097-4636(199905)45:2<133::aid-jbm9>3.0.co;2-#"
+    add = client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={
+            # Legacy DOI with an embedded semicolon must survive tokenizing,
+            # doi.org URLs must be unwrapped, and a bare year must not become
+            # a PMID stub.
+            "csv_text": f"{wiley_doi.upper()}\nhttps://doi.org/10.3000/from-url, 2021\npmid:87654321",
+        },
+        headers=user_headers,
+    )
+    assert add.status_code == 200, add.text
+    body = add.json()
+    assert body["added_count"] == 3
+    assert body["skipped_identifiers"] == ["2021"]
+
+    detail = client.get(f"/v1/collections/{collection_id}", headers=user_headers)
+    dois = {m["doi"] for m in detail.json()["members"] if m["doi"]}
+    pmids = {m["pmid"] for m in detail.json()["members"] if m["pmid"]}
+    assert wiley_doi in dois  # stored lowercase, semicolon suffix intact
+    assert "10.3000/from-url" in dois
+    assert pmids == {"87654321"}
+
+
+def test_duplicate_case_variant_doi_does_not_create_second_stub(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+
+    first = client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"dois": ["10.4000/CasedDOI"]},
+        headers=user_headers,
+    )
+    assert first.status_code == 200
+    assert len(first.json()["created_stub_work_ids"]) == 1
+
+    second = client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"dois": ["10.4000/caseddoi"]},
+        headers=user_headers,
+    )
+    assert second.status_code == 200
+    assert second.json()["created_stub_work_ids"] == []
+    assert second.json()["added_count"] == 0
+
+
+def test_add_members_batch_limit_is_enforced(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+
+    too_many = client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"csv_text": "\n".join(f"10.9000/bulk-{i}" for i in range(501))},
+        headers=user_headers,
+    )
+    assert too_many.status_code == 400
+    assert "limit" in too_many.json()["detail"]
+
+
+def test_get_collection_rejects_unknown_member_sort(client, user_headers):
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    resp = client.get(
+        f"/v1/collections/{collection_id}",
+        params={"member_sort": "bogus"},
+        headers=user_headers,
+    )
+    assert resp.status_code == 422

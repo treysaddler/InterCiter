@@ -7,14 +7,14 @@ and, when needed, registers metadata stubs through the existing ingest job path.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Literal
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..auth import NotAuthorized
 from ..ids import new_id
 from ..schemas import (
     CollectionAddMembersRequest,
@@ -30,7 +30,67 @@ from ..schemas import (
 from . import citation_stats, jobs
 from .projection import NotFound
 
+MemberSort = Literal["added_desc", "added_asc", "support_desc", "contradict_desc"]
+
+# Hard cap on identifiers per add-members request: each unknown DOI/PMID runs a
+# synchronous ingest job, so an unbounded batch would stall the request.
+MAX_BATCH_IDENTIFIERS = 500
+
 _DOI_LIKE = re.compile(r"10\.\d{4,9}/\S+", flags=re.IGNORECASE)
+# Accepted wrappers around a DOI; matched case-insensitively against the token.
+_DOI_PREFIXES = (
+    "doi:",
+    "https://doi.org/",
+    "http://doi.org/",
+    "https://dx.doi.org/",
+    "http://dx.doi.org/",
+)
+_PMID_PREFIXED = re.compile(r"pmid:?\s*(\d{1,8})", flags=re.IGNORECASE)
+
+
+class BatchLimitError(ValueError):
+    """Raised when an add-members batch exceeds MAX_BATCH_IDENTIFIERS."""
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def normalize_doi(token: str) -> str | None:
+    """Canonical lowercase DOI from a raw token, or None if not DOI-shaped.
+
+    Accepts doi.org / dx.doi.org URL forms and a ``doi:`` prefix. Trailing
+    list/prose punctuation is stripped (it is never part of a real DOI suffix,
+    while embedded semicolons/commas — e.g. legacy Wiley SICI DOIs — are kept).
+    DOIs are case-insensitive by spec, so the lowercase form is canonical.
+    """
+    t = token.strip()
+    lower = t.lower()
+    for prefix in _DOI_PREFIXES:
+        if lower.startswith(prefix):
+            t = t[len(prefix):]
+            break
+    t = t.rstrip(".,;:")
+    if _DOI_LIKE.fullmatch(t):
+        return t.lower()
+    return None
+
+
+def _pmid_from_token(token: str) -> str | None:
+    """PMID from a raw token, or None.
+
+    A ``pmid:``-prefixed number is always accepted. A bare 1-8 digit number is
+    accepted unless it is a 4-digit value in the publication-year range — pasted
+    CSV rows routinely carry year columns, and importing those as PMIDs would
+    register garbage metadata stubs.
+    """
+    if (m := _PMID_PREFIXED.fullmatch(token)) is not None:
+        return m.group(1)
+    if token.isdigit() and len(token) <= 8:
+        if len(token) == 4 and 1500 <= int(token) <= 2099:
+            return None
+        return token
+    return None
 
 
 def _member_view(
@@ -58,10 +118,13 @@ def _member_view(
     )
 
 
-def _collection_view(session: Session, collection: models.Collection) -> CollectionView:
-    member_count = session.query(models.CollectionMembership).filter(
-        models.CollectionMembership.collection_id == collection.collection_id
-    ).count()
+def _collection_view(
+    session: Session, collection: models.Collection, *, member_count: int | None = None
+) -> CollectionView:
+    if member_count is None:
+        member_count = session.query(models.CollectionMembership).filter(
+            models.CollectionMembership.collection_id == collection.collection_id
+        ).count()
     return CollectionView(
         collection_id=collection.collection_id,
         owner_id=collection.owner_id,
@@ -77,10 +140,10 @@ def _load_owned_collection(
     session: Session, collection_id: str, *, owner_id: str
 ) -> models.Collection:
     collection = session.get(models.Collection, collection_id)
-    if collection is None:
+    # A collection owned by someone else is reported identically to a missing
+    # one so collection ids don't leak across accounts.
+    if collection is None or collection.owner_id != owner_id:
         raise NotFound(f"collection {collection_id} not found")
-    if collection.owner_id != owner_id:
-        raise NotAuthorized("collection is owned by a different user")
     return collection
 
 
@@ -92,13 +155,29 @@ def list_collections(session: Session, *, owner_id: str) -> list[CollectionView]
             .order_by(models.Collection.updated_at.desc())
         )
     )
-    return [_collection_view(session, row) for row in rows]
+    counts = dict(
+        session.execute(
+            select(models.CollectionMembership.collection_id, func.count())
+            .where(
+                models.CollectionMembership.collection_id.in_(
+                    [row.collection_id for row in rows]
+                )
+            )
+            .group_by(models.CollectionMembership.collection_id)
+        ).all()
+    )
+    return [
+        _collection_view(
+            session, row, member_count=counts.get(row.collection_id, 0)
+        )
+        for row in rows
+    ]
 
 
 def create_collection(
     session: Session, payload: CollectionCreate, *, owner_id: str
 ) -> CollectionView:
-    now = datetime.now().astimezone()
+    now = _utcnow()
     collection = models.Collection(
         collection_id=new_id("Collection"),
         owner_id=owner_id,
@@ -109,7 +188,7 @@ def create_collection(
     )
     session.add(collection)
     session.commit()
-    return _collection_view(session, collection)
+    return _collection_view(session, collection, member_count=0)
 
 
 def get_collection(
@@ -118,7 +197,7 @@ def get_collection(
     *,
     owner_id: str,
     include_member_tallies: bool = False,
-    member_sort: str = "added_desc",
+    member_sort: MemberSort = "added_desc",
 ) -> CollectionDetailView:
     collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
     memberships = list(
@@ -148,7 +227,9 @@ def get_collection(
     members = _sort_members(members, sort_key=member_sort)
 
     return CollectionDetailView(
-        **_collection_view(session, collection).model_dump(),
+        **_collection_view(
+            session, collection, member_count=len(memberships)
+        ).model_dump(),
         aggregate_citation_tallies=aggregate_tallies,
         members=members,
     )
@@ -162,10 +243,14 @@ def update_collection(
     owner_id: str,
 ) -> CollectionView:
     collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
-    if payload.name is not None:
+    provided = payload.model_fields_set
+    if "name" in provided and payload.name is not None:
         collection.name = payload.name.strip()
-    if payload.description is not None:
-        collection.description = payload.description.strip() or None
+    # An explicit null clears the description; an omitted field leaves it alone.
+    if "description" in provided:
+        collection.description = (
+            payload.description.strip() or None if payload.description else None
+        )
     session.commit()
     return _collection_view(session, collection)
 
@@ -184,7 +269,12 @@ def _resolve_existing_work(
         if work is not None:
             return work
     if doi:
-        work = session.scalar(select(models.PaperWork).where(models.PaperWork.doi == doi))
+        # DOIs are case-insensitive; stored rows may predate lowercase intake.
+        work = session.scalar(
+            select(models.PaperWork).where(
+                func.lower(models.PaperWork.doi) == doi.lower()
+            )
+        )
         if work is not None:
             return work
     if pmid:
@@ -194,18 +284,41 @@ def _resolve_existing_work(
     return None
 
 
-def _identifiers_from_csv(text: str) -> tuple[list[str], list[str]]:
+def _identifiers_from_csv(text: str) -> tuple[list[str], list[str], list[str]]:
+    """Split pasted text into (dois, pmids, ambiguous) identifier lists.
+
+    Tokens are split on whitespace and commas only: semicolons appear inside
+    legacy Wiley/SICI DOIs, so they cannot be treated as separators.
+    ``ambiguous`` collects numeric tokens that look like publication years and
+    are deliberately not imported (they are reported back as skipped).
+    """
     dois: list[str] = []
     pmids: list[str] = []
-    for raw in re.split(r"[\s,;]+", text):
+    ambiguous: list[str] = []
+    for raw in re.split(r"[\s,]+", text):
         token = raw.strip()
         if not token:
             continue
-        if _DOI_LIKE.fullmatch(token):
-            dois.append(token)
+        doi = normalize_doi(token)
+        if doi is not None:
+            dois.append(doi)
+            continue
+        pmid = _pmid_from_token(token)
+        if pmid is not None:
+            pmids.append(pmid)
         elif token.isdigit():
-            pmids.append(token)
-    return dois, pmids
+            ambiguous.append(token)
+    return dois, pmids, ambiguous
+
+
+def _ingest_stub(
+    session: Session, submission: PaperSubmission, *, owner_id: str
+) -> models.PaperWork | None:
+    """Register an unknown identifier through the ingest path; None on failure."""
+    job = jobs.submit_ingest(session, submission, owner_id=owner_id)
+    if not job.paper_work_id:
+        return None
+    return session.get(models.PaperWork, job.paper_work_id)
 
 
 def add_members(
@@ -217,75 +330,82 @@ def add_members(
 ) -> CollectionAddMembersResult:
     collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
 
+    skipped: list[str] = []
+
     csv_dois: list[str] = []
     csv_pmids: list[str] = []
     if payload.csv_text:
-        csv_dois, csv_pmids = _identifiers_from_csv(payload.csv_text)
+        csv_dois, csv_pmids, ambiguous = _identifiers_from_csv(payload.csv_text)
+        skipped.extend(ambiguous)
+
+    explicit_dois: list[str] = []
+    for raw in payload.dois:
+        doi = normalize_doi(raw)
+        if doi is None:
+            skipped.append(raw)
+        else:
+            explicit_dois.append(doi)
+
+    explicit_pmids: list[str] = []
+    for raw in payload.pmids:
+        pmid = _pmid_from_token(raw.strip())
+        if pmid is None:
+            skipped.append(raw)
+        else:
+            explicit_pmids.append(pmid)
 
     work_ids = list(dict.fromkeys(payload.work_ids))
-    dois = list(dict.fromkeys([*payload.dois, *csv_dois]))
-    pmids = list(dict.fromkeys([*payload.pmids, *csv_pmids]))
+    dois = list(dict.fromkeys([*explicit_dois, *csv_dois]))
+    pmids = list(dict.fromkeys([*explicit_pmids, *csv_pmids]))
 
-    added_members: list[CollectionMemberView] = []
-    skipped: list[str] = []
+    total = len(work_ids) + len(dois) + len(pmids)
+    if total > MAX_BATCH_IDENTIFIERS:
+        raise BatchLimitError(
+            f"batch of {total} identifiers exceeds the limit of "
+            f"{MAX_BATCH_IDENTIFIERS} per request"
+        )
+
+    # Phase 1 — resolve every identifier to a work, registering metadata stubs
+    # for unknown DOIs/PMIDs. Stub ingestion commits per job (stubs are valid
+    # standalone works either way); membership writes are deferred to phase 2
+    # so they land in a single commit.
+    resolved_works: list[models.PaperWork] = []
     created_stub_work_ids: list[str] = []
 
     for work_id in work_ids:
         work = _resolve_existing_work(session, work_id=work_id)
         if work is None:
             skipped.append(work_id)
-            continue
-        if _membership_exists(session, collection.collection_id, work.work_id):
-            continue
-        member = _create_membership(
-            session, collection_id=collection.collection_id, work_id=work.work_id, added_by=owner_id
-        )
-        added_members.append(
-            _member_view(member, work, include_tallies=False, session=session)
-        )
+        else:
+            resolved_works.append(work)
 
     for doi in dois:
         work = _resolve_existing_work(session, doi=doi)
         if work is None:
-            job = jobs.submit_ingest(
-                session,
-                PaperSubmission(doi=doi),
-                owner_id=owner_id,
-            )
-            if not job.paper_work_id:
-                skipped.append(doi)
-                continue
-            work = session.get(models.PaperWork, job.paper_work_id)
+            work = _ingest_stub(session, PaperSubmission(doi=doi), owner_id=owner_id)
             if work is not None:
                 created_stub_work_ids.append(work.work_id)
         if work is None:
             skipped.append(doi)
-            continue
-        if _membership_exists(session, collection.collection_id, work.work_id):
-            continue
-        member = _create_membership(
-            session, collection_id=collection.collection_id, work_id=work.work_id, added_by=owner_id
-        )
-        added_members.append(
-            _member_view(member, work, include_tallies=False, session=session)
-        )
+        else:
+            resolved_works.append(work)
 
     for pmid in pmids:
         work = _resolve_existing_work(session, pmid=pmid)
         if work is None:
-            job = jobs.submit_ingest(
-                session,
-                PaperSubmission(pmid=pmid),
-                owner_id=owner_id,
-            )
-            if not job.paper_work_id:
-                skipped.append(pmid)
-                continue
-            work = session.get(models.PaperWork, job.paper_work_id)
+            work = _ingest_stub(session, PaperSubmission(pmid=pmid), owner_id=owner_id)
             if work is not None:
                 created_stub_work_ids.append(work.work_id)
         if work is None:
             skipped.append(pmid)
+        else:
+            resolved_works.append(work)
+
+    # Phase 2 — create memberships in one transaction.
+    added_members: list[CollectionMemberView] = []
+    added_work_ids: set[str] = set()
+    for work in resolved_works:
+        if work.work_id in added_work_ids:
             continue
         if _membership_exists(session, collection.collection_id, work.work_id):
             continue
@@ -295,8 +415,10 @@ def add_members(
         added_members.append(
             _member_view(member, work, include_tallies=False, session=session)
         )
+        added_work_ids.add(work.work_id)
 
-    collection.updated_at = datetime.now().astimezone()
+    if added_members:
+        collection.updated_at = _utcnow()
     session.commit()
 
     return CollectionAddMembersResult(
@@ -321,7 +443,7 @@ def remove_member(
     if member is None:
         raise NotFound("collection member not found")
     session.delete(member)
-    collection.updated_at = datetime.now().astimezone()
+    collection.updated_at = _utcnow()
     session.commit()
 
 
@@ -385,7 +507,7 @@ def _aggregate_tallies(members: list[CollectionMemberView]) -> CitationTallies:
 
 
 def _sort_members(
-    members: list[CollectionMemberView], *, sort_key: str
+    members: list[CollectionMemberView], *, sort_key: MemberSort
 ) -> list[CollectionMemberView]:
     if sort_key == "added_asc":
         return sorted(members, key=lambda member: member.added_at)

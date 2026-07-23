@@ -1,7 +1,8 @@
 """Collections API (scite-parity WP4, F5).
 
 Collections are user-owned curated sets of works. Writes require auth (+ CSRF for
-cookie sessions). Reads are scoped to the caller's own collections.
+cookie sessions). Reads are scoped to the caller's own collections; a collection
+owned by another user is indistinguishable from a missing one (404).
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from ...auth import NotAuthorized, Principal
+from ...auth import Principal
 from ...schemas import (
     CollectionAddMembersRequest,
     CollectionAddMembersResult,
@@ -19,6 +20,7 @@ from ...schemas import (
     CollectionView,
 )
 from ...services import collections
+from ...services.collections import BatchLimitError, MemberSort
 from ...services.projection import NotFound
 from ..deps import db_session
 from ..security import require_user
@@ -50,7 +52,7 @@ def get_collection(
         False,
         description="Include per-member citation tallies from /citation-stats.",
     ),
-    member_sort: str = Query(
+    member_sort: MemberSort = Query(
         "added_desc",
         description=(
             "Member order: added_desc (default), added_asc, support_desc, "
@@ -70,8 +72,6 @@ def get_collection(
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except NotAuthorized as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.patch("/collections/{collection_id}", response_model=CollectionView)
@@ -87,8 +87,6 @@ def update_collection(
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except NotAuthorized as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.delete("/collections/{collection_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -101,8 +99,6 @@ def delete_collection(
         collections.delete_collection(session, collection_id, owner_id=principal.user_id)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except NotAuthorized as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -122,8 +118,8 @@ def add_members(
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except NotAuthorized as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except BatchLimitError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete(
@@ -142,6 +138,4 @@ def remove_member(
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except NotAuthorized as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

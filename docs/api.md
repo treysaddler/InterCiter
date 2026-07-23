@@ -116,17 +116,28 @@ metadata stubs for unknown identifiers through the existing ingest path.
 - `GET /v1/collections/{id}` — collection detail with member list. Optional query
   `include_member_tallies=true` adds each member's WP1 citation tallies inline and
   `aggregate_citation_tallies` for the whole collection. Optional `member_sort`:
-  `added_desc` (default), `added_asc`, `support_desc`, `contradict_desc`.
-- `PATCH /v1/collections/{id}` — update `{name?, description?}`.
+  `added_desc` (default), `added_asc`, `support_desc`, `contradict_desc`
+  (unknown values are rejected with `422`).
+- `PATCH /v1/collections/{id}` — update `{name?, description?}`. An explicitly
+  `null` description clears the stored value; an omitted field is left unchanged.
 - `DELETE /v1/collections/{id}` — delete a collection (and memberships).
 - `POST /v1/collections/{id}/members` — batch add members (`{work_ids[], dois[],
   pmids[], csv_text?}`) and returns `{added_count, skipped_identifiers,
   created_stub_work_ids, members[]}` where `created_stub_work_ids` are works that
-  were registered as metadata stubs during identifier ingestion.
+  were registered as metadata stubs during identifier ingestion. Identifier
+  handling: DOIs are canonicalized to lowercase and may be given as bare DOIs,
+  `doi:`-prefixed, or doi.org / dx.doi.org URLs; pasted `csv_text` is split on
+  whitespace and commas only (semicolons occur inside legacy Wiley/SICI DOIs);
+  PMIDs may be `pmid:`-prefixed, and bare 4-digit numbers in the
+  publication-year range are treated as ambiguous and reported in
+  `skipped_identifiers` rather than imported. Batches are capped at 500
+  identifiers per request (`400` beyond that). Stub registration commits per
+  identifier; membership rows are written in a single transaction at the end.
 - `DELETE /v1/collections/{id}/members/{work_id}` — remove one member.
 
-All collection endpoints are auth-scoped to the caller's own resources. Writes require
-CSRF when using cookie auth.
+All collection endpoints are auth-scoped to the caller's own resources; a
+collection owned by another user is indistinguishable from a missing one (`404`).
+Writes require CSRF when using cookie auth.
 
 ## Identity, sessions, and accounts (MVP)
 

@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from ..db import init_db
 from .routers import (
     alerts,
+    bibliometrics,
     claims,
     collections,
     discovery,
@@ -52,6 +53,7 @@ app.include_router(collections.router, prefix="/v1", tags=["collections"])
 app.include_router(maps.router, prefix="/v1", tags=["maps"])
 app.include_router(alerts.router, prefix="/v1", tags=["alerts"])
 app.include_router(search.router, prefix="/v1", tags=["search"])
+app.include_router(bibliometrics.router, prefix="/v1", tags=["bibliometrics"])
 app.include_router(relations.router, prefix="/v1", tags=["relations"])
 app.include_router(review.router, prefix="/v1", tags=["review"])
 app.include_router(graph.router, prefix="/v1", tags=["graph"])

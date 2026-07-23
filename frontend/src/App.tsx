@@ -7,6 +7,7 @@ import { Loading } from './components/States'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import SearchPage from './pages/SearchPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 import PapersPage from './pages/PapersPage'
 import PaperDetailPage from './pages/PaperDetailPage'
 import ReportPage from './pages/ReportPage'
@@ -40,6 +41,7 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="papers" element={<PapersPage />} />
         <Route path="papers/:workId" element={<PaperDetailPage />} />
         <Route path="papers/:workId/report" element={<ReportPage />} />

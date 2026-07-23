@@ -524,3 +524,46 @@ export interface SearchResults {
   hits: SearchHit[]
   facets: SearchFacets
 }
+
+// --- Corpus bibliometrics (bibliometrix-parity WP-B1) ---
+
+export interface AnnualProduction {
+  year: number
+  document_count: number
+}
+
+export interface AuthorProductivity {
+  name: string
+  document_count: number
+}
+
+export interface SourceProductivity {
+  source: string
+  document_count: number
+}
+
+export interface CitedDocument {
+  work_id: string
+  title: string | null
+  year: number | null
+  citation_count: number
+}
+
+export interface BibliometricsSummary {
+  document_count: number
+  source_count: number
+  author_count: number
+  author_appearances: number
+  co_authors_per_doc: number
+  single_authored_count: number
+  min_year: number | null
+  max_year: number | null
+  annual_growth_rate: number | null
+  avg_citations_per_doc: number
+  total_citations: number
+  documents_without_year: number
+  annual_production: AnnualProduction[]
+  top_authors: AuthorProductivity[]
+  top_sources: SourceProductivity[]
+  top_cited_documents: CitedDocument[]
+}

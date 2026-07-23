@@ -465,6 +465,67 @@ class SearchResults(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Corpus bibliometrics (bibliometrix-parity WP-B1)
+# ---------------------------------------------------------------------------------
+
+
+class AnnualProduction(BaseModel):
+    """Document count for a single publication year."""
+
+    year: int
+    document_count: int
+
+
+class AuthorProductivity(BaseModel):
+    """A productive author and how many corpus documents list them."""
+
+    name: str
+    document_count: int
+
+
+class SourceProductivity(BaseModel):
+    """A source (venue) and how many corpus documents it published."""
+
+    source: str
+    document_count: int
+
+
+class CitedDocument(BaseModel):
+    """A corpus document ranked by how many works cite it (in-degree)."""
+
+    work_id: str
+    title: str | None = None
+    year: int | None = None
+    citation_count: int
+
+
+class BibliometricsSummary(BaseModel):
+    """Corpus-level "Main Information" descriptive rollup (bibliometrix).
+
+    A derived, non-mutating projection over the existing metadata (``PaperWork``
+    authors / venue / year plus the citation graph). Function + stance claim rigor is
+    untouched — this is the aggregate *metadata* lens that complements it.
+    """
+
+    document_count: int
+    source_count: int
+    author_count: int
+    author_appearances: int
+    co_authors_per_doc: float
+    single_authored_count: int
+    min_year: int | None = None
+    max_year: int | None = None
+    annual_growth_rate: float | None = None
+    avg_citations_per_doc: float
+    total_citations: int
+    documents_without_year: int
+    annual_production: list[AnnualProduction] = Field(default_factory=list)
+    top_authors: list[AuthorProductivity] = Field(default_factory=list)
+    top_sources: list[SourceProductivity] = Field(default_factory=list)
+    top_cited_documents: list[CitedDocument] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------------
 

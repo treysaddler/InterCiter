@@ -207,11 +207,28 @@ owner id and any identity, so a shared link never leaks who built the map.
 - `GET /v1/shared-maps/{token}/graph` — **no auth** — render the shared map's seed set
   as a `GraphView`. `include_authors` optional.
 
+### Monitoring (WP-L5)
+
+A saved map can be watched so the alerts subsystem (scite WP8) surfaces newly
+connected papers found by re-running seed discovery (WP-L1). This reuses the one
+alerts feed rather than adding a second system.
+
+- `POST /v1/maps/{id}/watch` — toggle monitoring (`{watch: bool}`). Enabling resets
+  the discovery baseline so the first monitor run seeds it silently (no alert flood).
+  Returns the updated `MapView` (`is_watched`, `watch_last_checked_at`).
+- `POST /v1/maps/{id}/monitor` — re-run discovery for the map's seed set, diff newly
+  connected papers against the last-seen set, and emit `map` / `new_connected_paper`
+  alerts. Performs a Semantic Scholar read (auth required). The first run after
+  watching only seeds the baseline. Returns `{created_count, alerts[]}`. Watched maps
+  are also swept by `POST /v1/alerts/run`.
+
 ## Monitoring — saved searches & alerts
 
 Persist claim searches and turn watched collections + saved searches into an in-app
 alert feed (scite-parity WP8, F3/F5). No email/SMTP yet — delivery is in-app only.
 All endpoints are auth-scoped to the caller; another user's records are `404`.
+Watched **maps** (litmaps WP-L5) feed the same alert list via a `map` source and are
+swept by `POST /v1/alerts/run`; see the Saved-maps → Monitoring section above.
 
 - `POST /v1/saved-searches` — create (`{name, query:{q?, section?, function?, stance?,
   resolution?, min_year?, max_year?}}`). Creation seeds a baseline of the current

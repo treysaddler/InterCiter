@@ -35,13 +35,12 @@ Shipped to origin/main:
   collections (+ watch / delta / integrity / bulk) · WP5 retraction+integrity
   signal · WP8 saved searches + alerts · WP9 Zotero/Mendeley (RIS/BibTeX) import.
 - litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
-  layouts + annotations · WP-L4 read-only map sharing.
+  layouts + annotations · WP-L4 read-only map sharing · WP-L5 map monitoring.
 - bibliometrix: none yet (plan drafted 2026-07-23).
 
 Not yet built:
 - scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check.
-- litmaps: WP-L5 map monitoring (extends scite WP8 — now unblocked) · WP-L6
-  Zotero seed import (extends the shipped scite WP9 importer).
+- litmaps: WP-L6 Zotero seed import (extends the shipped scite WP9 importer).
 - bibliometrix: WP-B1 … WP-B10 (all).
 
 Build-once shared WPs (one implementation serves several plans):
@@ -58,14 +57,14 @@ Build-once shared WPs (one implementation serves several plans):
   in every plan).
 
 Recommended next steps (highest cross-plan leverage first):
-1. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
-   shipped; completes the litmaps monitoring story by adding a "map" source.
-2. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
+1. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
    surface with no schema/NLP/deps; foundation for WP-B2…B10.
-3. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+2. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
    exist; later extended by bibliometrix WP-B10.
+3. scite WP7 Reference Check — reuses WP1 tallies + WP5 integrity over a paper's
+   reference list (identifier intake first, PDF later).
 4. litmaps WP-L6 / bibliometrix WP-B6 — layer Map-seed + WoS/Scopus/OpenAlex onto
-   the now-shipped scite WP9 import core.
+   the shipped scite WP9 import core.
 
 ---
 
@@ -189,7 +188,7 @@ Wave B:
 - WP-L4 Map sharing (read-only share token/link) (L4)   ✅ DONE
 
 Wave C (consolidated with scite plan):
-- WP-L5 Map monitoring → extend scite-parity WP8 (L5)
+- WP-L5 Map monitoring → extend scite-parity WP8 (L5)   ✅ DONE
 - WP-L6 Zotero seed import → extend scite-parity WP9 (L6)
 
 Rationale: WP-L2 (persistence) unblocks sharing (WP-L4) and monitoring (WP-L5);
@@ -306,7 +305,7 @@ Tests: token mint/revoke, token access returns map, revoked token 404, no writes
 via shared route.
 Deps: WP-L2.
 
-### WP-L5 — Map monitoring  (L5) → EXTEND scite-parity WP8
+### WP-L5 — Map monitoring  (L5) → EXTEND scite-parity WP8   ✅ DONE
 Goal: alert when new papers connect to a saved map's seed set.
 Do NOT build a separate alerts system. In scite-parity WP8's alerts subsystem,
 add a "map" alert source: periodically re-run WP-L1 discovery for the map's seed
@@ -314,6 +313,21 @@ set, diff candidates against last-seen, surface new connected papers as alert
 rows. In-app notifications first; email later/out of scope.
 Deps: WP-L1, WP-L2, scite-parity WP8 — ALL SHIPPED, so WP-L5 is unblocked and is
 the smallest remaining litmaps package (add a source to the existing subsystem).
+
+> Implemented: additive Map slots `is_watched` + `last_seen_ids` + `last_checked_at`
+> (LinkML + ORM). `maps.set_watch` toggles state and RESETS the baseline
+> (`last_checked_at=None`) so the first run seeds silently. `alerts._run_map`
+> re-runs `discovery.discover_from_seeds` over the map's member work ids, diffs
+> candidate ids (external id / in-corpus id) vs `last_seen_ids`, emits
+> `map`/`new_connected_paper` alerts, and advances the baseline; a transient
+> `S2Error` leaves the baseline untouched. `run_all` now also sweeps watched maps.
+> Endpoints `POST /v1/maps/{id}/watch` (`{watch}`) + `POST /v1/maps/{id}/monitor`
+> (require_user; ownership → 404; performs an S2 read). `MapView` gained `is_watched`
+> + `watch_last_checked_at`. Frontend: Watch/Unwatch + "Check now" controls on
+> `MapsPage`; alerts surface in the existing `AlertsPage`. Tests:
+> `tests/test_maps.py` (+3: watch state, seed-then-alert-on-new-connection with
+> monkeypatched `enrichment.reference_links`, ownership/auth) + `MapsPage.test.tsx`
+> (+2). Deferred: scheduled (vs on-demand) runner; email delivery.
 
 ### WP-L6 — Zotero seed import  (L6) → EXTEND scite-parity WP9
 Goal: import a Zotero library/collection as a seed set / Map.

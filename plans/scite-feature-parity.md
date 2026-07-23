@@ -28,13 +28,12 @@ Shipped to origin/main:
   collections (+ watch / delta / integrity / bulk) · WP5 retraction+integrity
   signal · WP8 saved searches + alerts · WP9 Zotero/Mendeley (RIS/BibTeX) import.
 - litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
-  layouts + annotations · WP-L4 read-only map sharing.
+  layouts + annotations · WP-L4 read-only map sharing · WP-L5 map monitoring.
 - bibliometrix: none yet (plan drafted 2026-07-23).
 
 Not yet built:
 - scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check.
-- litmaps: WP-L5 map monitoring (extends scite WP8 — now unblocked) · WP-L6
-  Zotero seed import (extends the shipped scite WP9 importer).
+- litmaps: WP-L6 Zotero seed import (extends the shipped scite WP9 importer).
 - bibliometrix: WP-B1 … WP-B10 (all).
 
 Build-once shared WPs (one implementation serves several plans):
@@ -51,14 +50,14 @@ Build-once shared WPs (one implementation serves several plans):
   in every plan).
 
 Recommended next steps (highest cross-plan leverage first):
-1. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
-   shipped; completes the litmaps monitoring story by adding a "map" source.
-2. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
+1. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
    surface with no schema/NLP/deps; foundation for WP-B2…B10.
-3. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+2. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
    exist; later extended by bibliometrix WP-B10.
+3. scite WP7 Reference Check — reuses WP1 tallies + WP5 integrity over a paper's
+   reference list (identifier intake first, PDF later).
 4. litmaps WP-L6 / bibliometrix WP-B6 — layer Map-seed + WoS/Scopus/OpenAlex onto
-   the now-shipped scite WP9 import core.
+   the shipped scite WP9 import core.
 
 ---
 

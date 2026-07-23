@@ -187,6 +187,14 @@ export default function SearchPage() {
               </Suspense>
             )}
 
+            {focusWorkId && (
+              <p className="margin-top-05 margin-bottom-2">
+                <Link to={`/graph/papers/${focusWorkId}`}>
+                  Open in the full network explorer →
+                </Link>
+              </p>
+            )}
+
             <ol className="usa-list usa-list--unstyled">
               {results.data.hits.map((hit) => (
                 <li

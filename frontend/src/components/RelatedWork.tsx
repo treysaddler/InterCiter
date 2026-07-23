@@ -14,8 +14,18 @@ import { ErrorAlert, Loading } from './States'
  * it is auth-gated exactly like graph expansion. Nothing is persisted — candidates are
  * suggestions; in-corpus hits deep-link, the rest show a Semantic Scholar id.
  */
-export default function RelatedWork({ workId }: { workId: string }) {
+export default function RelatedWork({
+  workId,
+  seedWorkIds,
+  label,
+}: {
+  workId?: string
+  seedWorkIds?: string[]
+  label?: string
+}) {
   const { status } = useAuth()
+  const seeds = seedWorkIds ?? (workId ? [workId] : [])
+  const multiSeed = seeds.length > 1
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +35,7 @@ export default function RelatedWork({ workId }: { workId: string }) {
     setError(null)
     try {
       const res = await api.post<DiscoveryResult>('/discovery/seeds', {
-        seed_work_ids: [workId],
+        seed_work_ids: seeds,
         limit: 20,
       })
       setResult(res)
@@ -52,7 +62,11 @@ export default function RelatedWork({ workId }: { workId: string }) {
         onClick={findRelated}
         disabled={loading}
       >
-        {loading ? 'Finding…' : result ? 'Refresh related work' : 'Find related work'}
+        {loading
+          ? 'Finding…'
+          : result
+            ? 'Refresh related work'
+            : (label ?? 'Find related work')}
       </button>
 
       {loading && <Loading />}
@@ -62,7 +76,9 @@ export default function RelatedWork({ workId }: { workId: string }) {
         <>
           {result.seeds_resolved === 0 ? (
             <p className="text-base margin-top-2">
-              This paper has no DOI, PMID, or Semantic Scholar id to search with.
+              {multiSeed
+                ? 'None of these papers has a DOI, PMID, or Semantic Scholar id to search with.'
+                : 'This paper has no DOI, PMID, or Semantic Scholar id to search with.'}
             </p>
           ) : result.candidates.length === 0 ? (
             <p className="text-base margin-top-2">No connected papers found.</p>

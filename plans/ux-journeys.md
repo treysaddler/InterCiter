@@ -398,15 +398,25 @@ Ordered by leverage; each is its own change, none included in this doc.
    USWDS `NavDropDownButton` + `Menu`. The Network explorer (`/graph`) now lives under
    Explore (fixes G2 orphan); Review is gated to reviewer/admin in the nav to match its
    route. Added `AppShell.test.tsx`; updated `docs/ui-design.md` §5 IA.
-2. **UX-2 — Cohort cross-links (§4.2, G1–G3).** Add "Analyze / Explore as network /
-   Find related work" actions on `/collections/:id`, `/maps`, and search results.
-   Small button-wiring changes; the APIs already accept `work_ids`.
-3. **UX-3 — Cohort as a routable concept (§4.3, G4). DECIDED — build before the
+2. **UX-2 — Cohort cross-links (§4.2, G2–G3). ◑ PARTIAL — the safe, no-plumbing
+   wins landed.** Shipped: (G3) a "Grow this collection" discovery action on
+   [`CollectionDetailPage`](../frontend/src/pages/CollectionDetailPage.tsx) — seeds
+   `POST /v1/discovery/seeds` with up to 25 of the collection's members (seeds travel
+   in the request body, so no URL-length limit); `RelatedWork` was generalized to
+   accept a `seedWorkIds` cohort. (G2) an "Open in the full network explorer →" link
+   from the focused search result. **Deferred to UX-3:** the "Analyze this
+   collection/map" and whole-cohort "Explore as network" buttons — these need a work
+   set passed by *reference* (`?collection=` / `?map=`), because inlining hundreds of
+   `work_ids` in a URL breaks, and the Analytics/Graph pages don't yet forward a
+   cohort. That plumbing IS UX-3, so those buttons ship there.
+3. **UX-3 — Cohort as a routable concept (§4.3, G1/G4). DECIDED — build before the
    bibliometric network/thematic WPs.** Teach Analytics + Graph (and later Discovery,
-   corpus report) to accept `?collection=` / `?map=` / `?search=` and resolve to a
-   work-set; standardize the cohort param across analysis screens. Ships over the
-   existing `work_ids` API — no schema change required to start. Structural backbone
-   of Persona D's journey; every future bibliometric WP inherits cohort selection.
+   corpus report) to accept `?collection=` / `?map=` / `?search=` (by reference) and
+   resolve to a work-set server-side; standardize the cohort param across analysis
+   screens; then add the "Analyze this collection/map" + "Explore as network" buttons
+   deferred from UX-2. Needs a small backend seam to resolve a collection/map id to
+   its `work_ids` for the bibliometrics + graph endpoints. Structural backbone of
+   Persona D's journey; every future bibliometric WP inherits cohort selection.
 4. **UX-4 — Journey coverage in the story doc.** Fold Persona D (now a DECIDED target)
    and journeys J2–J4 into [`docs/ui-design.md`](../docs/ui-design.md) §2/§8 so the
    canonical doc stops trailing the implementation, and add the a11y-table-fallback

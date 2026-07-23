@@ -33,4 +33,19 @@ describe('RelatedWork', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.getByText(/Sign in/)).toBeInTheDocument()
   })
+
+  it('accepts a multi-seed cohort with a custom action label', () => {
+    authState.status = 'authenticated'
+    render(
+      <MemoryRouter>
+        <RelatedWork
+          seedWorkIds={['work_1', 'work_2']}
+          label="Find related work"
+        />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('button', { name: 'Find related work' }),
+    ).toBeInTheDocument()
+  })
 })

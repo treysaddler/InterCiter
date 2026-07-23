@@ -9,6 +9,12 @@ vi.mock('../api/client', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), del: vi.fn() },
 }))
 
+// RelatedWork calls useAuth (no provider is mounted here); stub it so the
+// collection page tests stay focused on the collection behavior.
+vi.mock('../components/RelatedWork', () => ({
+  default: () => <div>related-work-stub</div>,
+}))
+
 const mockedGet = vi.mocked(api.get)
 const mockedPatch = vi.mocked(api.patch)
 const mockedDel = vi.mocked(api.del)
@@ -85,6 +91,10 @@ describe('CollectionDetailPage', () => {
     )
     expect(screen.getByText(/citation tallies/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /collection citation summary/i })).toBeInTheDocument()
+    // The collection offers a discovery action to grow itself (UX-2 / G3).
+    expect(
+      screen.getByRole('heading', { name: /grow this collection/i }),
+    ).toBeInTheDocument()
   })
 
   it('saves collection metadata and can delete the collection', async () => {

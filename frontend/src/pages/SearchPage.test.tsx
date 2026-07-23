@@ -112,6 +112,11 @@ describe('SearchPage', () => {
 
     // The citation network for the top result appears inline with the results.
     expect(await screen.findByTestId('search-network')).toHaveTextContent('work_1')
+
+    // A link promotes the focused result into the full network explorer (UX-2 / G2).
+    expect(
+      screen.getByRole('link', { name: /full network explorer/i }),
+    ).toHaveAttribute('href', '/graph/papers/work_1')
   })
 
   it('passes facet filters through to the search endpoint', async () => {

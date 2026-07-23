@@ -12,6 +12,7 @@ import type {
 import CitationTallies from '../components/CitationTallies'
 import IntegrityBadges from '../components/IntegrityBadges'
 import PageHeading from '../components/PageHeading'
+import RelatedWork from '../components/RelatedWork'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
@@ -523,6 +524,31 @@ export default function CollectionDetailPage() {
             <p className="font-body-3xs text-base margin-top-05 margin-bottom-0">
               Importing library…
             </p>
+          )}
+
+          {detail.data.members.length > 0 && (
+            <section
+              className="usa-summary-box margin-y-2"
+              aria-labelledby="grow-heading"
+            >
+              <div className="usa-summary-box__body">
+                <h2 className="usa-summary-box__heading" id="grow-heading">
+                  Grow this collection
+                </h2>
+                <div className="usa-summary-box__text">
+                  <p className="margin-top-0">
+                    Find papers connected to this collection through shared
+                    references (Semantic Scholar), based on up to 25 of its members.
+                  </p>
+                  <RelatedWork
+                    seedWorkIds={detail.data.members
+                      .slice(0, 25)
+                      .map((member) => member.work_id)}
+                    label="Find related work"
+                  />
+                </div>
+              </div>
+            </section>
           )}
 
           <h2>Batch add members</h2>

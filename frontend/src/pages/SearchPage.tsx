@@ -10,7 +10,7 @@ import { Loading, ErrorAlert } from '../components/States'
 import { EXAMPLE_QUERIES } from '../data/exampleQueries'
 import { useApi } from '../hooks/useApi'
 
-// The network view pulls in Cytoscape (large) so it is code-split and only fetched
+// The network view pulls in the d3 SVG renderer so it is code-split and only fetched
 // once a search has results to explore.
 const SearchNetwork = lazy(() => import('../components/SearchNetwork'))
 

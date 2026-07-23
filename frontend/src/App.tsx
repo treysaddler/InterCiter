@@ -22,8 +22,8 @@ import CollectionDetailPage from './pages/CollectionDetailPage'
 import AlertsPage from './pages/AlertsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
-// The graph view pulls in Cytoscape (a large canvas library) that no other screen
-// needs, so it is code-split and only fetched when a user opens /graph.
+// The graph view pulls in the d3 SVG renderer that no other screen needs, so it is
+// code-split and only fetched when a user opens /graph.
 const GraphPage = lazy(() => import('./pages/GraphPage'))
 
 /**

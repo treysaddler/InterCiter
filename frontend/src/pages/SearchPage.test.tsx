@@ -16,7 +16,7 @@ vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ status: mockStatus() }),
 }))
 
-// The inline network is lazy + Cytoscape-heavy; stub it so the page tests stay light.
+// The inline network is lazy + d3-heavy; stub it so the page tests stay light.
 vi.mock('../components/SearchNetwork', () => ({
   default: ({ workId }: { workId: string }) => (
     <div data-testid="search-network">network:{workId}</div>

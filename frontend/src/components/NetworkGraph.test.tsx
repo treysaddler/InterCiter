@@ -5,16 +5,27 @@ import { vi } from 'vitest'
 import NetworkGraph from './NetworkGraph'
 import type { GraphView } from '../api/types'
 
-// Cytoscape renders to a Canvas, which jsdom does not implement. Mock it so the
-// component's accessible fallback (the part we assert on) renders without a canvas.
-vi.mock('cytoscape', () => ({
-  default: () => ({
-    on: vi.fn(),
-    nodes: () => ({ removeClass: vi.fn() }),
-    getElementById: () => ({ addClass: vi.fn() }),
-    destroy: vi.fn(),
-  }),
+// The SVG renderer uses modular d3 (selection/force/zoom/drag). jsdom has no layout
+// engine, so mock the d3 entry points with a self-returning chainable stub. The
+// component's accessible fallback (the part we assert on) then renders unaffected.
+const chain = (): unknown => {
+  const proxy: unknown = new Proxy(function () {}, {
+    get: () => () => proxy,
+    apply: () => proxy,
+  })
+  return proxy
+}
+
+vi.mock('d3-selection', () => ({ select: () => chain() }))
+vi.mock('d3-force', () => ({
+  forceSimulation: () => chain(),
+  forceLink: () => chain(),
+  forceManyBody: () => chain(),
+  forceCenter: () => chain(),
+  forceCollide: () => chain(),
 }))
+vi.mock('d3-zoom', () => ({ zoom: () => chain() }))
+vi.mock('d3-drag', () => ({ drag: () => chain() }))
 
 const view: GraphView = {
   nodes: [

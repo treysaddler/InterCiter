@@ -13,8 +13,8 @@ import { ErrorAlert, Loading } from './States'
  * another paper node re-focuses the network on it, letting a reader walk the context
  * without leaving the search screen.
  *
- * Heavy (Cytoscape) — always mount this behind `React.lazy` so it stays out of the
- * initial bundle.
+ * Heavy (d3 SVG renderer) — always mount this behind `React.lazy` so it stays out of
+ * the initial bundle.
  */
 export default function SearchNetwork({
   workId,

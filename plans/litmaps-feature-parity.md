@@ -234,7 +234,7 @@ endpoints (add node.data measures in `services/graph.py` only if not already the
 Tests: layout/style props reflect in the a11y table; axis mode positions nodes.
 Deps: WP-L3a.
 
-**WP-L3c — Per-node annotations (needs persistence).**
+**WP-L3c — Per-node annotations (needs persistence).**   ✅ DONE
 When a saved Map is loaded (WP-L2), allow editing a per-node note; persist via the
 WP-L2 membership `note`. Show the note in the node summary box + a11y table.
 Tests: annotation edit calls the WP-L2 endpoint; note appears in the a11y table.

@@ -53,13 +53,48 @@ def _apply_additive_columns() -> None:
                 continue
             existing = {c["name"] for c in inspector.get_columns(table.name)}
             for column in table.columns:
-                if column.name in existing or not column.nullable:
+                if column.name in existing:
                     continue
                 ddl = (
                     f'ALTER TABLE {table.name} ADD COLUMN "{column.name}" '
                     f"{column.type.compile(engine.dialect)}"
                 )
+                if not column.nullable:
+                    server_default = _default_literal(column)
+                    if server_default is None:
+                        # No safe fill value for existing rows — leave for a real
+                        # migration rather than guessing.
+                        continue
+                    ddl += f" DEFAULT {server_default} NOT NULL"
                 conn.execute(text(ddl))
+
+
+def _default_literal(column) -> str | None:
+    """SQL literal for a column's Python-side default, or None if underivable."""
+    default = column.default
+    if default is None:
+        return None
+    if default.is_callable:
+        # mapped_column(default=list/dict) — empty JSON container.
+        origin = getattr(default, "arg", None)
+        # SQLAlchemy wraps the callable; unwrap common empty-container factories.
+        wrapped = getattr(origin, "__wrapped__", origin)
+        if wrapped is list:
+            return "'[]'"
+        if wrapped is dict:
+            return "'{}'"
+        return None
+    if not default.is_scalar:
+        return None
+    value = default.arg
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        escaped = value.replace("'", "''")
+        return f"'{escaped}'"
+    return None
 
 
 def get_session() -> Iterator[Session]:

@@ -9,7 +9,7 @@ One paper accumulates many jobs over time (parse, extract, re-extract, hydrate),
 - `POST /v1/papers` — submit by DOI/PMID or open-access XML. Returns `202 Accepted` + a job resource. Supports an **idempotency key** so retries don't double-ingest.
 - `GET /v1/papers` — list ingested papers (metadata + availability state), bounded by `limit`/`offset`. The reader UI's entry list; reads stay open.
 - `GET /v1/jobs/{job_id}` — poll any async work (MVP notification model; webhooks on the same abstraction in phase 2).
-- `GET /v1/papers/{paper_id}` — work-level metadata + **availability state** (`full_text_extracted` … `ingestion_failed`, see architecture.md).
+- `GET /v1/papers/{paper_id}` — work-level metadata + **availability state** (`full_text_extracted` … `ingestion_failed`, see architecture.md). Also carries the additive integrity flags `is_retracted` / `integrity_notice` (both `null` until an integrity source is consulted; populated by the Crossref-backed `integrity-check` enrichment — scite WP5).
 - `GET /v1/papers/{paper_id}/versions` — the paper's `PaperVersion`s (preprint vs published vs correction).
 - `GET /v1/extraction-runs/{run_id}` — full run provenance (model, prompt version, parameters, code revision).
 - `POST /v1/papers/{paper_id}/extractions` — trigger a re-extraction with a specified model (evaluation workflows; not a production multi-model feature in MVP).

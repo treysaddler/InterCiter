@@ -402,6 +402,44 @@ def _cmd_s2_backfill(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_integrity_check(args: argparse.Namespace) -> int:
+    from . import models
+    from .services.integrity import check_all, check_work
+
+    init_db()
+    with SessionLocal() as session:
+        if args.all:
+            results = check_all(
+                session, limit=args.limit, only_unchecked=args.only_unchecked
+            )
+        else:
+            if not args.work_id:
+                print("error: provide a work id or --all", file=sys.stderr)
+                return 1
+            work = session.get(models.PaperWork, args.work_id)
+            if work is None:
+                print(f"error: work {args.work_id} not found", file=sys.stderr)
+                return 1
+            result = check_work(session, work)
+            session.commit()
+            results = [result]
+
+    retracted = 0
+    for r in results:
+        if r.skipped_reason:
+            note = r.skipped_reason
+        else:
+            note = (
+                f"retracted={r.is_retracted} notice={r.integrity_notice!r} "
+                f"changed={r.changed}"
+            )
+        print(f"{r.work_id}: {note}")
+        if r.is_retracted:
+            retracted += 1
+    print(f"-- {len(results)} work(s) checked, {retracted} retracted --")
+    return 0
+
+
 def _cmd_s2_datasets(args: argparse.Namespace) -> int:
     import json
 
@@ -629,6 +667,22 @@ def main(argv: list[str] | None = None) -> int:
         help="Also fetch references and persist S2 intents/contexts onto mentions",
     )
     p_bf.set_defaults(func=_cmd_s2_backfill)
+
+    p_int = sub.add_parser(
+        "integrity-check",
+        help="Flag retracted / noticed works from Crossref (scite WP5)",
+    )
+    p_int.add_argument("work_id", nargs="?", default=None, help="A single PaperWork id")
+    p_int.add_argument(
+        "--all", action="store_true", help="Check every work that has a DOI"
+    )
+    p_int.add_argument(
+        "--only-unchecked",
+        action="store_true",
+        help="With --all, skip works already checked (is_retracted set)",
+    )
+    p_int.add_argument("--limit", type=int, default=None, help="Cap works processed with --all")
+    p_int.set_defaults(func=_cmd_integrity_check)
 
     p_ds = sub.add_parser(
         "s2-datasets", help="Semantic Scholar bulk datasets (requires INTERCITER_S2_API_KEY)"

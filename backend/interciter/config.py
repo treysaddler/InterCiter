@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     name_res_url: str = "https://name-resolution-sri.renci.org"
     robokop_cache_dir: str = ".cache/robokop"
 
+    # Crossref REST API (retraction / editorial-notice integrity signal, scite WP5).
+    # Non-destructive enrichment: reads ``update-to`` / ``updated-by`` on a work's DOI
+    # record to flag retractions and editorial notices. Crossref asks the "polite pool"
+    # to identify a contact via ``mailto`` (raises priority/limits); responses are cached
+    # under ``crossref_cache_dir`` (gitignored). Only integrity flags are persisted.
+    crossref_base: str = "https://api.crossref.org"
+    crossref_mailto: str = ""
+    crossref_cache_dir: str = ".cache/crossref"
+
     # SPECTER2 paper-level prefilter for cross-paper clustering. Gates which cross-paper
     # claim pairs are even compared; the claim-level decision itself stays token-overlap
     # (paper-level embeddings never assert claim equivalence — docs/architecture.md).

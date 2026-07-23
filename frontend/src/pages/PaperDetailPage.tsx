@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { CitationStats, ClaimView, PaperView } from '../api/types'
 import CitationTallies from '../components/CitationTallies'
+import IntegrityBadges from '../components/IntegrityBadges'
 import PageHeading from '../components/PageHeading'
 import RelatedWork from '../components/RelatedWork'
 import { Empty, ErrorAlert, Loading } from '../components/States'
@@ -33,6 +34,22 @@ export default function PaperDetailPage() {
 
       {paper.loading && <Loading />}
       {paper.error && <ErrorAlert message={paper.error} />}
+      {paper.data?.is_retracted && (
+        <div
+          className="usa-alert usa-alert--error usa-alert--slim margin-top-2"
+          role="alert"
+        >
+          <div className="usa-alert__body">
+            <p className="usa-alert__text">
+              This work has been retracted
+              {paper.data.integrity_notice
+                ? ` (${paper.data.integrity_notice.replaceAll('_', ' ')})`
+                : ''}
+              . Interpret its citations accordingly.
+            </p>
+          </div>
+        </div>
+      )}
       {paper.data && (
         <ul className="usa-list usa-list--unstyled text-base">
           {paper.data.authors.length > 0 && <li>{paper.data.authors.join(', ')}</li>}
@@ -47,6 +64,11 @@ export default function PaperDetailPage() {
             <span className="usa-tag bg-base-lighter text-ink">
               {paper.data.availability_state}
             </span>
+            <IntegrityBadges
+              isRetracted={paper.data.is_retracted}
+              integrityNotice={paper.data.integrity_notice}
+              className="margin-left-1"
+            />
           </li>
           <li className="margin-top-1">
             <Link to={`/graph/papers/${workId}`}>Explore citation network →</Link>

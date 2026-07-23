@@ -78,6 +78,10 @@ class PaperView(BaseModel):
     pmid: str | None = None
     s2_corpus_id: str | None = None
     availability_state: enums.AvailabilityState
+    # Additive integrity flags (scite-parity WP5); null until an integrity source
+    # has been consulted.
+    is_retracted: bool | None = None
+    integrity_notice: str | None = None
 
 
 class PassageView(BaseModel):

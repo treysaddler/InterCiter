@@ -27,6 +27,8 @@ export interface PaperView {
   pmid: string | null
   s2_corpus_id: string | null
   availability_state: string
+  is_retracted: boolean | null
+  integrity_notice: string | null
 }
 
 export interface ClaimView {

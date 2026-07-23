@@ -9,6 +9,7 @@ import type {
   CollectionMemberView,
 } from '../api/types'
 import CitationTallies from '../components/CitationTallies'
+import IntegrityBadges from '../components/IntegrityBadges'
 import PageHeading from '../components/PageHeading'
 import { Empty, ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
@@ -86,26 +87,6 @@ function parseIdentifiers(text: string): { dois: string[]; pmids: string[] } {
 
 function stanceCount(member: CollectionMemberView, stance: string): number {
   return member.citation_tallies?.by_stance[stance] ?? 0
-}
-
-// Renders integrity badges (scite-parity WP5 starter). Null flags render
-// nothing, so unenriched works stay visually quiet.
-function IntegrityBadges({ member }: { member: CollectionMemberView }) {
-  if (!member.is_retracted && !member.integrity_notice) return null
-  return (
-    <span className="margin-left-1">
-      {member.is_retracted && (
-        <span className="usa-tag bg-secondary-dark text-white margin-right-05">
-          Retracted
-        </span>
-      )}
-      {member.integrity_notice && (
-        <span className="usa-tag bg-accent-warm-dark text-white">
-          {member.integrity_notice.replaceAll('_', ' ')}
-        </span>
-      )}
-    </span>
-  )
 }
 
 function sortMembers(
@@ -620,7 +601,11 @@ export default function CollectionDetailPage() {
                       <Link to={`/papers/${member.work_id}`}>
                         {member.title ?? member.work_id}
                       </Link>
-                      <IntegrityBadges member={member} />
+                      <IntegrityBadges
+                        isRetracted={member.is_retracted}
+                        integrityNotice={member.integrity_notice}
+                        className="margin-left-1"
+                      />
                       {member.citation_tallies && (
                         <details className="margin-top-1">
                           <summary className="font-body-3xs">

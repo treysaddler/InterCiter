@@ -254,7 +254,7 @@ Deps: WP1 (tallies on members). Monitoring/alerts split to WP8.
 > Continued: collection detail now supports exporting a filter-aware DOI/PMID
 > identifiers TXT for quick round-trip re-import and sharing.
 
-### WP5 — Retraction / editorial-notice signal  (cross-cutting)
+### WP5 — Retraction / editorial-notice signal  (cross-cutting)   ✅ DONE
 Goal: non-mutating enrichment flagging retracted / noticed works.
 Backend: extend `services/enrichment.py` (or new `services/integrity.py`) to
 pull integrity flags from an external source (S2 paper flags first; optionally
@@ -265,6 +265,27 @@ Frontend: retraction/notice badge component surfaced on PaperDetail, Report
 (WP3), Reference Check (WP7), Collection members (WP4).
 Tests: backend enrichment (offline via monkeypatched client) + badge render.
 Deps: none hard; consumed by WP3/WP4/WP7.
+
+> Implemented: source = **Crossref** (its Retraction Watch integration). New
+> `ingestion/crossref.py` client (polite-pool `mailto`, rate-limit, disk cache,
+> `net.ssl_context`+retry, 404→None). New `services/integrity.py`:
+> `integrity_from_message` reads a work's `update-to` block (retraction/removal/
+> withdrawal → `is_retracted`; expression-of-concern/correction/… → notice) with a
+> `RETRACTED:`-title fallback; `check_work` writes the additive nullable
+> `PaperWork.is_retracted` / `integrity_notice` (a definite `False` once checked,
+> distinct from unchecked `null`); `check_all(only_unchecked=)`. Persisted on
+> `PaperWork` (nullable columns, LinkML-mirrored) rather than a side table — the
+> flags are 1:1 with a work and read on every paper view. Config
+> `crossref_base`/`crossref_mailto`/`crossref_cache_dir`. CLI
+> `integrity-check <work_id>|--all [--only-unchecked] [--limit]`. Surfaced via
+> `PaperView.is_retracted`/`integrity_notice` (projection). Frontend: reusable
+> `components/IntegrityBadges.tsx` (retracted + humanized notice tags) on
+> collection members (WP4) + a retraction alert banner + badge on PaperDetail.
+> Tests: `backend/tests/test_integrity.py` (11 offline + 1 net-gated live against
+> the Wakefield 1998 retraction); frontend `IntegrityBadges.test.tsx` (3) +
+> `PaperDetailPage.test.tsx` (1). Coverage caveat: absence of a flag means "no
+> signal found" (depends on publisher deposits), not a guarantee of integrity.
+> Deferred: Reference Check surfacing (WP7 not built yet); optional second source.
 
 ### WP6 — Grounded Assistant (RAG Q&A)  (F2)
 Goal: evidence-grounded Q&A over InterCiter claims, answers cite verbatim spans.
@@ -380,7 +401,9 @@ Status: ✅ all five items below implemented (backend + frontend + tests + docs)
   green (5 pre-existing skips); 44 frontend vitest pass; build clean.
 
 ## 6. Notes / open questions
-- Retraction feed choice (S2 vs Crossref vs Retraction Watch) — decide in WP5.
+- Retraction feed choice (S2 vs Crossref vs Retraction Watch) — DECIDED in WP5:
+  Crossref (its Retraction Watch integration), via a work's `update-to` block.
+  A second source can be layered later if coverage gaps warrant it.
 - Assistant model target: NIEHS LiteLLM proxy vs Biowulf vLLM — both supported by
   `llm_client.py`; pick per-deployment via config.
 - PDF reference extraction (WP7) adds a dependency; confirm before implementing.

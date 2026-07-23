@@ -198,18 +198,41 @@ token-styled) components:
 
 ## 5. Information architecture (routes)
 
+The primary nav is grouped by user goal rather than one flat list — see
+[UX journeys & IA redesign](../plans/ux-journeys.md) §4 for the rationale. The top
+nav is: **Search · Explore ▾ · Workspaces ▾ · Submit · Review\* · Account**, where
+the two `▾` items are USWDS `PrimaryNav` dropdowns:
+
+- **Explore ▾** (open): Papers · Network explorer · Analytics
+- **Workspaces ▾** (auth): Collections · Maps · Alerts
+
+Full route map:
+
 ```
-/                         Home / dashboard: recent papers, submit CTA, job activity
+/                         Home: search hero + example explorations
+/search                   Claim full-text search + facets + result network
+/analytics                Corpus bibliometrics (Overview/Authors/Sources/Countries)
 /papers                   Paper list (availability_state, filters)
-/papers/:workId           Paper detail: metadata, versions, claims list
+/papers/:workId           Paper detail: metadata, claims, citation tallies, integrity
+/papers/:workId/report    Paper citation report (timeline, facets)
 /papers/:workId/claims/:claimId   Claim detail (the core screen)
+/claims/:claimId          Standalone claim detail (links from relations/traces)
+/graph                    Network explorer (papers/claims, axis layouts, ROBOKOP)
+/graph/papers/:workId     Network explorer centered on a paper
+/shared/:token            Public read-only shared map
 /ingest                   Submit a paper (DOI/PMID/XML) + idempotency key
 /jobs/:jobId              Job status (poll) → link to run / paper on success
 /runs/:runId              Extraction-run provenance (model, prompt, params, code rev)
 /review                   Reviewer queue (role-gated): triage, clusters, stale assertions
 /clusters/:clusterId      Cluster detail: memberships, conflicting-stance surfacing
-/account                  Current user (GET /v1/users/me); admin: create users
+/collections              Collections list (auth)
+/collections/:id          Collection detail: watch, import, integrity, CSV export
+/maps                     Saved maps: open in graph, share, monitor (auth)
+/alerts                   Saved searches + alert feed (auth)
+/account                  Current user (GET /v1/users/me); admin: user management
 ```
+
+\* Review appears in the nav only for `reviewer`/`admin` (admin implies reviewer).
 
 Route-change focus management (move focus to the new page's `<h1>`) is a required
 accessibility behavior for the SPA.

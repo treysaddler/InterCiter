@@ -221,6 +221,7 @@ classes:
       - integrity_notice
       - tldr
       - abstract
+      - author_affiliations
 
   PaperVersion:
     description: >-
@@ -730,6 +731,12 @@ slots:
       Abstract text where licensed (Semantic Scholar abstracts dataset or Academic
       Graph). Display metadata only — cached locally per the per-source license,
       never redistributed.
+  author_affiliations:
+    description: >-
+      Additive: raw author-affiliation strings for the work (each may encode an
+      institution and country), used to derive country-level analytics. Empty when
+      no affiliation metadata has been imported (bibliometrix-parity WP-B2).
+    multivalued: true
 
   # --- PaperVersion ---
   manifestation:

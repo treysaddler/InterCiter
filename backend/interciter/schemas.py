@@ -530,6 +530,100 @@ class BibliometricsSummary(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Corpus bibliometrics — three-level metrics (bibliometrix-parity WP-B2)
+# ---------------------------------------------------------------------------------
+
+
+class LotkaPoint(BaseModel):
+    """One point of the author-productivity distribution (Lotka's law)."""
+
+    documents_written: int
+    author_count: int
+    proportion: float
+
+
+class LotkaFit(BaseModel):
+    """Lotka's-law fit ``f(x) = C / x**n`` over the productivity distribution.
+
+    ``coefficient`` is the fitted exponent *n* and ``constant`` the *C* term, both from
+    an ordinary least-squares fit of ``log10(authors)`` on ``log10(documents)``. Null
+    when fewer than two distinct productivity levels exist to fit.
+    """
+
+    coefficient: float | None = None
+    constant: float | None = None
+    author_count: int
+    points: list[LotkaPoint] = Field(default_factory=list)
+
+
+class AuthorMetric(BaseModel):
+    """Impact indices for one author over the cohort."""
+
+    name: str
+    document_count: int
+    total_citations: int
+    h_index: int
+
+
+class AuthorMetrics(BaseModel):
+    """Author-level analytics: productivity, h-index, and the Lotka fit."""
+
+    author_count: int
+    authors: list[AuthorMetric] = Field(default_factory=list)
+    lotka: LotkaFit
+
+
+class BradfordZone(BaseModel):
+    """A Bradford's-law zone (sources partitioned into thirds of total articles)."""
+
+    zone: int
+    source_count: int
+    article_count: int
+
+
+class SourceMetric(BaseModel):
+    """Impact indices for one source (venue) over the cohort, with its Bradford zone."""
+
+    source: str
+    document_count: int
+    total_citations: int
+    h_index: int
+    bradford_zone: int
+
+
+class SourceMetrics(BaseModel):
+    """Source-level analytics: productivity, impact, and Bradford's-law zones."""
+
+    source_count: int
+    sources: list[SourceMetric] = Field(default_factory=list)
+    bradford_zones: list[BradfordZone] = Field(default_factory=list)
+
+
+class CountryMetric(BaseModel):
+    """Country production with single- vs multi-country collaboration split."""
+
+    country: str
+    document_count: int
+    single_country_pubs: int
+    multi_country_pubs: int
+    mcp_ratio: float
+
+
+class CountryMetrics(BaseModel):
+    """Country-level analytics: production + SCP/MCP + international co-authorship.
+
+    Derived from ``PaperWork.author_affiliations``; ``documents_with_country`` is 0
+    until an importer with affiliation metadata populates those strings, in which case
+    the ranking degrades gracefully to an empty list.
+    """
+
+    country_count: int
+    documents_with_country: int
+    international_co_authorship_pct: float | None = None
+    countries: list[CountryMetric] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------------
 

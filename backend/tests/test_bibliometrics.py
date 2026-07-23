@@ -15,13 +15,14 @@ from interciter.services import bibliometrics
 from helpers import load_sample
 
 
-def _work(session, work_id, *, title=None, venue=None, year=None, authors=None):
+def _work(session, work_id, *, title=None, venue=None, year=None, authors=None, affiliations=None):
     work = models.PaperWork(
         work_id=work_id,
         title=title,
         venue=venue,
         year=year,
         authors=authors or [],
+        author_affiliations=affiliations or [],
         availability_state=AvailabilityState.metadata_stub,
     )
     session.add(work)
@@ -37,6 +38,14 @@ def _edge(session, citing, cited):
             source="semantic_scholar",
         )
     )
+
+
+def _cite_n(session, cited, n):
+    """Give ``cited`` exactly ``n`` citations from distinct stub citing works."""
+    for i in range(n):
+        citing = f"citing_{cited}_{i}"
+        _work(session, citing)
+        _edge(session, citing, cited)
 
 
 def _seed_corpus(session):
@@ -178,3 +187,130 @@ def test_summary_endpoint_reads_open(session, client):
     ranged = client.get("/v1/bibliometrics/summary", params={"min_year": 2021})
     assert ranged.status_code == 200
     assert ranged.json()["document_count"] == 2
+
+
+# --- WP-B2: author / source / country metrics ---
+
+
+def test_author_metrics_productivity_and_lotka(session):
+    _seed_corpus(session)
+    result = bibliometrics.author_metrics(session)
+
+    by_name = {a.name: a for a in result.authors}
+    ada = by_name["Ada Lovelace"]
+    assert ada.document_count == 3  # w1, w2, w3
+    assert ada.total_citations == 4  # w1(3) + w2(1) + w3(0)
+    assert ada.h_index == 1  # citations [3,1,0] → h=1
+    assert result.author_count == 3
+    # Lotka distribution: Ada wrote 3 docs; Alan + Grace wrote 2 each.
+    dist = {p.documents_written: p.author_count for p in result.lotka.points}
+    assert dist == {2: 2, 3: 1}
+    assert result.lotka.coefficient is not None
+
+
+def test_author_h_index(session):
+    for wid in ("p1", "p2", "p3"):
+        _work(session, wid, venue="J", authors=["Prolific Author"])
+    _cite_n(session, "p1", 3)
+    _cite_n(session, "p2", 2)
+    _cite_n(session, "p3", 1)
+    session.commit()
+
+    result = bibliometrics.author_metrics(session, work_ids=["p1", "p2", "p3"])
+    author = next(a for a in result.authors if a.name == "Prolific Author")
+    assert author.document_count == 3
+    assert author.total_citations == 6
+    # citations [3,2,1] → h=2 (two papers with ≥2 citations).
+    assert author.h_index == 2
+
+
+def test_source_metrics_impact_and_bradford(session):
+    _seed_corpus(session)
+    result = bibliometrics.source_metrics(session)
+
+    by_source = {s.source: s for s in result.sources}
+    assert by_source["Journal A"].document_count == 2
+    assert by_source["Journal A"].total_citations == 4  # w1(3) + w2(1)
+    assert by_source["Journal A"].h_index == 1
+    assert result.source_count == 2
+    # Zones partition every source + article.
+    assert sum(z.source_count for z in result.bradford_zones) == 2
+    assert sum(z.article_count for z in result.bradford_zones) == 4
+
+
+def test_bradford_zone_partition(session):
+    # 9 articles across 5 sources: S1=3, S2=2, S3=2, S4=1, S5=1 → thirds of 3 each.
+    for i in range(3):
+        _work(session, f"s1_{i}", venue="S1", authors=["x"])
+    for i in range(2):
+        _work(session, f"s2_{i}", venue="S2", authors=["x"])
+    for i in range(2):
+        _work(session, f"s3_{i}", venue="S3", authors=["x"])
+    _work(session, "s4_0", venue="S4", authors=["x"])
+    _work(session, "s5_0", venue="S5", authors=["x"])
+    session.commit()
+
+    result = bibliometrics.source_metrics(session, top_k=50)
+    zones = {z.zone: z for z in result.bradford_zones}
+    assert zones[1].article_count == 3  # the prolific core (S1)
+    assert sum(z.article_count for z in result.bradford_zones) == 9
+    assert sum(z.source_count for z in result.bradford_zones) == 5
+    core = next(s for s in result.sources if s.source == "S1")
+    assert core.bradford_zone == 1
+
+
+def test_country_metrics_scp_mcp(session):
+    _work(
+        session,
+        "c1",
+        venue="J",
+        authors=["A"],
+        affiliations=["Dept, Univ X, United States"],
+    )
+    _work(
+        session,
+        "c2",
+        venue="J",
+        authors=["A", "B"],
+        affiliations=["Univ X, USA", "Univ Y, United Kingdom"],
+    )
+    _work(session, "c3", venue="J", authors=["C"], affiliations=["Univ Z, Germany"])
+    session.commit()
+
+    result = bibliometrics.country_metrics(session)
+    by = {c.country: c for c in result.countries}
+    # US appears solo in c1 (SCP) and collaboratively in c2 (MCP).
+    assert by["United States"].document_count == 2
+    assert by["United States"].single_country_pubs == 1
+    assert by["United States"].multi_country_pubs == 1
+    # UK only collaborates (c2).
+    assert by["United Kingdom"].single_country_pubs == 0
+    assert by["United Kingdom"].multi_country_pubs == 1
+    assert by["Germany"].single_country_pubs == 1
+    assert result.country_count == 3
+    assert result.documents_with_country == 3
+    # One of three documents is multi-country.
+    assert result.international_co_authorship_pct == round(1 / 3 * 100, 2)
+
+
+def test_country_metrics_empty_without_affiliations(session):
+    _seed_corpus(session)
+    result = bibliometrics.country_metrics(session)
+    assert result.documents_with_country == 0
+    assert result.countries == []
+    assert result.international_co_authorship_pct is None
+
+
+def test_metric_endpoints_read_open(session, client):
+    _seed_corpus(session)
+    authors = client.get("/v1/bibliometrics/authors")
+    assert authors.status_code == 200
+    assert authors.json()["author_count"] == 3
+
+    sources = client.get("/v1/bibliometrics/sources")
+    assert sources.status_code == 200
+    assert sources.json()["source_count"] == 2
+
+    countries = client.get("/v1/bibliometrics/countries")
+    assert countries.status_code == 200
+    assert countries.json()["documents_with_country"] == 0

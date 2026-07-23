@@ -569,3 +569,66 @@ export interface BibliometricsSummary {
   top_sources: SourceProductivity[]
   top_cited_documents: CitedDocument[]
 }
+
+// --- Three-level metrics (bibliometrix-parity WP-B2) ---
+
+export interface LotkaPoint {
+  documents_written: number
+  author_count: number
+  proportion: number
+}
+
+export interface LotkaFit {
+  coefficient: number | null
+  constant: number | null
+  author_count: number
+  points: LotkaPoint[]
+}
+
+export interface AuthorMetric {
+  name: string
+  document_count: number
+  total_citations: number
+  h_index: number
+}
+
+export interface AuthorMetrics {
+  author_count: number
+  authors: AuthorMetric[]
+  lotka: LotkaFit
+}
+
+export interface BradfordZone {
+  zone: number
+  source_count: number
+  article_count: number
+}
+
+export interface SourceMetric {
+  source: string
+  document_count: number
+  total_citations: number
+  h_index: number
+  bradford_zone: number
+}
+
+export interface SourceMetrics {
+  source_count: number
+  sources: SourceMetric[]
+  bradford_zones: BradfordZone[]
+}
+
+export interface CountryMetric {
+  country: string
+  document_count: number
+  single_country_pubs: number
+  multi_country_pubs: number
+  mcp_ratio: number
+}
+
+export interface CountryMetrics {
+  country_count: number
+  documents_with_country: number
+  international_co_authorship_pct: number | null
+  countries: CountryMetric[]
+}

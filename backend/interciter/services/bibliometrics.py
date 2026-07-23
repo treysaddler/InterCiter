@@ -16,6 +16,7 @@ scientific assertion; it is a pure projection over a cohort of works (an explici
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 
 from sqlalchemy import select
@@ -24,9 +25,18 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..schemas import (
     AnnualProduction,
+    AuthorMetric,
+    AuthorMetrics,
     AuthorProductivity,
     BibliometricsSummary,
+    BradfordZone,
     CitedDocument,
+    CountryMetric,
+    CountryMetrics,
+    LotkaFit,
+    LotkaPoint,
+    SourceMetric,
+    SourceMetrics,
     SourceProductivity,
 )
 
@@ -250,4 +260,380 @@ def corpus_summary(
         top_authors=top_authors,
         top_sources=top_sources,
         top_cited_documents=top_cited_documents,
+    )
+
+
+# ---------------------------------------------------------------------------------
+# Three-level metrics — authors / sources / countries (WP-B2)
+# ---------------------------------------------------------------------------------
+
+
+def _h_index(citation_counts: list[int]) -> int:
+    """The h-index of a set of documents given their citation counts.
+
+    ``h`` is the largest number such that ``h`` documents each have at least ``h``
+    citations.
+    """
+    ordered = sorted(citation_counts, reverse=True)
+    h = 0
+    for rank, count in enumerate(ordered, start=1):
+        if count >= rank:
+            h = rank
+        else:
+            break
+    return h
+
+
+def _least_squares(xs: list[float], ys: list[float]) -> tuple[float, float] | None:
+    """Ordinary least-squares slope + intercept for ``y = slope*x + intercept``.
+
+    Returns ``None`` when there are fewer than two points or the x-values are constant
+    (a vertical fit is undefined).
+    """
+    n = len(xs)
+    if n < 2:
+        return None
+    sum_x = sum(xs)
+    sum_y = sum(ys)
+    sum_xx = sum(x * x for x in xs)
+    sum_xy = sum(x * y for x, y in zip(xs, ys))
+    denom = n * sum_xx - sum_x * sum_x
+    if denom == 0:
+        return None
+    slope = (n * sum_xy - sum_x * sum_y) / denom
+    intercept = (sum_y - slope * sum_x) / n
+    return slope, intercept
+
+
+def _author_work_ids(works: list[models.PaperWork]) -> dict[str, list[str]]:
+    """Map each distinct author (normalized key) to the cohort work ids they appear on."""
+    by_author: dict[str, list[str]] = {}
+    for work in works:
+        seen: set[str] = set()
+        for name in work.authors or []:
+            if not name or not name.strip():
+                continue
+            key = _author_key(name)
+            if key in seen:  # a work counts once per author even if listed twice
+                continue
+            seen.add(key)
+            by_author.setdefault(key, []).append(work.work_id)
+    return by_author
+
+
+def _lotka_fit(author_doc_counts: list[int]) -> LotkaFit:
+    """Fit Lotka's law ``f(x) = C / x**n`` to the author-productivity distribution."""
+    distribution = Counter(author_doc_counts)
+    total_authors = len(author_doc_counts)
+    points = [
+        LotkaPoint(
+            documents_written=docs,
+            author_count=count,
+            proportion=round(count / total_authors, 4) if total_authors else 0.0,
+        )
+        for docs, count in sorted(distribution.items())
+    ]
+
+    coefficient: float | None = None
+    constant: float | None = None
+    if len(distribution) >= 2:
+        xs = [math.log10(docs) for docs in distribution]
+        ys = [math.log10(count) for count in distribution.values()]
+        fit = _least_squares(xs, ys)
+        if fit is not None:
+            slope, intercept = fit
+            coefficient = round(-slope, 4)
+            constant = round(10**intercept, 4)
+
+    return LotkaFit(
+        coefficient=coefficient,
+        constant=constant,
+        author_count=total_authors,
+        points=points,
+    )
+
+
+def author_metrics(
+    session: Session,
+    *,
+    work_ids: list[str] | None = None,
+    min_year: int | None = None,
+    max_year: int | None = None,
+    top_k: int = DEFAULT_TOP_K,
+) -> AuthorMetrics:
+    """Author productivity, h-index, and the Lotka-law productivity distribution."""
+    top_k = max(1, min(top_k, MAX_TOP_K))
+    works = _load_cohort(session, work_ids, min_year, max_year)
+    in_deg = _citation_in_degree(session)
+    by_author = _author_work_ids(works)
+    display = {_author_key(n): n.strip() for w in works for n in (w.authors or []) if n and n.strip()}
+
+    metrics: list[AuthorMetric] = []
+    for key, work_id_list in by_author.items():
+        citations = [in_deg.get(wid, 0) for wid in work_id_list]
+        metrics.append(
+            AuthorMetric(
+                name=display.get(key, key),
+                document_count=len(work_id_list),
+                total_citations=sum(citations),
+                h_index=_h_index(citations),
+            )
+        )
+
+    metrics.sort(key=lambda m: (-m.document_count, -m.h_index, -m.total_citations, m.name))
+    lotka = _lotka_fit([m.document_count for m in metrics])
+    return AuthorMetrics(author_count=len(metrics), authors=metrics[:top_k], lotka=lotka)
+
+
+def _bradford_zone_map(source_articles: list[tuple[str, int]]) -> dict[str, int]:
+    """Assign each source to a Bradford zone (1/2/3) by cumulative article thirds.
+
+    Sources are taken in descending productivity order; the running article total is
+    split into three equal parts, so zone 1 is the small "core" of prolific sources.
+    """
+    total = sum(count for _source, count in source_articles)
+    if total == 0:
+        return {}
+    threshold = total / 3
+    zones: dict[str, int] = {}
+    cumulative = 0
+    for source, count in source_articles:
+        # Zone is decided by where this source's articles fall in the cumulative run.
+        midpoint = cumulative + count / 2
+        if midpoint <= threshold:
+            zone = 1
+        elif midpoint <= 2 * threshold:
+            zone = 2
+        else:
+            zone = 3
+        zones[source] = zone
+        cumulative += count
+    return zones
+
+
+def source_metrics(
+    session: Session,
+    *,
+    work_ids: list[str] | None = None,
+    min_year: int | None = None,
+    max_year: int | None = None,
+    top_k: int = DEFAULT_TOP_K,
+) -> SourceMetrics:
+    """Source productivity, h-index impact, and Bradford's-law zones."""
+    top_k = max(1, min(top_k, MAX_TOP_K))
+    works = _load_cohort(session, work_ids, min_year, max_year)
+    in_deg = _citation_in_degree(session)
+
+    source_works: dict[str, list[str]] = {}
+    for work in works:
+        venue = (work.venue or "").strip()
+        if venue:
+            source_works.setdefault(venue, []).append(work.work_id)
+
+    ranked = sorted(
+        source_works.items(), key=lambda kv: (-len(kv[1]), kv[0])
+    )
+    zone_map = _bradford_zone_map([(s, len(ids)) for s, ids in ranked])
+
+    sources: list[SourceMetric] = []
+    for source, work_id_list in ranked:
+        citations = [in_deg.get(wid, 0) for wid in work_id_list]
+        sources.append(
+            SourceMetric(
+                source=source,
+                document_count=len(work_id_list),
+                total_citations=sum(citations),
+                h_index=_h_index(citations),
+                bradford_zone=zone_map.get(source, 3),
+            )
+        )
+
+    zone_counter: Counter[int] = Counter()
+    zone_articles: Counter[int] = Counter()
+    for source, work_id_list in source_works.items():
+        zone = zone_map.get(source, 3)
+        zone_counter[zone] += 1
+        zone_articles[zone] += len(work_id_list)
+    bradford_zones = [
+        BradfordZone(
+            zone=zone,
+            source_count=zone_counter.get(zone, 0),
+            article_count=zone_articles.get(zone, 0),
+        )
+        for zone in (1, 2, 3)
+    ]
+
+    return SourceMetrics(
+        source_count=len(source_works),
+        sources=sources[:top_k],
+        bradford_zones=bradford_zones,
+    )
+
+
+# A modest lexicon of country names + common aliases for parsing affiliation strings.
+# Not exhaustive — an importer with structured country codes (WP-B6 OpenAlex) is the
+# authoritative source; this heuristic covers free-text affiliation tails.
+_COUNTRY_ALIASES = {
+    "usa": "United States",
+    "u.s.a.": "United States",
+    "u.s.": "United States",
+    "united states of america": "United States",
+    "uk": "United Kingdom",
+    "u.k.": "United Kingdom",
+    "england": "United Kingdom",
+    "scotland": "United Kingdom",
+    "wales": "United Kingdom",
+    "northern ireland": "United Kingdom",
+    "south korea": "South Korea",
+    "republic of korea": "South Korea",
+    "korea": "South Korea",
+    "prc": "China",
+    "p.r. china": "China",
+    "p.r.china": "China",
+    "russia": "Russia",
+    "russian federation": "Russia",
+}
+_COUNTRIES = {
+    "united states",
+    "united kingdom",
+    "china",
+    "germany",
+    "france",
+    "japan",
+    "canada",
+    "australia",
+    "italy",
+    "spain",
+    "netherlands",
+    "switzerland",
+    "sweden",
+    "india",
+    "brazil",
+    "south korea",
+    "russia",
+    "belgium",
+    "denmark",
+    "norway",
+    "finland",
+    "austria",
+    "poland",
+    "portugal",
+    "greece",
+    "ireland",
+    "israel",
+    "turkey",
+    "mexico",
+    "argentina",
+    "chile",
+    "south africa",
+    "egypt",
+    "saudi arabia",
+    "iran",
+    "singapore",
+    "new zealand",
+    "taiwan",
+    "hong kong",
+    "czech republic",
+    "hungary",
+    "romania",
+    "thailand",
+    "malaysia",
+    "indonesia",
+    "pakistan",
+    "colombia",
+}
+
+
+def _parse_country(affiliation: str) -> str | None:
+    """Best-effort country extraction from a free-text affiliation string.
+
+    Scans comma-separated segments (last segment first, where a country usually sits)
+    and the whole string against a country lexicon + alias map. Returns ``None`` when
+    no known country is recognized.
+    """
+    if not affiliation:
+        return None
+    segments = [seg.strip().lower().rstrip(".") for seg in affiliation.split(",")]
+    for seg in reversed(segments):
+        if not seg:
+            continue
+        if seg in _COUNTRY_ALIASES:
+            return _COUNTRY_ALIASES[seg]
+        if seg in _COUNTRIES:
+            return _title_country(seg)
+    return None
+
+
+def _title_country(seg: str) -> str:
+    """Title-case a multi-word country name from the lexicon."""
+    return " ".join(word.capitalize() for word in seg.split())
+
+
+def _work_countries(work: models.PaperWork) -> set[str]:
+    """The distinct set of countries recognized across a work's affiliation strings."""
+    countries: set[str] = set()
+    for aff in work.author_affiliations or []:
+        country = _parse_country(aff)
+        if country:
+            countries.add(country)
+    return countries
+
+
+def country_metrics(
+    session: Session,
+    *,
+    work_ids: list[str] | None = None,
+    min_year: int | None = None,
+    max_year: int | None = None,
+    top_k: int = DEFAULT_TOP_K,
+) -> CountryMetrics:
+    """Country production with single- vs multi-country (SCP/MCP) collaboration split."""
+    top_k = max(1, min(top_k, MAX_TOP_K))
+    works = _load_cohort(session, work_ids, min_year, max_year)
+
+    scp: Counter[str] = Counter()
+    mcp: Counter[str] = Counter()
+    documents_with_country = 0
+    multi_country_docs = 0
+    for work in works:
+        countries = _work_countries(work)
+        if not countries:
+            continue
+        documents_with_country += 1
+        is_multi = len(countries) > 1
+        if is_multi:
+            multi_country_docs += 1
+        for country in countries:
+            if is_multi:
+                mcp[country] += 1
+            else:
+                scp[country] += 1
+
+    all_countries = set(scp) | set(mcp)
+    metrics: list[CountryMetric] = []
+    for country in all_countries:
+        s = scp.get(country, 0)
+        m = mcp.get(country, 0)
+        total = s + m
+        metrics.append(
+            CountryMetric(
+                country=country,
+                document_count=total,
+                single_country_pubs=s,
+                multi_country_pubs=m,
+                mcp_ratio=round(m / total, 4) if total else 0.0,
+            )
+        )
+    metrics.sort(key=lambda c: (-c.document_count, c.country))
+
+    intl_pct = (
+        round(multi_country_docs / documents_with_country * 100, 2)
+        if documents_with_country
+        else None
+    )
+    return CountryMetrics(
+        country_count=len(all_countries),
+        documents_with_country=documents_with_country,
+        international_co_authorship_pct=intl_pct,
+        countries=metrics[:top_k],
     )

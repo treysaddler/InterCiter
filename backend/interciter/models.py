@@ -72,6 +72,10 @@ class PaperWork(Base):
     # never treated as a scientific assertion.
     tldr: Mapped[str | None] = mapped_column(Text, nullable=True)
     abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Additive: raw author-affiliation strings (each may encode a country), used to
+    # derive country-level analytics (bibliometrix-parity WP-B2). Empty until an
+    # importer with affiliation metadata (e.g. OpenAlex, WP-B6) populates it.
+    author_affiliations: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     versions: Mapped[list["PaperVersion"]] = relationship(
         back_populates="work", cascade="all, delete-orphan"

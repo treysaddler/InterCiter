@@ -66,4 +66,49 @@ describe('PaperDetailPage', () => {
     expect(screen.getByText('Retracted')).toBeInTheDocument()
     expect(screen.getByText('expression of concern')).toBeInTheDocument()
   })
+
+  it('renders the TLDR and collapsible abstract when present', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url.endsWith('/claims')) return Promise.resolve([])
+      if (url.endsWith('/citation-stats')) {
+        return Promise.resolve({
+          tallies: {
+            total: 0,
+            by_stance: {},
+            by_function: {},
+            by_resolution: {},
+            by_section: {},
+            abstained: 0,
+          },
+        })
+      }
+      return Promise.resolve({
+        work_id: 'work_2',
+        title: 'An enriched paper',
+        authors: [],
+        venue: null,
+        year: null,
+        doi: null,
+        pmid: null,
+        s2_corpus_id: '12345',
+        availability_state: 'metadata_stub',
+        is_retracted: null,
+        integrity_notice: null,
+        tldr: 'One-line gist of the work.',
+        abstract: 'The full abstract text.',
+      })
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/papers/work_2']}>
+        <Routes>
+          <Route path="/papers/:workId" element={<PaperDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/one-line gist of the work/i)).toBeInTheDocument()
+    expect(screen.getByText('Abstract')).toBeInTheDocument()
+    expect(screen.getByText('The full abstract text.')).toBeInTheDocument()
+  })
 })

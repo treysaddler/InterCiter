@@ -187,6 +187,8 @@ def paper_view(work: models.PaperWork) -> PaperView:
         availability_state=work.availability_state,
         is_retracted=work.is_retracted,
         integrity_notice=work.integrity_notice,
+        tldr=work.tldr,
+        abstract=work.abstract,
     )
 
 

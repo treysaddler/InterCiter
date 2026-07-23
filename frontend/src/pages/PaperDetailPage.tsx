@@ -79,6 +79,19 @@ export default function PaperDetailPage() {
         </ul>
       )}
 
+      {paper.data?.tldr && (
+        <p className="usa-summary-box margin-top-2 padding-2 text-base-darker">
+          <strong>TL;DR</strong> <span className="font-body-3xs text-base">(Semantic Scholar)</span>{' '}
+          — {paper.data.tldr}
+        </p>
+      )}
+      {paper.data?.abstract && (
+        <details className="margin-top-2">
+          <summary className="text-bold">Abstract</summary>
+          <p className="measure-6">{paper.data.abstract}</p>
+        </details>
+      )}
+
       <h2 className="margin-top-4">How this paper has been cited</h2>
       {stats.loading && <Loading />}
       {stats.error && <ErrorAlert message={stats.error} />}

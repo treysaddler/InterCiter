@@ -146,6 +146,34 @@ def _iter_records(path: Path):
                 yield json.loads(line)
 
 
+def iter_dataset(
+    dataset_name: str,
+    *,
+    settings: Settings | None = None,
+    on_shard=None,
+):
+    """Stream every record of a dataset across all manifest-recorded shards.
+
+    Shards whose files are missing on disk are skipped (the manifest is the source
+    of truth for what *should* exist; a partially synced cache still iterates).
+    ``on_shard(basename)`` is called before each shard is read, for progress logging.
+    """
+    settings = settings or get_settings()
+    manifest = load_manifest(settings)
+    if manifest is None:
+        return
+    dataset_dir = _root(settings) / manifest.release_id / dataset_name
+    for shard in manifest.shards:
+        if shard.dataset != dataset_name:
+            continue
+        path = dataset_dir / shard.basename
+        if not path.exists():
+            continue
+        if on_shard is not None:
+            on_shard(shard.basename)
+        yield from _iter_records(path)
+
+
 def lookup_corpusid(
     corpusid: int | str,
     *,

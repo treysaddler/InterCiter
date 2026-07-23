@@ -29,6 +29,8 @@ export interface PaperView {
   availability_state: string
   is_retracted: boolean | null
   integrity_notice: string | null
+  tldr: string | null
+  abstract: string | null
 }
 
 export interface ClaimView {

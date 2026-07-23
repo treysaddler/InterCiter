@@ -469,7 +469,32 @@ def _cmd_s2_datasets(args: argparse.Namespace) -> int:
         elif args.action == "lookup":
             record = lookup_corpusid(args.corpusid, dataset_name=args.dataset)
             print(json.dumps(record, indent=2) if record else "not found")
-    except S2DatasetsError as exc:
+        elif args.action == "backfill":
+            from .services import local_enrichment
+
+            datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
+            init_db()
+            with SessionLocal() as session:
+                reports = local_enrichment.backfill(
+                    session,
+                    datasets,
+                    dry_run=args.dry_run,
+                    on_shard=lambda basename: print(f"  scanning {basename}"),
+                )
+            for report in reports:
+                mode = " (dry run)" if report.dry_run else ""
+                print(f"{report.dataset}{mode}:")
+                print(f"  records scanned: {report.records_scanned}")
+                print(f"  works matched:   {report.works_matched}")
+                if report.fields_filled:
+                    filled = ", ".join(
+                        f"{k}={v}" for k, v in sorted(report.fields_filled.items())
+                    )
+                    print(f"  fields filled:   {filled}")
+                if report.dataset == "citations":
+                    print(f"  edges created:   {report.edges_created}")
+                    print(f"  edges existing:  {report.edges_existing}")
+    except (S2DatasetsError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0
@@ -701,6 +726,18 @@ def main(argv: list[str] | None = None) -> int:
     p_ds_lookup = ds_sub.add_parser("lookup", help="Find a record by corpusid in the cache")
     p_ds_lookup.add_argument("corpusid", help="Semantic Scholar corpusId")
     p_ds_lookup.add_argument("--dataset", default="papers", help="Dataset to scan")
+    p_ds_bf = ds_sub.add_parser(
+        "backfill",
+        help="Stream local bulk shards into the system of record (additive only)",
+    )
+    p_ds_bf.add_argument(
+        "--datasets",
+        default="papers,tldrs,abstracts",
+        help="Comma-separated passes to run (papers,tldrs,abstracts,citations)",
+    )
+    p_ds_bf.add_argument(
+        "--dry-run", action="store_true", help="Report matches without writing"
+    )
     p_ds.set_defaults(func=_cmd_s2_datasets)
 
     p_rk = sub.add_parser("robokop", help="ROBOKOP / Translator grounding + edge lookup")

@@ -67,6 +67,11 @@ class PaperWork(Base):
     # source consulted; never mutates the scientific record.
     is_retracted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     integrity_notice: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Additive display metadata from Semantic Scholar (bulk datasets or Academic
+    # Graph). Cached locally per the per-source license, never redistributed, and
+    # never treated as a scientific assertion.
+    tldr: Mapped[str | None] = mapped_column(Text, nullable=True)
+    abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     versions: Mapped[list["PaperVersion"]] = relationship(
         back_populates="work", cascade="all, delete-orphan"

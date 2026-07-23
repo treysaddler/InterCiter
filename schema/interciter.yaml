@@ -219,6 +219,8 @@ classes:
       - availability_state
       - is_retracted
       - integrity_notice
+      - tldr
+      - abstract
 
   PaperVersion:
     description: >-
@@ -718,6 +720,16 @@ slots:
     description: >-
       Additive integrity flag: a free-text editorial/integrity notice label
       (e.g. expression of concern), or null when none is known.
+  tldr:
+    description: >-
+      One-line machine-generated gist of the work (Semantic Scholar TLDR). Display
+      metadata only — cached locally from the bulk datasets, never redistributed,
+      and never treated as a scientific assertion.
+  abstract:
+    description: >-
+      Abstract text where licensed (Semantic Scholar abstracts dataset or Academic
+      Graph). Display metadata only — cached locally per the per-source license,
+      never redistributed.
 
   # --- PaperVersion ---
   manifestation:

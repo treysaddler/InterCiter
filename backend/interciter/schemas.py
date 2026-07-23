@@ -82,6 +82,10 @@ class PaperView(BaseModel):
     # has been consulted.
     is_retracted: bool | None = None
     integrity_notice: str | None = None
+    # Additive display metadata from Semantic Scholar (bulk backfill or Academic
+    # Graph); null until enriched.
+    tldr: str | None = None
+    abstract: str | None = None
 
 
 class PassageView(BaseModel):

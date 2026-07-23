@@ -408,15 +408,19 @@ Ordered by leverage; each is its own change, none included in this doc.
    collection/map" and whole-cohort "Explore as network" buttons — these need a work
    set passed by *reference* (`?collection=` / `?map=`), because inlining hundreds of
    `work_ids` in a URL breaks, and the Analytics/Graph pages don't yet forward a
-   cohort. That plumbing IS UX-3, so those buttons ship there.
-3. **UX-3 — Cohort as a routable concept (§4.3, G1/G4). DECIDED — build before the
-   bibliometric network/thematic WPs.** Teach Analytics + Graph (and later Discovery,
-   corpus report) to accept `?collection=` / `?map=` / `?search=` (by reference) and
-   resolve to a work-set server-side; standardize the cohort param across analysis
-   screens; then add the "Analyze this collection/map" + "Explore as network" buttons
-   deferred from UX-2. Needs a small backend seam to resolve a collection/map id to
-   its `work_ids` for the bibliometrics + graph endpoints. Structural backbone of
-   Persona D's journey; every future bibliometric WP inherits cohort selection.
+   cohort. That plumbing IS UX-3, so those buttons ship there **(now shipped — see
+   UX-3).**
+3. **UX-3 — Cohort as a routable concept (§4.3, G1/G4). ✅ DONE.** Backend: the four
+   `/v1/bibliometrics/*` endpoints and a new `GET /v1/collections/{id}/graph` accept a
+   cohort *by reference* — `?collection=` / `?map=` resolved server-side to the
+   owner's member work set (owner-scoped: `401` anon, `404` non-owner) via a new
+   optional-principal dependency that keeps the reads open otherwise. Frontend:
+   Analytics forwards the cohort to every tab and shows an "Analyzing a saved
+   collection/map" banner with a way back to the full corpus; GraphPage renders
+   `?collection=` (alongside the existing `?map=`) cohorts; the UX-2-deferred "Analyze
+   these papers" + "Explore as network" buttons now ship on the collection page, and
+   each saved map gets an "Analyze" link. Every future bibliometric WP inherits cohort
+   selection.
 4. **UX-4 — Journey coverage in the story doc.** Fold Persona D (now a DECIDED target)
    and journeys J2–J4 into [`docs/ui-design.md`](../docs/ui-design.md) §2/§8 so the
    canonical doc stops trailing the implementation, and add the a11y-table-fallback

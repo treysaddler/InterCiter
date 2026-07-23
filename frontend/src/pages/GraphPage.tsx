@@ -35,6 +35,7 @@ export default function GraphPage() {
   const { status } = useAuth()
   const [searchParams] = useSearchParams()
   const mapId = searchParams.get('map')
+  const collectionId = searchParams.get('collection')
 
   const [mode, setMode] = useState<Mode>('papers')
   const [includeAuthors, setIncludeAuthors] = useState(false)
@@ -60,13 +61,15 @@ export default function GraphPage() {
   const [robokopGraph, setRobokopGraph] = useState<GraphView | null>(null)
 
   const centered = Boolean(workId)
-  const path = mapId
-    ? `/maps/${mapId}/graph?include_authors=${includeAuthors}`
-    : centered
-      ? `/graph/papers/${workId}?depth=${depth}&include_authors=${includeAuthors}`
-      : mode === 'papers'
-        ? `/graph/papers?include_authors=${includeAuthors}`
-        : `/graph/claims`
+  const path = collectionId
+    ? `/collections/${collectionId}/graph?include_authors=${includeAuthors}`
+    : mapId
+      ? `/maps/${mapId}/graph?include_authors=${includeAuthors}`
+      : centered
+        ? `/graph/papers/${workId}?depth=${depth}&include_authors=${includeAuthors}`
+        : mode === 'papers'
+          ? `/graph/papers?include_authors=${includeAuthors}`
+          : `/graph/claims`
 
   const graph = useApi<GraphView>(() => api.get<GraphView>(path), [path])
   // When loading a saved map, fetch its metadata to hydrate the layout controls.
@@ -74,10 +77,20 @@ export default function GraphPage() {
     () => (mapId ? api.get<MapDetailView>(`/maps/${mapId}`) : Promise.resolve(null)),
     [mapId],
   )
+  // When exploring a saved collection, fetch its name for the heading.
+  const collectionMeta = useApi<{ name: string } | null>(
+    () =>
+      collectionId
+        ? api.get<{ name: string }>(`/collections/${collectionId}`)
+        : Promise.resolve(null),
+    [collectionId],
+  )
   const displayed = robokopGraph ?? graph.data
   // Axis/measure layout only makes sense for the paper/citation network (paper nodes
   // carry year + citation counts); claims and ROBOKOP overlays fall back to force.
-  const measureable = !robokopGraph && (Boolean(mapId) || mode === 'papers')
+  const measureable =
+    !robokopGraph &&
+    (Boolean(mapId) || Boolean(collectionId) || mode === 'papers')
   const effectiveLayout: LayoutMode = measureable ? layout : 'force'
 
   // Per-work annotations from the loaded map (work_id -> note), for the a11y table
@@ -228,14 +241,23 @@ export default function GraphPage() {
           <Link to="/maps">← Saved maps</Link>
         </p>
       )}
+      {collectionId && (
+        <p className="margin-top-4 margin-bottom-0">
+          <Link to={`/collections/${collectionId}`}>← Back to the collection</Link>
+        </p>
+      )}
       <PageHeading>
-        {mapId
-          ? mapMeta.data
-            ? `Map: ${mapMeta.data.name}`
-            : 'Saved map'
-          : centered
-            ? 'Paper neighborhood'
-            : 'Explore the network'}
+        {collectionId
+          ? collectionMeta.data
+            ? `Collection: ${collectionMeta.data.name}`
+            : 'Collection network'
+          : mapId
+            ? mapMeta.data
+              ? `Map: ${mapMeta.data.name}`
+              : 'Saved map'
+            : centered
+              ? 'Paper neighborhood'
+              : 'Explore the network'}
       </PageHeading>
       <p className="text-base measure-5">
         Visualize papers, authors, and how they cite one another. Select any node to
@@ -245,7 +267,7 @@ export default function GraphPage() {
 
       {/* Controls */}
       <div className="display-flex flex-wrap flex-align-center margin-y-2">
-        {!centered && (
+        {!centered && !mapId && !collectionId && (
           <fieldset className="usa-fieldset margin-right-3 border-0 padding-0">
             <legend className="usa-sr-only">Network mode</legend>
             <div className="usa-button-group usa-button-group--segmented">

@@ -29,10 +29,11 @@ from ..schemas import (
     CitationTallies,
     CollectionUpdate,
     CollectionView,
+    GraphView,
     PaperSubmission,
 )
 from ..ingestion import reference_managers
-from . import citation_stats, jobs
+from . import citation_stats, graph, jobs
 from .projection import NotFound
 
 MemberSort = Literal["added_desc", "added_asc", "support_desc", "contradict_desc"]
@@ -241,6 +242,45 @@ def get_collection(
         ).model_dump(),
         aggregate_citation_tallies=aggregate_tallies,
         members=members,
+    )
+
+
+def member_work_ids(
+    session: Session, collection_id: str, *, owner_id: str
+) -> list[str]:
+    """The work ids in an owned collection (order-stable, newest-first).
+
+    Raises :class:`NotFound` when the collection is missing or owned by someone
+    else, so ids never leak across accounts.
+    """
+    collection = _load_owned_collection(session, collection_id, owner_id=owner_id)
+    return list(
+        session.scalars(
+            select(models.CollectionMembership.work_id)
+            .where(
+                models.CollectionMembership.collection_id == collection.collection_id
+            )
+            .order_by(models.CollectionMembership.added_at.desc())
+        )
+    )
+
+
+def collection_graph(
+    session: Session,
+    collection_id: str,
+    *,
+    owner_id: str,
+    include_authors: bool = False,
+) -> GraphView:
+    """A citation graph over an owned collection's member works.
+
+    Lets a curated set be explored as a network without inlining its member ids
+    in a URL (UX-3 cohort-by-reference). Owner-scoped; delegates to the shared
+    :func:`graph.graph_for_works` projection.
+    """
+    work_ids = member_work_ids(session, collection_id, owner_id=owner_id)
+    return graph.graph_for_works(
+        session, work_ids, include_authors=include_authors
     )
 
 

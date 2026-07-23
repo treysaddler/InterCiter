@@ -23,14 +23,63 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key']
 
-/** Build the shared `?min_year=&max_year=` query string from the current URL. */
-function yearQuery(params: URLSearchParams): string {
+/**
+ * Build the shared query string forwarded to every bibliometrics endpoint: the
+ * year bounds plus the cohort selector. The cohort can be a saved `collection` or
+ * `map` (resolved by reference server-side, UX-3) or an explicit `work_ids` set.
+ */
+function cohortQuery(params: URLSearchParams): string {
   const query = new URLSearchParams()
-  for (const key of ['min_year', 'max_year']) {
+  for (const key of ['min_year', 'max_year', 'collection', 'map']) {
     const value = params.get(key)
     if (value) query.set(key, value)
   }
+  for (const workId of params.getAll('work_ids')) query.append('work_ids', workId)
   return query.toString() ? `?${query.toString()}` : ''
+}
+
+/**
+ * When analytics is scoped to a saved collection or map, show which cohort is
+ * active and a way back to the whole corpus. The name is fetched best-effort
+ * (owner-scoped cohorts require the viewer to be signed in).
+ */
+function CohortBanner({
+  collection,
+  map,
+}: {
+  collection: string | null
+  map: string | null
+}) {
+  const type = collection ? 'collection' : map ? 'map' : null
+  const path = collection
+    ? `/collections/${collection}`
+    : map
+      ? `/maps/${map}`
+      : null
+  const meta = useApi<{ name: string } | null>(
+    () => (path ? api.get<{ name: string }>(path) : Promise.resolve(null)),
+    [path],
+  )
+  if (!type) return null
+  const name = meta.data?.name
+  return (
+    <div
+      className="usa-alert usa-alert--info usa-alert--slim margin-bottom-2"
+      role="status"
+    >
+      <div className="usa-alert__body">
+        <p className="usa-alert__text">
+          Analyzing a saved {type}
+          {name ? (
+            <>
+              : <strong>{name}</strong>
+            </>
+          ) : null}
+          . <Link to="/analytics">Analyze the full corpus</Link>
+        </p>
+      </div>
+    </div>
+  )
 }
 
 /** One "Main Information" indicator card. */
@@ -366,7 +415,7 @@ function CountriesPanel({ suffix }: { suffix: string }) {
  */
 export default function AnalyticsPage() {
   const [params, setParams] = useSearchParams()
-  const suffix = yearQuery(params)
+  const suffix = cohortQuery(params)
   const requestedTab = params.get('tab') as TabKey | null
   const activeTab: TabKey =
     requestedTab && TABS.some((t) => t.key === requestedTab) ? requestedTab : 'overview'
@@ -409,6 +458,11 @@ export default function AnalyticsPage() {
         metadata. This is the aggregate lens that complements InterCiter&apos;s
         claim-level function, stance, and provenance.
       </p>
+
+      <CohortBanner
+        collection={params.get('collection')}
+        map={params.get('map')}
+      />
 
       <form className="usa-form margin-bottom-2" onSubmit={(e) => e.preventDefault()}>
         <fieldset className="usa-fieldset">

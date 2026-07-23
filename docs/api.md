@@ -62,10 +62,11 @@ Corpus-level "Main Information": aggregate descriptive statistics over the whole
 - `GET /v1/bibliometrics/summary` — query params `work_ids` (repeatable; omit for the whole corpus), `min_year`, `max_year` (year bounds exclude documents with no year), `top_k` (1–50, default 10). Returns `{document_count, source_count, author_count, author_appearances, co_authors_per_doc, single_authored_count, min_year, max_year, annual_growth_rate, avg_citations_per_doc, total_citations, documents_without_year, annual_production[], top_authors[], top_sources[], top_cited_documents[]}`. `annual_production` is a dense year → document-count series; `annual_growth_rate` is the compound annual growth rate (%) of production (null over a single year); `avg_citations_per_doc` / `total_citations` come from global citation in-degree (distinct citing works) restricted to the cohort; `top_cited_documents` ranks the cohort by that in-degree.
 
 Three-level metrics (authors / sources / countries) share the same `work_ids` / `min_year` / `max_year` / `top_k` query params (WP-B2):
-
 - `GET /v1/bibliometrics/authors` — `{author_count, authors[], lotka}`. Each author carries `document_count`, `total_citations`, and `h_index` (largest *h* with *h* papers of ≥ *h* citations). `lotka` fits Lotka's law `f(x)=C/x**n` to the productivity distribution: `{coefficient, constant, author_count, points[]}` (each point = `documents_written`, `author_count`, `proportion`); `coefficient`/`constant` are null when fewer than two distinct productivity levels exist.
 - `GET /v1/bibliometrics/sources` — `{source_count, sources[], bradford_zones[]}`. Each source carries `document_count`, `total_citations`, `h_index`, and its `bradford_zone` (1–3). `bradford_zones` partitions all sources into three zones of roughly equal article totals (zone 1 = prolific core), each `{zone, source_count, article_count}`.
 - `GET /v1/bibliometrics/countries` — `{country_count, documents_with_country, international_co_authorship_pct, countries[]}`, derived from `PaperWork.author_affiliations`. Each country carries `document_count`, `single_country_pubs` (SCP), `multi_country_pubs` (MCP), and `mcp_ratio`. `documents_with_country` is 0 (and `countries` empty) until an importer with affiliation metadata populates those strings.
+
+Every bibliometrics endpoint also accepts a cohort **by reference** — `collection=<id>` or `map=<id>` — to analyze a saved collection's or map's members without inlining every work id in the URL (UX-3). Those saved sets are owner-private, so a `collection`/`map` cohort requires an authenticated principal (`401` if anonymous) and `404`s for a set owned by someone else. With no cohort reference the endpoints stay open (whole corpus, or an explicit `work_ids`).
 
 ## Revisions (MVP)
 
@@ -134,6 +135,10 @@ metadata stubs for unknown identifiers through the existing ingest path.
   (unknown values are rejected with `422`). Each member also carries additive
   integrity flags `is_retracted` and `integrity_notice` (both `null` until an
   integrity source has been consulted — scite WP5 starter).
+- `GET /v1/collections/{id}/graph` — citation graph over the collection's members
+  (optional `include_authors`), returning the same `GraphView` as the network
+  endpoints. Lets a curated set be explored as a network by reference (UX-3).
+  Owner-scoped (`404`).
 - `PATCH /v1/collections/{id}` — update `{name?, description?}`. An explicitly
   `null` description clears the stored value; an omitted field is left unchanged.
 - `DELETE /v1/collections/{id}` — delete a collection (and memberships).

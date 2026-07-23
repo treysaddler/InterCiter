@@ -95,6 +95,13 @@ describe('CollectionDetailPage', () => {
     expect(
       screen.getByRole('heading', { name: /grow this collection/i }),
     ).toBeInTheDocument()
+    // Cohort-by-reference actions link to analytics + the network explorer (UX-3).
+    expect(
+      screen.getByRole('link', { name: 'Analyze these papers' }),
+    ).toHaveAttribute('href', '/analytics?collection=coll_1')
+    expect(
+      screen.getByRole('link', { name: 'Explore as network' }),
+    ).toHaveAttribute('href', '/graph?collection=coll_1')
   })
 
   it('saves collection metadata and can delete the collection', async () => {

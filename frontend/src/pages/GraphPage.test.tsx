@@ -119,6 +119,24 @@ it('loads a saved map: renders its graph and hydrates the name', async () => {
   expect(mockedGet).toHaveBeenCalledWith('/maps/map_1/graph?include_authors=false')
 })
 
+it('loads a saved collection: renders its graph and hydrates the name', async () => {
+  mockedGet.mockImplementation((url: string) => {
+    if (url === '/collections/coll_1') return Promise.resolve({ name: 'Core set' })
+    return Promise.resolve(GRAPH) // /collections/coll_1/graph
+  })
+
+  render(
+    <MemoryRouter initialEntries={['/graph?collection=coll_1']}>
+      <GraphPage />
+    </MemoryRouter>,
+  )
+
+  expect(await screen.findByText('Collection: Core set')).toBeInTheDocument()
+  expect(mockedGet).toHaveBeenCalledWith(
+    '/collections/coll_1/graph?include_authors=false',
+  )
+})
+
 it('edits a per-node annotation on a loaded map member via PATCH', async () => {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/maps/map_1') return Promise.resolve(MAP_DETAIL)

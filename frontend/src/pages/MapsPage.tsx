@@ -140,6 +140,9 @@ export default function MapsPage() {
                       {m.description}
                     </span>
                   )}
+                  <span className="display-block font-body-3xs">
+                    <Link to={`/analytics?map=${m.map_id}`}>Analyze</Link>
+                  </span>
                 </td>
                 <td>{m.member_count}</td>
                 <td>

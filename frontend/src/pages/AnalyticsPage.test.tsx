@@ -80,6 +80,8 @@ const sourceMetrics: SourceMetrics = {
 
 /** Route the mock by URL so each tab's panel resolves the right shape. */
 function routeByUrl(url: string) {
+  if (url.startsWith('/collections/')) return Promise.resolve({ name: 'Core diabetes' })
+  if (url.startsWith('/maps/')) return Promise.resolve({ name: 'My map' })
   if (url.startsWith('/bibliometrics/authors')) return Promise.resolve(authorMetrics)
   if (url.startsWith('/bibliometrics/sources')) return Promise.resolve(sourceMetrics)
   if (url.startsWith('/bibliometrics/countries'))
@@ -148,6 +150,26 @@ describe('AnalyticsPage', () => {
 
     await screen.findByText('2019–2022')
     expect(mockedGet).toHaveBeenCalledWith('/bibliometrics/summary?min_year=2020')
+  })
+
+  it('forwards a saved-collection cohort and shows the cohort banner', async () => {
+    mockedGet.mockImplementation((url: string) => routeByUrl(url))
+    render(
+      <MemoryRouter initialEntries={['/analytics?collection=coll_1']}>
+        <AnalyticsPage />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('2019–2022')).toBeInTheDocument()
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/bibliometrics/summary?collection=coll_1',
+    )
+    // The banner names the cohort and offers a way back to the whole corpus.
+    expect(screen.getByText(/Analyzing a saved collection/)).toBeInTheDocument()
+    expect(screen.getByText('Core diabetes')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Analyze the full corpus/ }),
+    ).toHaveAttribute('href', '/analytics')
   })
 
   it('renders author metrics (h-index + Lotka) on the Authors tab', async () => {

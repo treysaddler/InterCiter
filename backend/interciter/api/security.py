@@ -79,6 +79,21 @@ def get_principal(
     raise _unauthorized("missing or malformed credentials")
 
 
+def get_optional_principal(
+    request: Request,
+    session: Session = Depends(db_session),
+) -> Principal | None:
+    """Like :func:`get_principal` but returns ``None`` for anonymous callers.
+
+    Used by otherwise-open read endpoints that can *optionally* scope to the
+    caller's own private cohort (a saved collection or map).
+    """
+    try:
+        return get_principal(request, session)
+    except HTTPException:
+        return None
+
+
 def require_roles(*roles: Role) -> Callable[..., Principal]:
     def dependency(principal: Principal = Depends(get_principal)) -> Principal:
         if not principal.can_act_as(*roles):

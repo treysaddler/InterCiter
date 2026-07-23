@@ -42,6 +42,10 @@ it('lists saved maps with a link into the explorer', async () => {
   )
   const link = await screen.findByRole('link', { name: 'T2D core' })
   expect(link).toHaveAttribute('href', '/graph?map=map_1')
+  expect(screen.getByRole('link', { name: 'Analyze' })).toHaveAttribute(
+    'href',
+    '/analytics?map=map_1',
+  )
   expect(screen.getByText('3')).toBeInTheDocument()
 })
 

@@ -24,6 +24,7 @@ from ...schemas import (
     CollectionUpdate,
     CollectionView,
     CollectionWatchRequest,
+    GraphView,
 )
 from ...services import collections
 from ...services.collections import BatchLimitError, MemberSort
@@ -75,6 +76,25 @@ def get_collection(
             owner_id=principal.user_id,
             include_member_tallies=include_member_tallies,
             member_sort=member_sort,
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/collections/{collection_id}/graph", response_model=GraphView)
+def collection_graph(
+    collection_id: str,
+    include_authors: bool = Query(False),
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> GraphView:
+    """Citation graph over the collection's members (UX-3 cohort-by-reference)."""
+    try:
+        return collections.collection_graph(
+            session,
+            collection_id,
+            owner_id=principal.user_id,
+            include_authors=include_authors,
         )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

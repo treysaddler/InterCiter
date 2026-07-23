@@ -314,3 +314,80 @@ def test_metric_endpoints_read_open(session, client):
     countries = client.get("/v1/bibliometrics/countries")
     assert countries.status_code == 200
     assert countries.json()["documents_with_country"] == 0
+
+
+# --- UX-3: cohort by reference (analyze a saved collection / map) ---
+
+
+def _submit(client, headers, sample: str) -> str:
+    resp = client.post("/v1/papers", json={"xml": load_sample(sample)}, headers=headers)
+    assert resp.status_code == 202, resp.text
+    return resp.json()["result"]["work_id"]
+
+
+def test_cohort_by_collection_and_map(client, user_headers):
+    a = _submit(client, user_headers, "paper_a.xml")
+    b = _submit(client, user_headers, "paper_b.xml")
+
+    coll_id = client.post(
+        "/v1/collections", json={"name": "cohort"}, headers=user_headers
+    ).json()["collection_id"]
+    added = client.post(
+        f"/v1/collections/{coll_id}/members",
+        json={"work_ids": [a, b]},
+        headers=user_headers,
+    )
+    assert added.status_code == 200
+
+    # The collection's two members define the analysis cohort, by reference.
+    summary = client.get(
+        f"/v1/bibliometrics/summary?collection={coll_id}", headers=user_headers
+    )
+    assert summary.status_code == 200
+    assert summary.json()["document_count"] == 2
+
+    # A saved map's seed set works the same way.
+    map_id = client.post(
+        "/v1/maps", json={"name": "cohort", "work_ids": [a, b]}, headers=user_headers
+    ).json()["map_id"]
+    map_summary = client.get(
+        f"/v1/bibliometrics/summary?map={map_id}", headers=user_headers
+    )
+    assert map_summary.status_code == 200
+    assert map_summary.json()["document_count"] == 2
+
+
+def test_cohort_requires_auth_and_ownership(client, user_headers, make_user):
+    from interciter.enums import Role
+
+    a = _submit(client, user_headers, "paper_a.xml")
+    coll_id = client.post(
+        "/v1/collections", json={"name": "private"}, headers=user_headers
+    ).json()["collection_id"]
+    client.post(
+        f"/v1/collections/{coll_id}/members",
+        json={"work_ids": [a]},
+        headers=user_headers,
+    )
+
+    # Anonymous callers cannot analyze a private collection.
+    assert (
+        client.get(f"/v1/bibliometrics/summary?collection={coll_id}").status_code == 401
+    )
+
+    # Another user gets 404 — a collection id must not leak across accounts.
+    _, other = make_user(Role.user, "user2")
+    assert (
+        client.get(
+            f"/v1/bibliometrics/summary?collection={coll_id}", headers=other
+        ).status_code
+        == 404
+    )
+
+    # An unknown id is likewise a 404.
+    assert (
+        client.get(
+            "/v1/bibliometrics/summary?collection=coll_missing", headers=user_headers
+        ).status_code
+        == 404
+    )

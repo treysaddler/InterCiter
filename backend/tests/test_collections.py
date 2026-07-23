@@ -531,3 +531,40 @@ def test_import_is_owner_scoped_and_requires_auth(client, user_headers, make_use
         ).status_code
         == 401
     )
+
+
+def test_collection_graph_over_members(client, user_headers, make_user):
+    from interciter.enums import Role
+
+    collection_id = _create_collection(client, user_headers)["collection_id"]
+    b = _submit(client, user_headers, "paper_b.xml")["result"]["work_id"]
+    a = _submit(client, user_headers, "paper_a.xml")["result"]["work_id"]
+    client.post(
+        f"/v1/collections/{collection_id}/members",
+        json={"work_ids": [a, b]},
+        headers=user_headers,
+    )
+
+    # The collection renders as a citation graph of its members, with the A→B edge.
+    resp = client.get(
+        f"/v1/collections/{collection_id}/graph", headers=user_headers
+    )
+    assert resp.status_code == 200
+    view = resp.json()
+    paper_ids = {n["id"] for n in view["nodes"] if n["type"] == "paper"}
+    assert paper_ids == {a, b}
+    assert any(
+        e["source"] == a and e["target"] == b
+        for e in view["edges"]
+        if e["type"] == "cites"
+    )
+
+    # Owner-scoped: another user 404s (id doesn't leak); anonymous 401s.
+    _, other = make_user(Role.user, "graphother")
+    assert (
+        client.get(
+            f"/v1/collections/{collection_id}/graph", headers=other
+        ).status_code
+        == 404
+    )
+    assert client.get(f"/v1/collections/{collection_id}/graph").status_code == 401

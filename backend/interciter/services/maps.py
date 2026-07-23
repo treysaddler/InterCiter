@@ -403,3 +403,14 @@ def member_work_ids(session: Session, saved_map: models.Map) -> list[str]:
             )
         )
     )
+
+
+def member_work_ids_by_id(
+    session: Session, map_id: str, *, owner_id: str
+) -> list[str]:
+    """The work ids of an owned map, resolved by id (owner-scoped).
+
+    Raises :class:`NotFound` for a missing or non-owned map so ids never leak.
+    """
+    saved_map = _load_owned_map(session, map_id, owner_id=owner_id)
+    return member_work_ids(session, saved_map)

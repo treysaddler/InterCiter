@@ -411,6 +411,22 @@ export default function CollectionDetailPage() {
 
       {detail.data && (
         <>
+          {detail.data.members.length > 0 && (
+            <div className="margin-top-2 margin-bottom-2">
+              <Link
+                className="usa-button usa-button--outline"
+                to={`/analytics?collection=${collectionId}`}
+              >
+                Analyze these papers
+              </Link>
+              <Link
+                className="usa-button usa-button--outline margin-left-1"
+                to={`/graph?collection=${collectionId}`}
+              >
+                Explore as network
+              </Link>
+            </div>
+          )}
           <section className="usa-summary-box margin-bottom-2" aria-labelledby="monitoring-heading">
             <div className="usa-summary-box__body">
               <h2 className="usa-summary-box__heading" id="monitoring-heading">

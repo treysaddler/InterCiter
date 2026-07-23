@@ -494,7 +494,7 @@ def _member_stance_counts(session: Session, work_id: str) -> tuple[int, int]:
 
 
 def _current_stance_snapshot(session: Session, collection_id: str) -> dict[str, dict[str, int]]:
-    """Per-member {work_id: {support, contradict}} for the whole collection."""
+    """Per-member {work_id: {support, contradict, retracted}} for the whole collection."""
     work_ids = list(
         session.scalars(
             select(models.CollectionMembership.work_id).where(
@@ -505,7 +505,12 @@ def _current_stance_snapshot(session: Session, collection_id: str) -> dict[str, 
     snapshot: dict[str, dict[str, int]] = {}
     for work_id in work_ids:
         support, contradict = _member_stance_counts(session, work_id)
-        snapshot[work_id] = {"support": support, "contradict": contradict}
+        work = session.get(models.PaperWork, work_id)
+        snapshot[work_id] = {
+            "support": support,
+            "contradict": contradict,
+            "retracted": bool(work.is_retracted) if work is not None else False,
+        }
     return snapshot
 
 

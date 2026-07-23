@@ -7,7 +7,13 @@ import type { SearchResults } from '../api/types'
 import { api } from '../api/client'
 
 vi.mock('../api/client', () => ({
-  api: { get: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn() },
+}))
+
+// Auth is mocked per-test; default anonymous so the save affordance is hidden.
+const mockStatus = vi.fn(() => 'anonymous')
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ status: mockStatus() }),
 }))
 
 // The inline network is lazy + Cytoscape-heavy; stub it so the page tests stay light.
@@ -18,6 +24,7 @@ vi.mock('../components/SearchNetwork', () => ({
 }))
 
 const mockedGet = vi.mocked(api.get)
+const mockedPost = vi.mocked(api.post)
 
 function results(overrides: Partial<SearchResults> = {}): SearchResults {
   return {
@@ -70,6 +77,8 @@ function renderAt(path: string) {
 describe('SearchPage', () => {
   beforeEach(() => {
     mockedGet.mockReset()
+    mockedPost.mockReset()
+    mockStatus.mockReturnValue('anonymous')
   })
 
   it('shows example searches when there is no query or facet', () => {
@@ -110,5 +119,26 @@ describe('SearchPage', () => {
     renderAt('/search?q=glucose&stance=support')
     expect(mockedGet).toHaveBeenCalledWith('/search/claims?q=glucose&stance=support')
     await screen.findByText(/1 matching claim/i)
+  })
+
+  it('lets an authenticated user save the current search', async () => {
+    mockStatus.mockReturnValue('authenticated')
+    mockedGet.mockResolvedValue(results())
+    mockedPost.mockResolvedValue({ saved_search_id: 'ssch_1' })
+    renderAt('/search?q=metformin&stance=support')
+
+    const saveButton = await screen.findByRole('button', { name: /save this search/i })
+    saveButton.click()
+
+    expect(mockedPost).toHaveBeenCalledWith('/saved-searches', {
+      name: 'metformin',
+      query: {
+        q: 'metformin',
+        section: null,
+        function: null,
+        stance: 'support',
+        resolution: null,
+      },
+    })
   })
 })

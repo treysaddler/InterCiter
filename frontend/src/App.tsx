@@ -19,6 +19,7 @@ import ClusterPage from './pages/ClusterPage'
 import AccountPage from './pages/AccountPage'
 import CollectionsPage from './pages/CollectionsPage'
 import CollectionDetailPage from './pages/CollectionDetailPage'
+import AlertsPage from './pages/AlertsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // The graph view pulls in Cytoscape (a large canvas library) that no other screen
@@ -90,6 +91,14 @@ export default function App() {
           element={
             <RequireAuth>
               <CollectionDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="alerts"
+          element={
+            <RequireAuth>
+              <AlertsPage />
             </RequireAuth>
           }
         />

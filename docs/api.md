@@ -156,6 +156,35 @@ All collection endpoints are auth-scoped to the caller's own resources; a
 collection owned by another user is indistinguishable from a missing one (`404`).
 Writes require CSRF when using cookie auth.
 
+## Monitoring — saved searches & alerts
+
+Persist claim searches and turn watched collections + saved searches into an in-app
+alert feed (scite-parity WP8, F3/F5). No email/SMTP yet — delivery is in-app only.
+All endpoints are auth-scoped to the caller; another user's records are `404`.
+
+- `POST /v1/saved-searches` — create (`{name, query:{q?, section?, function?, stance?,
+  resolution?, min_year?, max_year?}}`). Creation seeds a baseline of the current
+  matching claims so the first run only surfaces claims added afterwards.
+- `GET /v1/saved-searches` / `GET /v1/saved-searches/{id}` — list / fetch.
+- `PATCH /v1/saved-searches/{id}` — update `{name?, query?}` (changing the query
+  re-baselines).
+- `DELETE /v1/saved-searches/{id}` — delete.
+- `POST /v1/saved-searches/{id}/run` — re-run one search, diff against last-seen,
+  emit `new_claim` alerts, and advance the baseline. Returns
+  `{created_count, alerts[]}`.
+- `POST /v1/alerts/run` — run every saved search **and** watched collection the
+  caller owns. Collections emit `new_support` / `new_contradict` (vs the watch
+  snapshot) and `retraction` (a member newly flagged retracted) alerts, then
+  re-baseline. Returns `{created_count, alerts[]}`.
+- `GET /v1/alerts` — the alert feed, newest first; `?unread_only=true` filters.
+- `POST /v1/alerts/{id}/read` — mark one read. `POST /v1/alerts/read-all` — mark all
+  read (`{marked_read}`).
+
+Each `AlertView` carries `{alert_type, source_type, source_id, work_id?, claim_id?,
+summary, is_read, created_at}`. Baselines advance whenever a check runs, so the same
+signal is never alerted twice.
+
+
 ## Identity, sessions, and accounts (MVP)
 
 Every request resolves to a `Principal` from **either** an `Authorization: Bearer <token>` header (API/CLI clients) **or** a browser session cookie. Reads stay open; only writes require a principal, and some require `reviewer`/`admin` or ownership. The raw token is stored only as a SHA-256 hash.

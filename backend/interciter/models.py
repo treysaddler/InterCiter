@@ -433,6 +433,50 @@ class CollectionMembership(Base):
     work: Mapped[PaperWork] = relationship()
 
 
+class SavedSearch(Base):
+    __tablename__ = "saved_search"
+
+    saved_search_id: Mapped[str] = mapped_column(String, primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        String, ForeignKey("app_user.user_id"), index=True
+    )
+    name: Mapped[str] = mapped_column(String)
+    # Persisted search params (q + facet filters) as a JSON object.
+    search_query: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Claim ids observed at the last run, diffed to surface new hits.
+    last_seen_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    last_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+    owner: Mapped["User"] = relationship("User")
+
+
+class Alert(Base):
+    __tablename__ = "alert"
+
+    alert_id: Mapped[str] = mapped_column(String, primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        String, ForeignKey("app_user.user_id"), index=True
+    )
+    # source_type in {"saved_search", "collection"}; source_id is that record's id.
+    alert_source_type: Mapped[str] = mapped_column(String)
+    alert_source_id: Mapped[str] = mapped_column(String, index=True)
+    # alert_type in {"new_claim", "new_support", "new_contradict", "retraction"}.
+    alert_type: Mapped[str] = mapped_column(String)
+    work_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    claim_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary: Mapped[str] = mapped_column(Text)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    owner: Mapped["User"] = relationship("User")
+
+
 # ---------------------------------------------------------------------------------
 # Jobs — first-class async work resources (docs/architecture.md, api.md)
 # ---------------------------------------------------------------------------------

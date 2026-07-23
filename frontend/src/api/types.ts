@@ -234,6 +234,43 @@ export interface CollectionBulkRemoveResult {
   removed_work_ids: string[]
 }
 
+export interface SearchQuery {
+  q: string
+  section: string | null
+  function: string | null
+  stance: string | null
+  resolution: string | null
+  min_year: number | null
+  max_year: number | null
+}
+
+export interface SavedSearchView {
+  saved_search_id: string
+  owner_id: string
+  name: string
+  query: SearchQuery
+  last_checked_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AlertView {
+  alert_id: string
+  source_type: string
+  source_id: string
+  alert_type: string
+  work_id: string | null
+  claim_id: string | null
+  summary: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface AlertRunResult {
+  created_count: number
+  alerts: AlertView[]
+}
+
 export interface ClaimOccurrenceView {
   occurrence_id: string
   passage_id: string

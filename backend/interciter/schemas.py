@@ -636,6 +636,62 @@ class CollectionAddMembersResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Monitoring — saved searches + alerts (scite-parity WP8)
+# ---------------------------------------------------------------------------------
+
+
+class SearchQuery(BaseModel):
+    """The persisted parameters of a saved claim search (mirrors search_claims)."""
+
+    q: str = ""
+    section: str | None = None
+    function: str | None = None
+    stance: str | None = None
+    resolution: str | None = None
+    min_year: int | None = None
+    max_year: int | None = None
+
+
+class SavedSearchCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    query: SearchQuery = Field(default_factory=SearchQuery)
+
+
+class SavedSearchUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    query: SearchQuery | None = None
+
+
+class SavedSearchView(BaseModel):
+    saved_search_id: str
+    owner_id: str
+    name: str
+    query: SearchQuery
+    last_checked_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AlertView(BaseModel):
+    alert_id: str
+    source_type: str
+    source_id: str
+    alert_type: str
+    work_id: str | None = None
+    claim_id: str | None = None
+    summary: str
+    is_read: bool = False
+    created_at: datetime
+
+
+class AlertRunResult(BaseModel):
+    """Outcome of running monitoring checks: newly created alerts."""
+
+    created_count: int = 0
+    alerts: list[AlertView] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------
 # Network graph — papers/authors/citations (and, later, ROBOKOP claims)
 # ---------------------------------------------------------------------------------
 

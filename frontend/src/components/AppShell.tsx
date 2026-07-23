@@ -14,6 +14,7 @@ import { useAuth } from '../auth/AuthContext'
 const NAV = [
   { to: '/search', label: 'Search' },
   { to: '/collections', label: 'Collections', authOnly: true },
+  { to: '/alerts', label: 'Alerts', authOnly: true },
   { to: '/ingest', label: 'Submit a paper', authOnly: true },
   { to: '/review', label: 'Review', authOnly: true },
   { to: '/account', label: 'Account', authOnly: true },

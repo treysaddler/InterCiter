@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { SearchResults } from '../api/types'
+import type { SavedSearchView, SearchResults } from '../api/types'
+import { useAuth } from '../auth/AuthContext'
 import PageHeading from '../components/PageHeading'
 import SearchBox from '../components/SearchBox'
 import { Loading, ErrorAlert } from '../components/States'
@@ -67,6 +68,33 @@ export default function SearchPage() {
   const focusTitle =
     hits.find((h) => h.work_id === focusWorkId)?.paper_title ?? null
 
+  const { status } = useAuth()
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function onSaveSearch() {
+    setSaving(true)
+    setSaveMessage(null)
+    try {
+      const name = q.trim() || activeFacets.map((k) => params.get(k)).join(' · ') || 'Saved search'
+      await api.post<SavedSearchView>('/saved-searches', {
+        name,
+        query: {
+          q,
+          section: params.get('section'),
+          function: params.get('function'),
+          stance: params.get('stance'),
+          resolution: params.get('resolution'),
+        },
+      })
+      setSaveMessage('Saved. Track new matches on the Alerts page.')
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function toggleFacet(key: FacetKey, value: string) {
     const next = new URLSearchParams(params)
     if (next.get(key) === value) next.delete(key)
@@ -129,6 +157,25 @@ export default function SearchPage() {
                     results.data.total === 1 ? '' : 's'
                   }`}
             </p>
+
+            {status === 'authenticated' && (
+              <p className="margin-top-0">
+                <button
+                  type="button"
+                  className="usa-button usa-button--outline"
+                  onClick={onSaveSearch}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving…' : 'Save this search'}
+                </button>
+                {saveMessage && (
+                  <span className="margin-left-1 text-base">
+                    {saveMessage}{' '}
+                    <Link to="/alerts">Go to Alerts</Link>
+                  </span>
+                )}
+              </p>
+            )}
 
             {focusWorkId && (
               <Suspense fallback={<Loading label="Loading network…" />}>

@@ -548,6 +548,47 @@ classes:
         required: true
         description: The member work.
 
+  # ---------------------------------------------------------------------------------
+  # Monitoring layer — saved searches + alerts (scite-parity WP8, F3/F5)
+  # ---------------------------------------------------------------------------------
+
+  SavedSearch:
+    description: >-
+      A user-owned, persisted claim search. Re-running it and diffing against the
+      last-seen hit set produces alerts. Additive and non-authoritative.
+    slots:
+      - saved_search_id
+      - owner_id
+      - name
+      - search_query
+      - last_seen_ids
+      - last_checked_at
+      - created_at
+      - updated_at
+
+  Alert:
+    description: >-
+      An in-app notification recording a newly observed signal (a new matching claim
+      for a saved search, or a new supporting/contradicting citation or retraction on a
+      watched collection). Delivery is in-app only for now.
+    slots:
+      - alert_id
+      - owner_id
+      - alert_source_type
+      - alert_source_id
+      - alert_type
+      - work_id
+      - claim_id
+      - summary
+      - is_read
+      - created_at
+    slot_usage:
+      work_id:
+        identifier: false
+        range: PaperWork
+        required: false
+        description: The work the alert concerns, when applicable.
+
 # =====================================================================================
 # Slots
 # =====================================================================================
@@ -917,3 +958,34 @@ slots:
   updated_at:
     range: datetime
     description: When the record was last updated.
+
+  # --- SavedSearch / Alert (monitoring) ---
+  saved_search_id:
+    identifier: true
+    description: Stable identifier for a SavedSearch.
+  search_query:
+    description: >-
+      Persisted search parameters (q + facet filters) as a structured object.
+  last_seen_ids:
+    description: Claim ids observed at the last run, used to diff new hits.
+    multivalued: true
+  last_checked_at:
+    range: datetime
+    description: When the saved search was last run.
+  alert_id:
+    identifier: true
+    description: Stable identifier for an Alert.
+  alert_source_type:
+    description: What produced the alert (saved_search or collection).
+  alert_source_id:
+    description: Id of the SavedSearch or Collection that produced the alert.
+  alert_type:
+    description: >-
+      The kind of signal (new_claim, new_support, new_contradict, retraction).
+  claim_id:
+    description: The claim interpretation the alert concerns, when applicable.
+  summary:
+    description: Human-readable one-line description of the alert.
+  is_read:
+    range: boolean
+    description: Whether the owner has marked the alert read.

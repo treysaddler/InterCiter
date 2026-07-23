@@ -27,6 +27,8 @@ _PREFIXES = {
     "EntityGrounding": "grnd",
     "Collection": "coll",
     "CollectionMembership": "cmem",
+    "SavedSearch": "ssch",
+    "Alert": "alrt",
     "Job": "job",
     "User": "user",
     "UserSession": "sess",

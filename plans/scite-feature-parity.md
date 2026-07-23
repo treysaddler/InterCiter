@@ -314,7 +314,7 @@ Frontend: `ReferenceCheckPage`: paste identifiers / upload, results table
 Tests: backend identifier intake + roll-up (offline); frontend render.
 Deps: WP1, WP5, WP3 (report aggregates). PDF parsing is a later sub-task.
 
-### WP8 — Saved searches & monitoring alerts  (F3/F5)
+### WP8 — Saved searches & monitoring alerts  (F3/F5)   ✅ DONE
 Goal: persist searches / collections and notify on new supporting/contrasting
 citations or retractions.
 Schema: `SavedSearch` / `Alert` LinkML classes (additive). Backend: a scheduled
@@ -325,6 +325,27 @@ in-app notification list first (email later, out of scope). Endpoints for CRUD +
 collection" affordances.
 Tests: diffing logic (new supporting citation appears -> alert row).
 Deps: WP2, WP4, WP5.
+
+> Implemented: additive LinkML `SavedSearch` (id `ssch_`, `search_query` JSON +
+> `last_seen_ids` + `last_checked_at`) and `Alert` (id `alrt_`,
+> `alert_source_type`/`alert_source_id`/`alert_type`/`work_id`/`claim_id`/`summary`/
+> `is_read`), mirrored in `models.py`. `services/alerts.py`: SavedSearch CRUD
+> (baseline seeded on create so pre-existing hits don't alert); `_run_saved_search`
+> diffs current `search_claims` hits vs `last_seen_ids` → `new_claim` alerts;
+> `_run_collection` diffs member support/contradict vs the WP4 watch snapshot →
+> `new_support`/`new_contradict` alerts and emits `retraction` when a member is
+> newly WP5-flagged (snapshot extended with a `retracted` bool). Both advance their
+> baseline so a signal is never alerted twice. `run_all` covers all of a caller's
+> saved searches + watched collections. Router `api/routers/alerts.py`
+> (`/v1/saved-searches*`, `/v1/alerts*`, all `require_user` + ownership 404).
+> Frontend: `AlertsPage` (saved-search list w/ run+delete, alert feed w/ mark-read +
+> mark-all-read + "Check now"), `/alerts` route + nav entry (authOnly), and a
+> "Save this search" affordance on `SearchPage` (auth-gated). Tests:
+> `backend/tests/test_alerts.py` (8: CRUD, new-match diffing, create-baselines,
+> read flow, run_all collection support + retraction, ownership/auth) + frontend
+> `AlertsPage.test.tsx` (3) + a SearchPage save test. Consolidates Litmaps L5
+> monitoring into this one subsystem. Deferred: email/SMTP delivery; a scheduled
+> (vs on-demand) runner.
 
 ### WP9 — Zotero / Mendeley import connectors  (F5)
 Goal: import collections from reference managers.

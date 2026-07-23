@@ -4,12 +4,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { ClaimExpansion, GraphExpansion, GraphNode, GraphView } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
-import NetworkGraph from '../components/NetworkGraph'
+import NetworkGraph, {
+  MEASURE_LABELS,
+  type GraphMeasure,
+  type LayoutMode,
+} from '../components/NetworkGraph'
 import PageHeading from '../components/PageHeading'
 import { ErrorAlert, Loading } from '../components/States'
 import { useApi } from '../hooks/useApi'
 
 type Mode = 'papers' | 'claims'
+
+const MEASURES: GraphMeasure[] = ['year', 'cited_by_count', 'references_count']
 
 /**
  * Network exploration (docs/ui-design.md). Renders the citation/author network from
@@ -29,6 +35,12 @@ export default function GraphPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [expanding, setExpanding] = useState(false)
   const [expandError, setExpandError] = useState<string | null>(null)
+  // Litmaps-style dynamic mapping: force layout by default, or map papers onto
+  // quantitative axes (e.g. year × citation count) and size nodes by a measure.
+  const [layout, setLayout] = useState<LayoutMode>('force')
+  const [xMeasure, setXMeasure] = useState<GraphMeasure>('year')
+  const [yMeasure, setYMeasure] = useState<GraphMeasure>('cited_by_count')
+  const [sizeMeasure, setSizeMeasure] = useState<GraphMeasure | 'none'>('none')
   // A ROBOKOP claim expansion produces its own knowledge-graph view that temporarily
   // replaces the citation/claim network until the user clears it.
   const [robokopGraph, setRobokopGraph] = useState<GraphView | null>(null)
@@ -42,6 +54,10 @@ export default function GraphPage() {
 
   const graph = useApi<GraphView>(() => api.get<GraphView>(path), [path])
   const displayed = robokopGraph ?? graph.data
+  // Axis/measure layout only makes sense for the paper/citation network (paper nodes
+  // carry year + citation counts); claims and ROBOKOP overlays fall back to force.
+  const measureable = mode === 'papers' && !robokopGraph
+  const effectiveLayout: LayoutMode = measureable ? layout : 'force'
 
   function onSelectNode(node: GraphNode) {
     setSelected(node)
@@ -176,6 +192,84 @@ export default function GraphPage() {
         )}
       </div>
 
+      {/* Layout & measure controls (paper network only). */}
+      {measureable && (
+        <div className="display-flex flex-wrap flex-align-end margin-bottom-2">
+          <div className="margin-right-3">
+            <label className="usa-label margin-top-0 font-body-3xs" htmlFor="layout">
+              Layout
+            </label>
+            <select
+              id="layout"
+              className="usa-select width-auto"
+              value={layout}
+              onChange={(e) => setLayout(e.target.value as LayoutMode)}
+            >
+              <option value="force">Force-directed</option>
+              <option value="axis">Map by measure (axes)</option>
+            </select>
+          </div>
+
+          {layout === 'axis' && (
+            <>
+              <div className="margin-right-3">
+                <label className="usa-label margin-top-0 font-body-3xs" htmlFor="x-measure">
+                  X axis
+                </label>
+                <select
+                  id="x-measure"
+                  className="usa-select width-auto"
+                  value={xMeasure}
+                  onChange={(e) => setXMeasure(e.target.value as GraphMeasure)}
+                >
+                  {MEASURES.map((m) => (
+                    <option key={m} value={m}>
+                      {MEASURE_LABELS[m]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="margin-right-3">
+                <label className="usa-label margin-top-0 font-body-3xs" htmlFor="y-measure">
+                  Y axis
+                </label>
+                <select
+                  id="y-measure"
+                  className="usa-select width-auto"
+                  value={yMeasure}
+                  onChange={(e) => setYMeasure(e.target.value as GraphMeasure)}
+                >
+                  {MEASURES.map((m) => (
+                    <option key={m} value={m}>
+                      {MEASURE_LABELS[m]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="usa-label margin-top-0 font-body-3xs" htmlFor="size-measure">
+              Node size
+            </label>
+            <select
+              id="size-measure"
+              className="usa-select width-auto"
+              value={sizeMeasure}
+              onChange={(e) => setSizeMeasure(e.target.value as GraphMeasure | 'none')}
+            >
+              <option value="none">Uniform</option>
+              {MEASURES.map((m) => (
+                <option key={m} value={m}>
+                  {MEASURE_LABELS[m]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {notice && (
         <div className="usa-alert usa-alert--info usa-alert--slim margin-y-2" role="status">
           <div className="usa-alert__body">
@@ -211,6 +305,10 @@ export default function GraphPage() {
               view={displayed}
               selectedId={selected?.id}
               onSelectNode={onSelectNode}
+              layout={effectiveLayout}
+              xMeasure={xMeasure}
+              yMeasure={yMeasure}
+              sizeMeasure={sizeMeasure}
             />
           </div>
           <div className="tablet:grid-col-4">

@@ -26,11 +26,12 @@ vi.mock('d3-force', () => ({
 }))
 vi.mock('d3-zoom', () => ({ zoom: () => chain() }))
 vi.mock('d3-drag', () => ({ drag: () => chain() }))
+vi.mock('d3-scale', () => ({ scaleLinear: () => chain(), scaleSqrt: () => chain() }))
 
 const view: GraphView = {
   nodes: [
-    { id: 'work_a', type: 'paper', label: 'Paper A', data: {} },
-    { id: 'work_b', type: 'paper', label: 'Paper B', data: {} },
+    { id: 'work_a', type: 'paper', label: 'Paper A', data: { year: 2020, cited_by_count: 5 } },
+    { id: 'work_b', type: 'paper', label: 'Paper B', data: { year: 2018, cited_by_count: 12 } },
     { id: 'author_1', type: 'author', label: 'Jane Doe', data: {} },
   ],
   edges: [
@@ -83,4 +84,27 @@ test('legend lists the node types present', () => {
   const legend = within(screen.getByLabelText('Node types shown'))
   expect(legend.getByText('paper')).toBeInTheDocument()
   expect(legend.getByText('author')).toBeInTheDocument()
+})
+
+test('axis layout surfaces the active measures as accessible table columns', () => {
+  render(
+    <NetworkGraph
+      view={view}
+      layout="axis"
+      xMeasure="year"
+      yMeasure="cited_by_count"
+    />,
+  )
+  // Column headers for both axis measures appear in the node table.
+  expect(screen.getByRole('columnheader', { name: 'Year' })).toBeInTheDocument()
+  expect(screen.getByRole('columnheader', { name: 'Cited by' })).toBeInTheDocument()
+  // And the per-node measure values are rendered (a node missing a measure shows —).
+  expect(screen.getByText('2020')).toBeInTheDocument()
+  expect(screen.getByText('12')).toBeInTheDocument()
+  expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+})
+
+test('force layout adds no measure columns', () => {
+  render(<NetworkGraph view={view} />)
+  expect(screen.queryByRole('columnheader', { name: 'Cited by' })).toBeNull()
 })

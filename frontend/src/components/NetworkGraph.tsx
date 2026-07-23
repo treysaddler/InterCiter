@@ -10,6 +10,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force'
+import { scaleLinear, scaleSqrt } from 'd3-scale'
 import { zoom } from 'd3-zoom'
 import { drag } from 'd3-drag'
 
@@ -20,22 +21,43 @@ import type { GraphView, GraphNode } from '../api/types'
  * citations, and later ROBOKOP claims). The same node/edge envelope drives every
  * mode — node color/shape keys off `type`.
  *
- * Rendered with a custom D3 (SVG) force layout. SVG keeps the DOM inspectable and
- * performs well at the current node caps (≤250 per neighborhood); modular d3
- * (selection/force/zoom/drag) is a much smaller bundle than a full graph library.
+ * Rendered with a custom D3 (SVG) renderer. Two layout modes:
+ *  - `force` (default): a `d3-force` spring layout — good for topology.
+ *  - `axis`: papers positioned on quantitative axes (e.g. x = year, y = citation
+ *    count) via `d3-scale`, the Litmaps-style "map papers by a measure" view.
+ * Nodes can additionally be sized by a measure. SVG keeps the DOM inspectable and
+ * performs well at the current node caps (≤250 per neighborhood).
  *
  * Accessibility (Section 508 / docs/ui-design.md): the SVG canvas is not perceivable
  * to assistive tech, so an equivalent tabular view of the same nodes and edges is
  * always rendered alongside it. Node labels there are buttons, giving keyboard users
  * the same "select a node" affordance the SVG gives pointer users. The SVG is marked
- * `aria-hidden` so it is not double-announced.
+ * `aria-hidden` so it is not double-announced. Whichever measures drive the layout or
+ * node size are surfaced as extra columns in that table so the two stay in sync.
  */
+
+/** Quantitative measures a client can map/size paper nodes by (from `node.data`). */
+export type GraphMeasure = 'year' | 'cited_by_count' | 'references_count'
+export type LayoutMode = 'force' | 'axis'
+
+export const MEASURE_LABELS: Record<GraphMeasure, string> = {
+  year: 'Year',
+  cited_by_count: 'Cited by',
+  references_count: 'References',
+}
 
 export interface NetworkGraphProps {
   view: GraphView
   selectedId?: string | null
   onSelectNode?: (node: GraphNode) => void
   height?: number
+  /** `force` (default) or quantitative `axis` layout. */
+  layout?: LayoutMode
+  /** Axis measures (only used when `layout === 'axis'`). */
+  xMeasure?: GraphMeasure
+  yMeasure?: GraphMeasure
+  /** Size paper nodes by this measure; omit/`none` for uniform size. */
+  sizeMeasure?: GraphMeasure | 'none'
 }
 
 // USWDS-adjacent palette; kept in one place so legend + graph agree.
@@ -48,6 +70,8 @@ const TYPE_COLOR: Record<string, string> = {
 
 const SELECTED_COLOR = '#fa9441'
 const NODE_RADIUS = 9
+// Plot margins for the axis layout (room for tick labels + axis titles).
+const AXIS_PAD = { top: 16, right: 20, bottom: 40, left: 52 }
 
 function colorFor(type: string): string {
   return TYPE_COLOR[type] ?? '#71767a'
@@ -57,12 +81,33 @@ function truncate(label: string, max = 22): string {
   return label.length > max ? `${label.slice(0, max - 1)}…` : label
 }
 
+/** Finite numeric measure from a node's `data`, else null (missing/non-numeric). */
+function measureValue(node: GraphNode, measure: GraphMeasure): number | null {
+  const raw = node.data?.[measure]
+  const num = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isFinite(num) ? num : null
+}
+
+function extent(values: number[]): [number, number] {
+  if (values.length === 0) return [0, 1]
+  let lo = Math.min(...values)
+  let hi = Math.max(...values)
+  if (lo === hi) {
+    lo -= 1
+    hi += 1
+  }
+  return [lo, hi]
+}
+
 // Simulation-augmented mirrors of the API node/edge shapes. d3-force mutates
 // these with x/y/vx/vy during layout, so they must be its own local objects.
 interface SimNode extends SimulationNodeDatum {
   id: string
   label: string
   type: string
+  xVal: number | null
+  yVal: number | null
+  sizeVal: number | null
 }
 
 interface SimLink extends SimulationLinkDatum<SimNode> {
@@ -71,10 +116,11 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
 }
 
 // Draw the per-type node glyph (matches the legend). Cheap inline SVG rather than
-// pulling in d3-shape/symbols for four fixed shapes.
+// pulling in d3-shape/symbols for four fixed shapes. `radius` sizes the paper circle.
 function appendShape(
   g: Selection<SVGGElement, SimNode, null, undefined>,
   type: string,
+  radius: number,
 ): void {
   const color = colorFor(type)
   const r = NODE_RADIUS
@@ -106,7 +152,7 @@ function appendShape(
       `${-h},0 ${-h / 2},${-h} ${h / 2},${-h} ${h},0 ${h / 2},${h} ${-h / 2},${h}`,
     ) // hexagon
   } else {
-    base.attr('r', r) // paper: circle
+    base.attr('r', radius) // paper: circle (sizable by measure)
   }
 }
 
@@ -115,6 +161,10 @@ export default function NetworkGraph({
   selectedId,
   onSelectNode,
   height = 480,
+  layout = 'force',
+  xMeasure = 'year',
+  yMeasure = 'cited_by_count',
+  sizeMeasure = 'none',
 }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -137,11 +187,25 @@ export default function NetworkGraph({
         id: n.id,
         label: n.label,
         type: n.type,
+        xVal: measureValue(n, xMeasure),
+        yVal: measureValue(n, yMeasure),
+        sizeVal: sizeMeasure === 'none' ? null : measureValue(n, sizeMeasure),
       }))
       const nodeIds = new Set(nodes.map((n) => n.id))
+      const simById = new Map(nodes.map((n) => [n.id, n]))
       const links: SimLink[] = view.edges
         .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
         .map((e) => ({ id: e.id, source: e.source, target: e.target, type: e.type }))
+
+      // Size paper nodes by a measure (area-proportional), else uniform.
+      const sizeValues = nodes
+        .map((n) => n.sizeVal)
+        .filter((v): v is number => v != null)
+      const sizeScale = scaleSqrt()
+        .domain(extent(sizeValues))
+        .range([6, 20])
+      const radiusFor = (d: SimNode): number =>
+        d.sizeVal != null ? sizeScale(d.sizeVal) : NODE_RADIUS
 
       const svg = select(svgEl)
       svg.selectAll('*').remove()
@@ -184,7 +248,7 @@ export default function NetworkGraph({
         })
 
       node.each(function (d) {
-        appendShape(select<SVGGElement, SimNode>(this), d.type)
+        appendShape(select<SVGGElement, SimNode>(this), d.type, radiusFor(d))
       })
 
       node
@@ -205,44 +269,128 @@ export default function NetworkGraph({
           .on('zoom', (event) => zoomLayer.attr('transform', event.transform)),
       )
 
-      // Let users pin/reposition nodes.
-      node.call(
-        drag<SVGGElement, SimNode>()
-          .on('start', (event, d) => {
-            if (!event.active) sim?.alphaTarget(0.3).restart()
-            d.fx = d.x
-            d.fy = d.y
-          })
-          .on('drag', (event, d) => {
-            d.fx = event.x
-            d.fy = event.y
-          })
-          .on('end', (event, d) => {
-            if (!event.active) sim?.alphaTarget(0)
-            d.fx = null
-            d.fy = null
-          }),
-      )
+      if (layout === 'axis') {
+        // Map papers onto quantitative axes (Litmaps-style year × citations). Static
+        // positions from d3-scale — no simulation to fight the fixed coordinates.
+        const xScale = scaleLinear()
+          .domain(extent(nodes.map((n) => n.xVal).filter((v): v is number => v != null)))
+          .range([AXIS_PAD.left, width - AXIS_PAD.right])
+          .nice()
+        const yScale = scaleLinear()
+          .domain(extent(nodes.map((n) => n.yVal).filter((v): v is number => v != null)))
+          .range([height - AXIS_PAD.bottom, AXIS_PAD.top])
+          .nice()
 
-      sim = forceSimulation<SimNode>(nodes)
-        .force(
-          'link',
-          forceLink<SimNode, SimLink>(links)
-            .id((d) => d.id)
-            .distance(70),
-        )
-        .force('charge', forceManyBody().strength(-180))
-        .force('center', forceCenter(width / 2, height / 2))
-        .force('collide', forceCollide(NODE_RADIUS + 12))
-        .on('tick', () => {
-          link
-            .attr('x1', (d) => (d.source as SimNode).x ?? 0)
-            .attr('y1', (d) => (d.source as SimNode).y ?? 0)
-            .attr('x2', (d) => (d.target as SimNode).x ?? 0)
-            .attr('y2', (d) => (d.target as SimNode).y ?? 0)
-          node.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
+        const posX = (d: SimNode): number =>
+          d.xVal != null ? xScale(d.xVal) : AXIS_PAD.left
+        const posY = (d: SimNode): number =>
+          d.yVal != null ? yScale(d.yVal) : height - AXIS_PAD.bottom
+
+        // Gridlines + tick labels behind the nodes.
+        const axisG = zoomLayer.insert('g', ':first-child').attr('font-size', 9).attr('fill', '#71767a')
+        axisG
+          .append('g')
+          .selectAll('line')
+          .data(xScale.ticks(6))
+          .join('line')
+          .attr('x1', (t) => xScale(t))
+          .attr('x2', (t) => xScale(t))
+          .attr('y1', AXIS_PAD.top)
+          .attr('y2', height - AXIS_PAD.bottom)
+          .attr('stroke', '#edeff0')
+        axisG
+          .append('g')
+          .selectAll('text')
+          .data(xScale.ticks(6))
+          .join('text')
+          .attr('x', (t) => xScale(t))
+          .attr('y', height - AXIS_PAD.bottom + 14)
+          .attr('text-anchor', 'middle')
+          .text((t) => String(t))
+        axisG
+          .append('g')
+          .selectAll('line')
+          .data(yScale.ticks(6))
+          .join('line')
+          .attr('y1', (t) => yScale(t))
+          .attr('y2', (t) => yScale(t))
+          .attr('x1', AXIS_PAD.left)
+          .attr('x2', width - AXIS_PAD.right)
+          .attr('stroke', '#edeff0')
+        axisG
+          .append('g')
+          .selectAll('text')
+          .data(yScale.ticks(6))
+          .join('text')
+          .attr('x', AXIS_PAD.left - 6)
+          .attr('y', (t) => yScale(t) + 3)
+          .attr('text-anchor', 'end')
+          .text((t) => String(t))
+        // Axis titles.
+        axisG
+          .append('text')
+          .attr('x', (AXIS_PAD.left + width - AXIS_PAD.right) / 2)
+          .attr('y', height - 6)
+          .attr('text-anchor', 'middle')
+          .attr('font-weight', 'bold')
+          .text(MEASURE_LABELS[xMeasure])
+        axisG
+          .append('text')
+          .attr('transform', `translate(12,${(AXIS_PAD.top + height - AXIS_PAD.bottom) / 2}) rotate(-90)`)
+          .attr('text-anchor', 'middle')
+          .attr('font-weight', 'bold')
+          .text(MEASURE_LABELS[yMeasure])
+
+        nodes.forEach((n) => {
+          n.x = posX(n)
+          n.y = posY(n)
         })
-      simRef.current = sim
+        node.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
+        link
+          .attr('x1', (d) => simById.get(d.source as string)?.x ?? 0)
+          .attr('y1', (d) => simById.get(d.source as string)?.y ?? 0)
+          .attr('x2', (d) => simById.get(d.target as string)?.x ?? 0)
+          .attr('y2', (d) => simById.get(d.target as string)?.y ?? 0)
+      } else {
+        // Let users pin/reposition nodes (only meaningful in the free force layout).
+        node.call(
+          drag<SVGGElement, SimNode>()
+            .on('start', (event, d) => {
+              if (!event.active) sim?.alphaTarget(0.3).restart()
+              d.fx = d.x
+              d.fy = d.y
+            })
+            .on('drag', (event, d) => {
+              d.fx = event.x
+              d.fy = event.y
+            })
+            .on('end', (event, d) => {
+              if (!event.active) sim?.alphaTarget(0)
+              d.fx = null
+              d.fy = null
+            }),
+        )
+
+        sim = forceSimulation<SimNode>(nodes)
+          .force(
+            'link',
+            forceLink<SimNode, SimLink>(links)
+              .id((d) => d.id)
+              .distance(70),
+          )
+          .force('charge', forceManyBody().strength(-180))
+          .force('center', forceCenter(width / 2, height / 2))
+          .force('collide', forceCollide(NODE_RADIUS + 12))
+          .on('tick', () => {
+            link
+              .attr('x1', (d) => (d.source as SimNode).x ?? 0)
+              .attr('y1', (d) => (d.source as SimNode).y ?? 0)
+              .attr('x2', (d) => (d.target as SimNode).x ?? 0)
+              .attr('y2', (d) => (d.target as SimNode).y ?? 0)
+            node.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
+          })
+        simRef.current = sim
+      }
     } catch {
       // SVG/layout is unavailable (e.g. jsdom in tests) — the accessible table
       // below still conveys the full graph. Fail soft rather than crash the page.
@@ -254,7 +402,7 @@ export default function NetworkGraph({
       simRef.current = null
       nodeSelRef.current = null
     }
-  }, [view, nodesById, onSelectNode, height])
+  }, [view, nodesById, onSelectNode, height, layout, xMeasure, yMeasure, sizeMeasure])
 
   // Reflect the current selection onto the SVG without a full rebuild.
   useEffect(() => {
@@ -271,6 +419,15 @@ export default function NetworkGraph({
   }, [selectedId, view])
 
   const types = Array.from(new Set(view.nodes.map((n) => n.type)))
+
+  // Measures currently driving the view — surfaced as table columns so the accessible
+  // representation stays in sync with the (aria-hidden) axis/size encoding.
+  const activeMeasures: GraphMeasure[] = Array.from(
+    new Set<GraphMeasure>([
+      ...(layout === 'axis' ? [xMeasure, yMeasure] : []),
+      ...(sizeMeasure !== 'none' ? [sizeMeasure] : []),
+    ]),
+  )
 
   return (
     <div>
@@ -329,6 +486,11 @@ export default function NetworkGraph({
             <tr>
               <th scope="col">Type</th>
               <th scope="col">Label</th>
+              {activeMeasures.map((m) => (
+                <th scope="col" key={m}>
+                  {MEASURE_LABELS[m]}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -348,6 +510,10 @@ export default function NetworkGraph({
                     n.label
                   )}
                 </td>
+                {activeMeasures.map((m) => {
+                  const v = measureValue(n, m)
+                  return <td key={m}>{v == null ? '—' : v}</td>
+                })}
               </tr>
             ))}
           </tbody>

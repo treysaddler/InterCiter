@@ -109,6 +109,21 @@ def test_paper_graph_has_nodes_and_citation_edge(session):
     assert all(e.source != e.target for e in view.edges)
 
 
+def test_paper_nodes_carry_citation_count_measures(session):
+    b, a = _ingest_both(session)  # A cites B
+    for view in (
+        graph.build_paper_graph(session),
+        graph.paper_neighborhood(session, a.work_id, depth=1),
+    ):
+        nodes = {n.id: n for n in view.nodes if n.type == "paper"}
+        # B is cited by A (in-degree 1) and cites nothing; A cites B (+ metadata
+        # stubs), so A has a non-zero out-degree and is itself uncited.
+        assert nodes[b.work_id].data["cited_by_count"] == 1
+        assert nodes[b.work_id].data["references_count"] == 0
+        assert nodes[a.work_id].data["references_count"] >= 1
+        assert nodes[a.work_id].data["cited_by_count"] == 0
+
+
 def test_include_authors_adds_author_nodes_and_edges(session):
     work = models.PaperWork(
         work_id="work_authors",

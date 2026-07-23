@@ -144,6 +144,30 @@ def _cite_edge(pair: _CitePair) -> GraphEdge:
     )
 
 
+def _attach_citation_counts(
+    nodes: dict[str, GraphNode], pairs: dict[tuple[str, str], _CitePair]
+) -> None:
+    """Annotate each paper node with global citation-degree measures, in place.
+
+    Two derived measures a client can map/size by (Litmaps-style ``year × citations``):
+
+    * ``cited_by_count`` — in-degree, how many distinct works cite this one; and
+    * ``references_count`` — out-degree, how many distinct works this one cites.
+
+    Degrees are computed over the *whole* citation network (every edge source), not just
+    the current view, so the measure is stable no matter how the graph is windowed.
+    """
+    in_deg: dict[str, int] = {}
+    out_deg: dict[str, int] = {}
+    for citing, cited in pairs:
+        out_deg[citing] = out_deg.get(citing, 0) + 1
+        in_deg[cited] = in_deg.get(cited, 0) + 1
+    for node_id, node in nodes.items():
+        if node.type == "paper":
+            node.data["cited_by_count"] = in_deg.get(node_id, 0)
+            node.data["references_count"] = out_deg.get(node_id, 0)
+
+
 def _attach_authors(
     nodes: dict[str, GraphNode], edges: list[GraphEdge], works: list[models.PaperWork]
 ) -> None:
@@ -190,12 +214,14 @@ def build_paper_graph(
         )
     )
     seed_ids = {w.work_id for w in works}
+    pairs = _citation_pairs(session)
     nodes: dict[str, GraphNode] = {w.work_id: _paper_node(w) for w in works}
     edges: list[GraphEdge] = [
         _cite_edge(pair)
-        for pair in _citation_pairs(session).values()
+        for pair in pairs.values()
         if pair.citing in seed_ids and pair.cited in seed_ids
     ]
+    _attach_citation_counts(nodes, pairs)
     if include_authors:
         _attach_authors(nodes, edges, works)
     return GraphView(
@@ -254,6 +280,7 @@ def paper_neighborhood(
         for pair in pairs.values()
         if pair.citing in visited and pair.cited in visited
     ]
+    _attach_citation_counts(nodes, pairs)
     if include_authors:
         _attach_authors(nodes, edges, works)
     return GraphView(

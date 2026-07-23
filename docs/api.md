@@ -92,6 +92,8 @@ The response reports cycles, truncated branches, evidence for every hop, and sep
 
 A derived, read-side projection (like the claim views): the immutable record is flattened into a generic node/edge envelope so the same shape serves the citation network today and a ROBOKOP claim graph later. Nodes carry an open `type` discriminator (`paper`, `author`, `claim`, …); edges are directed with a `type` (`cites`, `authored`, `relates`). `cites` edges union two sources — passage-grounded `CitationMention`s (full-text corpus) and bibliographic `CitationEdge`s (which can point at metadata-only stubs). Every view is bounded and reports `truncated` when a cap is hit.
 
+Paper nodes also carry derived quantitative measures in `node.data` for client-side mapping (Litmaps-style `year × citations`): `year`, `cited_by_count` (global in-degree — how many distinct works cite it), and `references_count` (global out-degree). Degrees are computed over the whole citation network, so they are stable regardless of how the view is windowed.
+
 - `GET /v1/graph/papers` — a bounded overview of the citation network (`limit`, `include_authors`). Reads stay open.
 - `GET /v1/graph/papers/{work_id}` — the citation neighborhood centered on one paper, BFS to `depth` hops (both directions), `include_authors` optional.
 - `POST /v1/graph/papers/{work_id}/expand` — grow the graph on demand from **Semantic Scholar**: pulls the paper's references, creates any missing cited works as metadata-only stubs, and persists each as a `semantic_scholar` `CitationEdge` (idempotent — re-expanding never duplicates). A write, so it requires an authenticated principal (+ CSRF for cookie auth). Returns counts plus the refreshed neighborhood.

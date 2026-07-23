@@ -213,7 +213,7 @@ Hard constraints (unchanged):
 
 Split into three independently-shippable steps:
 
-**WP-L3a — D3 render core (no backend change).**
+**WP-L3a — D3 render core (no backend change).**   ✅ DONE
 Replace `NetworkGraph.tsx` internals with a d3 SVG renderer behind the SAME
 props/interface. Keep a force layout (`d3-force`) as the default, node-select
 buttons, legend, and the a11y table/fallback + jsdom try/catch. Add `d3` (modular)

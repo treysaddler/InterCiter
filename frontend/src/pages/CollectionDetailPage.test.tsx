@@ -454,7 +454,7 @@ describe('CollectionDetailPage', () => {
       ],
     })
 
-    const createObjectURL = vi.fn(() => 'blob:test')
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:test')
     const revokeObjectURL = vi.fn()
     Object.defineProperty(URL, 'createObjectURL', {
       value: createObjectURL,
@@ -479,7 +479,7 @@ describe('CollectionDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /export members csv/i }))
 
     expect(createObjectURL).toHaveBeenCalledTimes(1)
-    const blob = createObjectURL.mock.calls[0][0] as Blob
+    const blob = createObjectURL.mock.calls[0][0]
     const text = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onerror = () => reject(new Error('failed to read blob text'))
@@ -552,7 +552,7 @@ describe('CollectionDetailPage', () => {
       ],
     })
 
-    const createObjectURL = vi.fn(() => 'blob:test')
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:test')
     const revokeObjectURL = vi.fn()
     Object.defineProperty(URL, 'createObjectURL', {
       value: createObjectURL,
@@ -580,7 +580,7 @@ describe('CollectionDetailPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /export identifiers txt/i }))
 
-    const blob = createObjectURL.mock.calls[0][0] as Blob
+    const blob = createObjectURL.mock.calls[0][0]
     const text = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onerror = () => reject(new Error('failed to read blob text'))

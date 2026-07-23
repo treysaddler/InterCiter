@@ -26,16 +26,15 @@ all three before starting a WP so shared work is built once.
 Shipped to origin/main:
 - scite: WP1 citation tallies · WP2 claim search · WP3 paper report · WP4
   collections (+ watch / delta / integrity / bulk) · WP5 retraction+integrity
-  signal · WP8 saved searches + alerts.
+  signal · WP8 saved searches + alerts · WP9 Zotero/Mendeley (RIS/BibTeX) import.
 - litmaps: WP-L1 discovery · WP-L2 saved maps · WP-L3a/b/c D3 renderer + axis
   layouts + annotations · WP-L4 read-only map sharing.
 - bibliometrix: none yet (plan drafted 2026-07-23).
 
 Not yet built:
-- scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check · WP9
-  Zotero/Mendeley import.
+- scite: WP6 grounded Assistant (RAG QA) · WP7 Reference Check.
 - litmaps: WP-L5 map monitoring (extends scite WP8 — now unblocked) · WP-L6
-  Zotero seed import (extends scite WP9).
+  Zotero seed import (extends the shipped scite WP9 importer).
 - bibliometrix: WP-B1 … WP-B10 (all).
 
 Build-once shared WPs (one implementation serves several plans):
@@ -52,14 +51,14 @@ Build-once shared WPs (one implementation serves several plans):
   in every plan).
 
 Recommended next steps (highest cross-plan leverage first):
-1. scite WP9 import connectors — self-contained file parsing (no network) that
-   simultaneously unblocks litmaps WP-L6 and bibliometrix WP-B6.
-2. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
-   shipped; completes the litmaps monitoring story.
-3. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
+1. litmaps WP-L5 map monitoring — small; every dependency (WP-L1/L2/WP8) is
+   shipped; completes the litmaps monitoring story by adding a "map" source.
+2. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
    surface with no schema/NLP/deps; foundation for WP-B2…B10.
-4. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
+3. scite WP6 grounded Assistant — high value; WP2 retrieval + LLM client already
    exist; later extended by bibliometrix WP-B10.
+4. litmaps WP-L6 / bibliometrix WP-B6 — layer Map-seed + WoS/Scopus/OpenAlex onto
+   the now-shipped scite WP9 import core.
 
 ---
 
@@ -369,7 +368,7 @@ Deps: WP2, WP4, WP5.
 > monitoring into this one subsystem. Deferred: email/SMTP delivery; a scheduled
 > (vs on-demand) runner.
 
-### WP9 — Zotero / Mendeley import connectors  (F5)   → also serves litmaps WP-L6 + bibliometrix WP-B6
+### WP9 — Zotero / Mendeley import connectors  (F5)   ✅ DONE   → also serves litmaps WP-L6 + bibliometrix WP-B6
 Goal: import collections from reference managers.
 Cross-plan: this is the ONE import layer. litmaps WP-L6 extends it to seed a Map,
 and bibliometrix WP-B6 extends it to WoS/Scopus/Lens/Dimensions/OpenAlex + a
@@ -380,6 +379,25 @@ Endpoint `POST /v1/collections/{id}/import` (multipart). OAuth API sync is a
 later, optional sub-task.
 Frontend: import form on CollectionDetail. Tests: parser round-trip.
 Deps: WP4.
+
+> Implemented: pure offline parser `ingestion/reference_managers.py`
+> (`detect_format` + `parse_references`) extracting DOIs/PMIDs from Zotero/Mendeley
+> **RIS** and **BibTeX** exports (per-entry brace/TY–ER splitting; DOI from `DO`/
+> `doi=` fields or any DOI-shaped substring; PMID from `pmid=`, pubmed URLs, or an
+> RIS `AN` accession when a PubMed/MEDLINE hint is present). `collections.import_references`
+> routes the extracted ids (PMIDs wrapped `pmid:` so they pass the existing
+> validator) through `add_members`, reusing resolution + metadata-stub creation +
+> the 500-id batch cap; CSV/plain text falls back to the existing identifier
+> detector. Endpoint `POST /v1/collections/{id}/import` (`{text, format?}`,
+> require_user + ownership → 404, `400` on bad format / over-cap). Returns
+> `CollectionImportResult` = add result + `{format, entry_count, matched_count}`.
+> Frontend: an "Import from a reference manager" RIS/BibTeX file input on
+> `CollectionDetailPage` (reads text client-side, detects format from extension,
+> posts, reports imported/matched/added/stub/skipped). Tests:
+> `tests/test_collections.py` (+3: parser unit, RIS+BibTeX import round-trip,
+> ownership/auth) + `CollectionDetailPage.test.tsx` (+1). Deferred: OAuth API sync;
+> WoS/Scopus/Lens/Dimensions parsers + OpenAlex API (bibliometrix WP-B6);
+> Map-seed target (litmaps WP-L6).
 
 ---
 

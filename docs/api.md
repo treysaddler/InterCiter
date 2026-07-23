@@ -142,6 +142,15 @@ metadata stubs for unknown identifiers through the existing ingest path.
   (`{work_ids[]}`, 1–500 ids; `422` on an empty list). Unknown work ids are
   ignored; returns `{removed_count, removed_work_ids[]}`. The UI wires this to a
   filter-aware "remove filtered members" action behind a confirmation.
+- `POST /v1/collections/{id}/import` — seed a collection from a reference-manager
+  export (scite WP9). Body `{text, format?}` where `text` is the raw contents of a
+  Zotero/Mendeley **RIS** or **BibTeX** file (or a CSV/plain-text identifier blob)
+  and `format` is `ris` / `bibtex` / `csv` (omit to auto-detect). DOIs and PMIDs are
+  extracted and routed through the same resolution + metadata-stub path as
+  `.../members`, so the 500-identifier batch cap applies (`400` beyond it). Returns
+  a `CollectionAddMembersResult` plus `{format, entry_count, matched_count}` (how
+  many references were seen vs. yielded an identifier). Titles/authors in the export
+  are ignored — metadata is re-derived from the identifier.
 - `POST /v1/collections/{id}/watch` — toggle monitoring (`{watch: bool}`, scite
   WP4→WP8 bridge). Enabling (or re-enabling) captures a per-member
   support/contradict baseline snapshot and stamps `watch_snapshot_at`. State only —

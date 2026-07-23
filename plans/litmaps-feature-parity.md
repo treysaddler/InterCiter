@@ -172,7 +172,7 @@ Tests: backend scoring with monkeypatched S2 client (ranking order, degrade
 without embeddings, filter application); frontend panel render.
 Deps: none hard (S2 client + graph exist). Net-gated live test optional.
 
-### WP-L2 — Saved Maps / seed-set persistence  (L4)
+### WP-L2 — Saved Maps / seed-set persistence  (L4)   ✅ DONE
 Goal: persist a named map = seed set + layout config + (later) annotations.
 Schema (LinkML-first): add `Map` (aka SavedMap) + `MapMembership` classes to
 `schema/interciter.yaml`; regenerate. Consider a shared base with scite-parity

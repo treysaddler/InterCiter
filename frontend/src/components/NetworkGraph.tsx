@@ -58,6 +58,12 @@ export interface NetworkGraphProps {
   yMeasure?: GraphMeasure
   /** Size paper nodes by this measure; omit/`none` for uniform size. */
   sizeMeasure?: GraphMeasure | 'none'
+  /**
+   * Per-node annotations keyed by node id (from a loaded saved map's members).
+   * When provided, a "Note" column is shown in the accessible node table so the
+   * annotations stay perceivable alongside the aria-hidden SVG.
+   */
+  notes?: Record<string, string | null>
 }
 
 // USWDS-adjacent palette; kept in one place so legend + graph agree.
@@ -165,6 +171,7 @@ export default function NetworkGraph({
   xMeasure = 'year',
   yMeasure = 'cited_by_count',
   sizeMeasure = 'none',
+  notes,
 }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -491,6 +498,7 @@ export default function NetworkGraph({
                   {MEASURE_LABELS[m]}
                 </th>
               ))}
+              {notes !== undefined && <th scope="col">Note</th>}
             </tr>
           </thead>
           <tbody>
@@ -514,6 +522,7 @@ export default function NetworkGraph({
                   const v = measureValue(n, m)
                   return <td key={m}>{v == null ? '—' : v}</td>
                 })}
+                {notes !== undefined && <td>{notes[n.id] || ''}</td>}
               </tr>
             ))}
           </tbody>

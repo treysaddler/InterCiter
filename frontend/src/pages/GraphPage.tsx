@@ -44,6 +44,11 @@ export default function GraphPage() {
   const [expanding, setExpanding] = useState(false)
   const [expandError, setExpandError] = useState<string | null>(null)
   const [savingMap, setSavingMap] = useState(false)
+  // Per-node annotation editing (litmaps-parity WP-L3c), only when a saved map is
+  // loaded — notes persist onto that map's membership.
+  const [noteDraft, setNoteDraft] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [noteError, setNoteError] = useState<string | null>(null)
   // Litmaps-style dynamic mapping: force layout by default, or map papers onto
   // quantitative axes (e.g. year × citation count) and size nodes by a measure.
   const [layout, setLayout] = useState<LayoutMode>('force')
@@ -75,6 +80,15 @@ export default function GraphPage() {
   const measureable = !robokopGraph && (Boolean(mapId) || mode === 'papers')
   const effectiveLayout: LayoutMode = measureable ? layout : 'force'
 
+  // Per-work annotations from the loaded map (work_id -> note), for the a11y table
+  // and the selected-node editor.
+  const noteByWork: Record<string, string> = {}
+  const memberWorkIds = new Set<string>()
+  for (const m of mapMeta.data?.members ?? []) {
+    memberWorkIds.add(m.work_id)
+    if (m.note) noteByWork[m.work_id] = m.note
+  }
+
   // Hydrate layout controls from a loaded map's saved layout_config (once).
   useEffect(() => {
     const cfg = mapMeta.data?.layout_config
@@ -86,6 +100,30 @@ export default function GraphPage() {
       setSizeMeasure(cfg.sizeMeasure as GraphMeasure | 'none')
     if (typeof cfg.includeAuthors === 'boolean') setIncludeAuthors(cfg.includeAuthors)
   }, [mapMeta.data])
+
+  // Seed the note editor from the selected member's current note.
+  useEffect(() => {
+    setNoteError(null)
+    setNoteDraft(selected ? (noteByWork[selected.id] ?? '') : '')
+    // noteByWork is derived from mapMeta.data; key the reset on the stable inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, mapMeta.data])
+
+  async function saveNote() {
+    if (!mapId || !selected) return
+    setSavingNote(true)
+    setNoteError(null)
+    try {
+      await api.patch(`/maps/${mapId}/members/${selected.id}`, {
+        note: noteDraft.trim() || null,
+      })
+      mapMeta.reload()
+    } catch (e) {
+      setNoteError(e instanceof ApiError ? e.message : String(e))
+    } finally {
+      setSavingNote(false)
+    }
+  }
 
   async function saveAsMap() {
     if (!displayed) return
@@ -395,6 +433,7 @@ export default function GraphPage() {
               xMeasure={xMeasure}
               yMeasure={yMeasure}
               sizeMeasure={sizeMeasure}
+              notes={mapId ? noteByWork : undefined}
             />
           </div>
           <div className="tablet:grid-col-4">
@@ -450,6 +489,34 @@ export default function GraphPage() {
                         </li>
                       </ul>
                     )}
+                    {selected.type === 'paper' &&
+                      mapId &&
+                      memberWorkIds.has(selected.id) && (
+                        <div className="margin-top-2">
+                          <label
+                            className="usa-label margin-top-0 font-body-3xs"
+                            htmlFor="node-note"
+                          >
+                            Note on this paper
+                          </label>
+                          <textarea
+                            id="node-note"
+                            className="usa-textarea"
+                            rows={3}
+                            value={noteDraft}
+                            onChange={(e) => setNoteDraft(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="usa-button usa-button--outline margin-top-1"
+                            onClick={saveNote}
+                            disabled={savingNote}
+                          >
+                            {savingNote ? 'Saving…' : 'Save note'}
+                          </button>
+                          {noteError && <ErrorAlert message={noteError} />}
+                        </div>
+                      )}
                     {selected.type === 'claim' && (
                       <ul className="usa-list usa-list--unstyled">
                         <li>

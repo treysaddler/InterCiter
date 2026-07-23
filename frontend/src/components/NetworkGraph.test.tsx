@@ -108,3 +108,14 @@ test('force layout adds no measure columns', () => {
   render(<NetworkGraph view={view} />)
   expect(screen.queryByRole('columnheader', { name: 'Cited by' })).toBeNull()
 })
+
+test('shows a Note column with per-node annotations when notes are provided', () => {
+  render(<NetworkGraph view={view} notes={{ work_a: 'seminal work' }} />)
+  expect(screen.getByRole('columnheader', { name: 'Note' })).toBeInTheDocument()
+  expect(screen.getByText('seminal work')).toBeInTheDocument()
+})
+
+test('omits the Note column when no notes are provided', () => {
+  render(<NetworkGraph view={view} />)
+  expect(screen.queryByRole('columnheader', { name: 'Note' })).toBeNull()
+})

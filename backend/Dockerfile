@@ -39,6 +39,9 @@ RUN groupadd --system app && useradd --system --gid app --home /app app
 COPY --from=build /opt/venv /opt/venv
 
 WORKDIR /app
+# The app writes local caches under the workdir (.cache/s2, .cache/pmc, …) at
+# runtime, so the unprivileged user must own it.
+RUN chown -R app:app /app
 USER app
 
 EXPOSE 8000

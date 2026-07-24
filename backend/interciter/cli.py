@@ -88,6 +88,70 @@ def _cmd_llm_import_batch(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_id_list(path: str) -> list[str]:
+    """Read one id per line, ignoring blanks and ``#`` comments."""
+    ids: list[str] = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            ids.append(line)
+    return ids
+
+
+def _corpus_sources(args: argparse.Namespace):
+    """Yield ``(doc_id, jats_xml)`` pairs from PMCIDs and/or a JATS directory."""
+    if args.pmcids:
+        for pmcid in _read_id_list(args.pmcids):
+            yield pmcid, _load_source_xml(pmcid)
+    if args.jats_dir:
+        for path in sorted(Path(args.jats_dir).glob("*.xml")):
+            yield path.stem, path.read_text(encoding="utf-8")
+
+
+def _cmd_llm_export_corpus(args: argparse.Namespace) -> int:
+    from .ingestion.batch import export_corpus
+
+    if not (args.pmcids or args.jats_dir):
+        print("error: provide --pmcids and/or --jats-dir", file=sys.stderr)
+        return 1
+    manifest = export_corpus(
+        _corpus_sources(args), args.out_dir, model=args.model, settings=get_settings()
+    )
+    print(
+        f"Exported {manifest.prompt_count} prompt(s) across {len(manifest.docs)} doc(s) "
+        f"to {args.out_dir} (model={manifest.model}, "
+        f"template={manifest.prompt_template_version})"
+    )
+    print(
+        "Next: copy the directory to the cluster, run scripts/hpc/run_vllm_batch.py "
+        "on the prompts, then `llm-import-corpus` with the completions."
+    )
+    return 0
+
+
+def _cmd_llm_import_corpus(args: argparse.Namespace) -> int:
+    from .ingestion.batch import ingest_corpus
+
+    init_db()
+    with SessionLocal() as session:
+        results = ingest_corpus(
+            args.dir,
+            args.responses,
+            session=session,
+            settings=get_settings(),
+            model=args.model,
+        )
+    occurrences = sum(r.result.occurrences for r in results)
+    interpretations = sum(r.result.interpretations for r in results)
+    relations = sum(r.result.relation_assertions for r in results)
+    print(
+        f"Ingested {len(results)} doc(s) from {args.dir}\n"
+        f"  occurrences={occurrences} interpretations={interpretations} "
+        f"relations={relations}"
+    )
+    return 0
+
+
 def _cmd_llm_compare(args: argparse.Namespace) -> int:
     from .evaluation.compare import compare_extractors, format_comparison
     from .evaluation.gold import load_gold, load_gold_named
@@ -828,6 +892,31 @@ def main(argv: list[str] | None = None) -> int:
     p_llm_import.add_argument("--responses", required=True, help="Batch responses JSONL")
     p_llm_import.add_argument("--model", default=None, help="Model name (overrides config)")
     p_llm_import.set_defaults(func=_cmd_llm_import_batch)
+
+    p_llm_ec = sub.add_parser(
+        "llm-export-corpus",
+        help="Build one bulk LLM-extraction batch (many papers) for an HPC run",
+    )
+    p_llm_ec.add_argument(
+        "--pmcids", default=None, help="File of PMCIDs (one per line, # comments)"
+    )
+    p_llm_ec.add_argument(
+        "--jats-dir", default=None, help="Directory of JATS/PMC *.xml files"
+    )
+    p_llm_ec.add_argument(
+        "--out-dir", required=True, help="Output batch directory (prompts + sources)"
+    )
+    p_llm_ec.add_argument("--model", default=None, help="Model name (overrides config)")
+    p_llm_ec.set_defaults(func=_cmd_llm_export_corpus)
+
+    p_llm_ic = sub.add_parser(
+        "llm-import-corpus",
+        help="Ingest a whole HPC batch from its manifest + completions JSONL",
+    )
+    p_llm_ic.add_argument("--dir", required=True, help="Batch directory from llm-export-corpus")
+    p_llm_ic.add_argument("--responses", required=True, help="Completions JSONL from the run")
+    p_llm_ic.add_argument("--model", default=None, help="Model name (overrides the manifest)")
+    p_llm_ic.set_defaults(func=_cmd_llm_import_corpus)
 
     p_llm_cmp = sub.add_parser(
         "llm-compare", help="Score extractors side by side on a gold corpus"

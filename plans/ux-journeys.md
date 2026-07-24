@@ -421,10 +421,11 @@ Ordered by leverage; each is its own change, none included in this doc.
    these papers" + "Explore as network" buttons now ship on the collection page, and
    each saved map gets an "Analyze" link. Every future bibliometric WP inherits cohort
    selection.
-4. **UX-4 — Journey coverage in the story doc.** Fold Persona D (now a DECIDED target)
-   and journeys J2–J4 into [`docs/ui-design.md`](../docs/ui-design.md) §2/§8 so the
-   canonical doc stops trailing the implementation, and add the a11y-table-fallback
-   reminder for every new visualization.
+4. **UX-4 — Journey coverage in the story doc. ✅ DONE.** Added Persona D and a new
+   corpus-exploration epic (US-7.1–7.5, covering journeys J2–J4/J7) to
+   [`docs/ui-design.md`](../docs/ui-design.md) §2/§8, plus an a11y principle that
+   every visualization ships a synced non-canvas table; reconciled the stale
+   "deferred: semantic search / network viz" and "side nav" notes with what shipped.
 5. **Backlog — shared saved-set base.** The open question across all three parity
    plans (unify Collection / Map / Corpus membership) is the same as G4 at the data
    layer. UX-3 deliberately ships FIRST over the existing `work_ids` API so the UI

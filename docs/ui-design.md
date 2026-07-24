@@ -68,8 +68,8 @@ phase-2 API surface ([api.md](api.md) §Phase 2) and are out of scope here.
 
 ## 2. Users & personas
 
-The MVP UI serves two primary personas. A third (operator) is supported minimally
-because ingestion has to happen somewhere, but it is not the focus.
+The UI serves three primary personas — a Reader, a Reviewer, and (as the corpus
+tooling grew) a Research strategist — plus a secondary Ingestion operator.
 
 ### Persona A — Reader / Explorer (primary)
 A biomedical researcher who wants to understand a paper's empirical claims and
@@ -91,6 +91,18 @@ Requires `reviewer` or `admin` role.
 Submits a paper (DOI / PMID / open-access XML), watches the job, and — for
 evaluation — triggers a re-extraction or compares extractors. Any authenticated
 user can submit; this persona is thin in the MVP.
+
+### Persona D — Research strategist / Bibliometric analyst (primary)
+Works at the **corpus** level, not a single paper: assembles a body of literature
+(search → collect → snowball / discover), understands its shape (corpus
+bibliometrics — production over time, top authors / sources / countries,
+Bradford / Lotka), maps its structure (citation network, axis layouts, saved maps),
+and monitors it over time (watched collections / maps, saved-search alerts). This
+persona consumes the Search / Analytics / Explore / Workspaces surfaces. Crucially,
+every aggregate view keeps a path **down** to claim-level evidence, so corpus
+metrics never become an unaccountable blended score — that is InterCiter's
+differentiator from a pure science-mapping tool. Full walkthroughs are the journeys
+in [UX journeys & IA redesign](../plans/ux-journeys.md) §3 (J2–J4, J7).
 
 ---
 
@@ -314,6 +326,11 @@ with a reason, not omission; scores never collapse into one number.
   normalized/model text (labeled "interpretation").
 - **Loading, empty, error, and abstained are all designed states**, each using the
   appropriate USWDS Alert/skeleton, not spinners-only.
+- **Every visualization has a synced non-canvas fallback.** Network graphs,
+  axis / thematic maps, Sankey diagrams, timelines, and metric charts are
+  `aria-hidden` decoration; the authoritative representation is an accessible table
+  (or list) carrying the same nodes / edges / values, kept in sync with the visual
+  encoding. No information is available only inside a canvas / SVG.
 
 ---
 
@@ -457,17 +474,55 @@ UI never fakes certainty.
 - AC: each data view has designed loading, empty, error, and abstained states using
   USWDS Alerts/skeletons.
 
-### Epic 6 — Deferred (P2, listed for coverage)
-Semantic search (`POST /v1/search`), reference drafting (`POST /v1/references`),
-multi-hop bounded traversal (`GET /v1/traces`), network visualization
-(`GET /v1/networks`), and user-trust/paper-trust scoring — all deferred to phase 2
-per [api.md](api.md). Called out here only so the MVP boundary is explicit.
+### Epic 6 — Beyond the MVP
+Several items once deferred here have since shipped and are covered by Epic 7:
+full-text claim **search** (`GET /v1/search/claims`), **network visualization** (the
+network explorer + saved maps), and seed-based **discovery**. Still deferred:
+reference drafting, multi-hop bounded traversal (`GET /v1/traces`), and
+user-trust / paper-trust scoring. Listed so the boundary stays explicit.
+
+### Epic 7 — Explore & synthesize a corpus (Research strategist)
+
+Persona D works across the Search / Analytics / Explore / Workspaces surfaces; these
+stories are shipped. Full walkthroughs are the journeys J2–J4 / J7 in
+[UX journeys & IA redesign](../plans/ux-journeys.md).
+
+**US-7.1** As a strategist, I want to search claims by full text with function,
+stance, and section facets, so that I can find evidence across the corpus.
+- AC: `GET /v1/search/claims` drives result cards (claim text + verbatim + separate
+  function/stance tags); a focused result shows its citation neighborhood and links
+  into the full network explorer.
+
+**US-7.2** As a strategist, I want to assemble a body of literature, so that I can
+work with a curated set.
+- AC: Collections accept works by DOI/PMID and RIS/BibTeX/CSV import; "Grow this
+  collection" seeds `POST /v1/discovery/seeds` from its members to suggest related
+  work; membership is additive.
+
+**US-7.3** As a strategist, I want corpus-level bibliometrics for a chosen cohort,
+so that I can understand a field's shape without losing provenance.
+- AC: Analytics renders Main Information + author/source/country metrics; the cohort
+  is the whole corpus or a saved collection/map **by reference** (`?collection=` /
+  `?map=`); every visualization has a synced table; metrics trace back toward the
+  underlying works/claims.
+
+**US-7.4** As a strategist, I want to map and visually explore citation structure,
+so that I can see how a literature connects.
+- AC: the network explorer renders papers/authors/claims with force or axis
+  (year × citations) layouts; a view can be saved as a map, shared read-only, and a
+  paper expanded from Semantic Scholar (or a claim corroborated via ROBOKOP); the
+  `aria-hidden` graph is mirrored by an accessible node/edge table.
+
+**US-7.5** As a strategist, I want to monitor a topic, collection, or map, so that I
+learn when new evidence or connections appear.
+- AC: saved searches and watched collections/maps feed one `/alerts` feed;
+  "Check now" runs the diff; alerts link to the new claim/paper.
 
 ---
 
 ## 9. Suggested MVP cut
 
-1. App shell (USWDS header/banner/footer, side nav), auth, `/account`.
+1. App shell (USWDS header/banner/footer, grouped top nav), auth, `/account`.
 2. Ingest + job polling (US-2.1–2.3).
 3. Paper list + paper detail (US-1.1–1.2).
 4. **Claim detail with pinned evidence, relations, one-hop, decomposed scores,

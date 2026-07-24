@@ -88,6 +88,29 @@ class PaperView(BaseModel):
     abstract: str | None = None
 
 
+class PaperLookupRequest(BaseModel):
+    """Fetch-and-cache a paper from Semantic Scholar by external id."""
+
+    external_id: str = Field(
+        description="Semantic Scholar id: DOI:…, PMID:…, CorpusId:…, a paperId hash, or a bare DOI.",
+    )
+    with_references: bool = Field(
+        default=True,
+        description="Also materialize the paper's references as citation edges to stub works.",
+    )
+
+
+class PaperLookupResult(BaseModel):
+    """Outcome of a read-through Semantic Scholar lookup."""
+
+    paper: PaperView
+    cache_hit: bool = Field(description="True when served from the local cache without a fetch.")
+    created: bool = Field(description="True when a new work row was inserted.")
+    fields_filled: list[str] = []
+    stubs_created: int = 0
+    edges_created: int = 0
+
+
 class PassageView(BaseModel):
     passage_id: str
     paper_version_id: str

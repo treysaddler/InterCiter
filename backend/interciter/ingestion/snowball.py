@@ -217,6 +217,84 @@ def _edge_exists(session: Session, citing_id: str, cited_id: str) -> bool:
     )
 
 
+def materialize_references(
+    session: Session,
+    work: models.PaperWork,
+    *,
+    index: "_Index | None" = None,
+    result: SnowballResult | None = None,
+    edges_seen: set[tuple[str, str]] | None = None,
+    refs_per_paper: int = DEFAULT_REFS_PER_PAPER,
+    settings: Settings | None = None,
+    use_cache: bool = True,
+    on_stub=None,
+    stop=None,
+) -> SnowballResult:
+    """Fetch one work's resolved references and materialize them locally.
+
+    Each usable reference becomes a metadata-stub :class:`~interciter.models.PaperWork`
+    (deduped by corpusId / DOI / PMID) and a ``semantic_scholar``
+    :class:`~interciter.models.CitationEdge`. Shared by the snowball corpus builder
+    (breadth-first, passing its own ``index`` / ``result`` / ``edges_seen`` so state
+    accumulates across the walk) and the on-demand lookup cache (single hop, letting
+    this create throwaway state). Idempotent against the unique edge constraint and
+    additive on stubs — never commits; the caller owns the transaction.
+
+    ``on_stub(cited)`` fires for every resolved reference (the BFS enqueues its frontier
+    here); ``stop()`` short-circuits the loop once the caller has hit a size budget.
+    """
+    settings = settings or get_settings()
+    if index is None:
+        index = _Index(session)
+        index.add(work)
+    if result is None:
+        result = SnowballResult(target_size=0)
+    if edges_seen is None:
+        edges_seen = set()
+
+    s2_id = _s2_id(work)
+    if s2_id is None:
+        return result
+    try:
+        refs = s2.get_references(
+            s2_id,
+            _REFERENCE_FIELDS,
+            max_records=refs_per_paper,
+            settings=settings,
+            use_cache=use_cache,
+        )
+    except s2.S2Error:
+        return result
+    result.expansions += 1
+
+    for ref in refs:
+        link = _link_from_reference(ref)
+        if link is None:
+            continue
+        cited = _resolve_or_create_stub(session, index, link, result)
+        if cited.work_id == work.work_id:
+            continue
+        pair = (work.work_id, cited.work_id)
+        if pair not in edges_seen and not _edge_exists(session, work.work_id, cited.work_id):
+            session.add(
+                models.CitationEdge(
+                    edge_id=new_id("CitationEdge"),
+                    citing_work_id=work.work_id,
+                    cited_work_id=cited.work_id,
+                    source="semantic_scholar",
+                    is_influential=link.get("is_influential"),
+                    edge_metadata={"s2_intents": link.get("intents", [])},
+                )
+            )
+            edges_seen.add(pair)
+            result.edges_created += 1
+        if on_stub is not None:
+            on_stub(cited)
+        if stop is not None and stop():
+            break
+    return result
+
+
 def build_corpus(
     session: Session,
     seed_ids: list[str],
@@ -283,45 +361,20 @@ def build_corpus(
             continue
         expanded.add(work_id)
         work = session.get(models.PaperWork, work_id)
-        s2_id = _s2_id(work) if work else None
-        if s2_id is None:
+        if work is None or _s2_id(work) is None:
             continue
-        try:
-            refs = s2.get_references(
-                s2_id,
-                _REFERENCE_FIELDS,
-                max_records=refs_per_paper,
-                settings=settings,
-                use_cache=use_cache,
-            )
-        except s2.S2Error:
-            continue
-        result.expansions += 1
-
-        for ref in refs:
-            link = _link_from_reference(ref)
-            if link is None:
-                continue
-            cited = _resolve_or_create_stub(session, index, link, result)
-            if cited.work_id == work_id:
-                continue
-            pair = (work_id, cited.work_id)
-            if pair not in edges_seen and not _edge_exists(session, work_id, cited.work_id):
-                session.add(
-                    models.CitationEdge(
-                        edge_id=new_id("CitationEdge"),
-                        citing_work_id=work_id,
-                        cited_work_id=cited.work_id,
-                        source="semantic_scholar",
-                        is_influential=link.get("is_influential"),
-                        edge_metadata={"s2_intents": link.get("intents", [])},
-                    )
-                )
-                edges_seen.add(pair)
-                result.edges_created += 1
-            _note(cited, expandable=True)
-            if len(corpus) >= target_size:
-                break
+        materialize_references(
+            session,
+            work,
+            index=index,
+            result=result,
+            edges_seen=edges_seen,
+            refs_per_paper=refs_per_paper,
+            settings=settings,
+            use_cache=use_cache,
+            on_stub=lambda cited: _note(cited, expandable=True),
+            stop=lambda: len(corpus) >= target_size,
+        )
 
         since_commit += 1
         if since_commit >= _COMMIT_EVERY:

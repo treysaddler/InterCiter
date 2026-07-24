@@ -10,6 +10,8 @@ FRONTEND := frontend
 DOCS     := docs
 
 COMPOSE  := docker compose
+# Self-contained dev stack (no Traefik / NAS deps); see docker-compose.dev.yml.
+DEV_COMPOSE := docker compose -f docker-compose.dev.yml
 
 .PHONY: help \
 	lint pydantic sqlddl jsonschema all clean \
@@ -17,6 +19,7 @@ COMPOSE  := docker compose
 	fe-install fe-dev fe-build fe-typecheck fe-test \
 	docs-render docs-preview \
 	docker-build docker-up docker-down docker-logs docker-seed docker-admin \
+	dev-up dev-down dev-logs dev-seed dev-admin \
 	test
 
 help: ## Show this help
@@ -106,6 +109,23 @@ docker-seed: ## Seed the bundled sample corpus into the running stack
 
 docker-admin: ## Bootstrap an admin user (NAME=<username>)
 	$(COMPOSE) exec backend interciter useradd $(NAME) --role admin
+
+# --- Docker (self-contained dev stack: no Traefik / NAS deps) ----------------
+
+dev-up: ## Start the self-contained dev stack (db + api + web) in the background
+	$(DEV_COMPOSE) up --build -d
+
+dev-down: ## Stop the dev stack (add ARGS=-v to also drop the database volume)
+	$(DEV_COMPOSE) down $(ARGS)
+
+dev-logs: ## Tail logs from all dev services
+	$(DEV_COMPOSE) logs -f
+
+dev-seed: ## Seed the bundled sample corpus into the running dev stack
+	$(DEV_COMPOSE) exec backend interciter seed
+
+dev-admin: ## Bootstrap an admin user in the dev stack (NAME=<username>)
+	$(DEV_COMPOSE) exec backend interciter useradd $(NAME) --role admin
 
 # --- Aggregate --------------------------------------------------------------
 

@@ -210,6 +210,34 @@ def _cmd_seed_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_s2_fetch(args: argparse.Namespace) -> int:
+    from .services import lookup
+
+    init_db()
+    with SessionLocal() as session:
+        try:
+            result = lookup.fetch_and_cache_paper(
+                session,
+                args.id,
+                with_references=not args.no_references,
+                refs_limit=args.refs_limit,
+                use_cache=not args.no_cache,
+            )
+        except lookup.LookupError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
+    verb = "cached" if result.cache_hit else "fetched"
+    print(f"{verb} work {result.work_id}")
+    if result.fields_filled:
+        print(f"  filled: {', '.join(result.fields_filled)}")
+    print(
+        f"  references: {result.stubs_created} new stub(s), "
+        f"{result.edges_created} citation edge(s)"
+    )
+    return 0
+
+
 def _cmd_useradd(args: argparse.Namespace) -> int:
     from .auth import create_user
     from .enums import Role
@@ -604,6 +632,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_corpus.add_argument("--no-cache", action="store_true", help="Bypass the local S2 cache")
     p_corpus.set_defaults(func=_cmd_seed_corpus)
+
+    p_fetch = sub.add_parser(
+        "s2-fetch",
+        help="Fetch one paper from Semantic Scholar by id and cache it into the DB",
+    )
+    p_fetch.add_argument("id", help="A Semantic Scholar id (DOI:…, PMID:…, CorpusId:…, or a bare DOI)")
+    p_fetch.add_argument(
+        "--no-references", action="store_true", help="Skip materializing the paper's references"
+    )
+    p_fetch.add_argument(
+        "--refs-limit", type=int, default=100, help="Max references to materialize"
+    )
+    p_fetch.add_argument("--no-cache", action="store_true", help="Bypass the local S2 cache")
+    p_fetch.set_defaults(func=_cmd_s2_fetch)
 
     p_user = sub.add_parser("useradd", help="Create a user and print its token")
     p_user.add_argument("display_name", help="Display name for the user")

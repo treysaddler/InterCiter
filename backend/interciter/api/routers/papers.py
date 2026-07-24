@@ -12,13 +12,16 @@ from ...schemas import (
     CitationStats,
     ExtractionRunView,
     JobView,
+    PaperLookupRequest,
+    PaperLookupResult,
     PaperReport,
     PaperSubmission,
     PaperVersionView,
     PaperView,
 )
-from ...services import citation_stats, jobs, report
+from ...services import citation_stats, jobs, lookup, report
 from ...services.jobs import SubmissionError
+from ...services.lookup import LookupError
 from ...services.projection import list_papers as _list_papers, paper_view
 from ..deps import db_session
 from ..security import require_user
@@ -63,6 +66,37 @@ def get_job(job_id: str, session: Session = Depends(db_session)) -> JobView:
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     return _job_view(job)
+
+
+@router.post("/papers/lookup", response_model=PaperLookupResult)
+def lookup_paper(
+    request: PaperLookupRequest,
+    session: Session = Depends(db_session),
+    principal: Principal = Depends(require_user),
+) -> PaperLookupResult:
+    """Fetch a paper from Semantic Scholar by external id and cache it locally.
+
+    Read-through cache: a paper we already hold is returned straight from the database;
+    otherwise it is fetched from the Academic Graph, persisted (metadata, abstract,
+    TLDR, and — optionally — its references as citation edges to stub works), and
+    returned. Browsing this way organically bootstraps the corpus. Requires a signed-in
+    user because it triggers outbound network calls.
+    """
+    try:
+        res = lookup.fetch_and_cache_paper(
+            session, request.external_id, with_references=request.with_references
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    work = session.get(models.PaperWork, res.work_id)
+    return PaperLookupResult(
+        paper=paper_view(work),
+        cache_hit=res.cache_hit,
+        created=res.created,
+        fields_filled=res.fields_filled,
+        stubs_created=res.stubs_created,
+        edges_created=res.edges_created,
+    )
 
 
 @router.get("/papers/{work_id}", response_model=PaperView)

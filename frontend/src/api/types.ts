@@ -33,6 +33,15 @@ export interface PaperView {
   abstract: string | null
 }
 
+export interface PaperLookupResult {
+  paper: PaperView
+  cache_hit: boolean
+  created: boolean
+  fields_filled: string[]
+  stubs_created: number
+  edges_created: number
+}
+
 export interface ClaimView {
   claim_id: string
   normalized_text: string

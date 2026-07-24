@@ -68,6 +68,12 @@ Three-level metrics (authors / sources / countries) share the same `work_ids` / 
 
 Every bibliometrics endpoint also accepts a cohort **by reference** — `collection=<id>` or `map=<id>` — to analyze a saved collection's or map's members without inlining every work id in the URL (UX-3). Those saved sets are owner-private, so a `collection`/`map` cohort requires an authenticated principal (`401` if anonymous) and `404`s for a set owned by someone else. With no cohort reference the endpoints stay open (whole corpus, or an explicit `work_ids`).
 
+## Cohorts — the shared saved-set base
+
+A *cohort* is an interchangeable set of works any analysis surface can accept: explicit `work_ids`, a saved **Collection**, or a saved **Map**. Collections and Maps keep their own tables and side-state, but membership resolution is unified in one owner-scoped service (`services/cohort.py`): every cohort-aware endpoint (bibliometrics today, more later) resolves a saved set the same way, and a future `Corpus` registers a single resolver instead of adding a divergent one.
+
+- `GET /v1/cohorts/resolve` — query params `collection=<id>` **or** `map=<id>` (exactly one). Returns `{source_type, source_id, name, member_count}` for the active saved set — the shared way to label a cohort regardless of kind. Owner-scoped: `401` if anonymous, `404` for a set owned by someone else, `400` if both (or neither) source is given.
+
 ## Revisions (MVP)
 
 Revising is creating, so it's a `POST`, not a `PATCH`:

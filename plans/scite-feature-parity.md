@@ -45,9 +45,11 @@ Build-once shared WPs (one implementation serves several plans):
 - Grounded LLM — scite WP6 ⊇ bibliometrix WP-B10 (Biblio-AI narration).
 - Graph rendering — the litmaps WP-L3 D3 `NetworkGraph` is the ONE renderer;
   bibliometrix WP-B3/B5/B7 reuse it (no second graph library).
-- Saved-set membership — scite `Collection`, litmaps `Map`, bibliometrix `Corpus`
-  are siblings; unify the membership base before adding the third (open question
-  in every plan).
+- Saved-set membership — ✅ DONE. scite `Collection`, litmaps `Map`, bibliometrix
+  `Corpus` are siblings; unified via a shared cohort service base
+  (`services/cohort.py` + `GET /v1/cohorts/resolve`) — one owner-scoped seam
+  resolves any saved set to work ids, and a future `Corpus` registers a resolver
+  there. Tables stay separate (divergent side-state); the membership base is shared.
 
 Recommended next steps (highest cross-plan leverage first):
 1. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping

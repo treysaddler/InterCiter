@@ -624,6 +624,24 @@ class CountryMetrics(BaseModel):
 
 
 # ---------------------------------------------------------------------------------
+# Cohorts — shared saved-set base (unifies Collection / Map membership)
+# ---------------------------------------------------------------------------------
+
+
+class CohortView(BaseModel):
+    """A resolved saved-set cohort source (shared Collection/Map membership base).
+
+    Lets any cohort-aware screen name the active saved set — and count its members —
+    from one endpoint, regardless of whether it is a collection or a map.
+    """
+
+    source_type: Literal["collection", "map"]
+    source_id: str
+    name: str
+    member_count: int
+
+
+# ---------------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------------
 

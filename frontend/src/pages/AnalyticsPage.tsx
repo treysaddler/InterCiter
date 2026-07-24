@@ -51,14 +51,18 @@ function CohortBanner({
   map: string | null
 }) {
   const type = collection ? 'collection' : map ? 'map' : null
-  const path = collection
-    ? `/collections/${collection}`
+  // One shared saved-set resolver for either kind (unified cohort base).
+  const query = collection
+    ? `?collection=${encodeURIComponent(collection)}`
     : map
-      ? `/maps/${map}`
+      ? `?map=${encodeURIComponent(map)}`
       : null
-  const meta = useApi<{ name: string } | null>(
-    () => (path ? api.get<{ name: string }>(path) : Promise.resolve(null)),
-    [path],
+  const meta = useApi<{ name: string; member_count: number } | null>(
+    () =>
+      query
+        ? api.get<{ name: string; member_count: number }>(`/cohorts/resolve${query}`)
+        : Promise.resolve(null),
+    [query],
   )
   if (!type) return null
   const name = meta.data?.name

@@ -426,12 +426,18 @@ Ordered by leverage; each is its own change, none included in this doc.
    [`docs/ui-design.md`](../docs/ui-design.md) §2/§8, plus an a11y principle that
    every visualization ships a synced non-canvas table; reconciled the stale
    "deferred: semantic search / network viz" and "side nav" notes with what shipped.
-5. **Backlog — shared saved-set base.** The open question across all three parity
-   plans (unify Collection / Map / Corpus membership) is the same as G4 at the data
-   layer. UX-3 deliberately ships FIRST over the existing `work_ids` API so the UI
-   cohort contract is stable; this table unification then lands underneath without
-   changing that contract. Sequence before the heavier bibliometric network/thematic
-   WPs but after UX-3.
+5. **Backlog — shared saved-set base. ✅ DONE.** The open question across all three
+   parity plans (unify Collection / Map / Corpus membership) is the same as G4 at the
+   data layer. Resolved with a shared **cohort service base** (`services/cohort.py`) +
+   registry rather than a destructive merge of the two mature membership tables:
+   Collections and Maps keep their own tables and divergent side-state (watch
+   snapshots/import vs layout/sharing/notes/positions), but "which works are in this
+   saved set" now resolves through one owner-scoped seam that every cohort-aware
+   endpoint shares (`resolve_cohort`), plus a unified `GET /v1/cohorts/resolve` the
+   analytics banner uses. A future bibliometrix `Corpus` (WP-B7) registers one
+   resolver here instead of adding a third divergent implementation. UX-3 shipped the
+   UI cohort contract first over `work_ids`; this base now sits underneath it
+   unchanged.
 
 ---
 

@@ -52,9 +52,11 @@ Build-once shared WPs (one implementation serves several plans):
 - Grounded LLM — scite WP6 ⊇ bibliometrix WP-B10 (Biblio-AI narration).
 - Graph rendering — the litmaps WP-L3 D3 `NetworkGraph` is the ONE renderer;
   bibliometrix WP-B3/B5/B7 reuse it (no second graph library).
-- Saved-set membership — scite `Collection`, litmaps `Map`, bibliometrix `Corpus`
-  are siblings; unify the membership base before adding the third (open question
-  in every plan).
+- Saved-set membership — ✅ DONE. scite `Collection`, litmaps `Map`, bibliometrix
+  `Corpus` are siblings; unified via a shared cohort service base
+  (`services/cohort.py` + `GET /v1/cohorts/resolve`) — one owner-scoped seam
+  resolves any saved set to work ids, and a future `Corpus` registers a resolver
+  there. Tables stay separate (divergent side-state); the membership base is shared.
 
 Recommended next steps (highest cross-plan leverage first):
 1. bibliometrix WP-B1 corpus descriptive analytics — opens the science-mapping
@@ -162,12 +164,14 @@ Gap: covered by scite-parity WP9; extend it to seed a Map, not just a Collection
   monitoring into WP8 rather than building a second alerts system.
 - Zotero/Mendeley import → scite-parity **WP9**. Litmaps L6 = extend WP9 to also
   seed a Map/seed-set.
-- Collections (scite WP4) and Maps/Workspaces (Litmaps L4) are siblings; consider
-  a shared "saved set of works" base so Collections and Maps reuse membership.
+- Collections (scite WP4) and Maps/Workspaces (Litmaps L4) are siblings; ✅ they now
+  share a saved-set membership base (`services/cohort.py`) so both resolve to a
+  cohort of works the same way.
 - Graph rendering → the WP-L3 D3 `NetworkGraph` renderer is reused by bibliometrix
   WP-B3/B5/B7 (co-citation / coupling / historiograph networks). One renderer.
 - Saved-set membership → Map (WP-L2) is also a sibling of bibliometrix `Corpus`
-  (WP-B7); unify the base before building the third membership table.
+  (WP-B7); ✅ unified via the shared cohort base — a future `Corpus` registers one
+  resolver instead of adding a third membership implementation.
 
 ---
 

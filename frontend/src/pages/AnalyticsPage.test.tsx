@@ -80,8 +80,13 @@ const sourceMetrics: SourceMetrics = {
 
 /** Route the mock by URL so each tab's panel resolves the right shape. */
 function routeByUrl(url: string) {
-  if (url.startsWith('/collections/')) return Promise.resolve({ name: 'Core diabetes' })
-  if (url.startsWith('/maps/')) return Promise.resolve({ name: 'My map' })
+  if (url.startsWith('/cohorts/resolve'))
+    return Promise.resolve({
+      source_type: url.includes('map=') ? 'map' : 'collection',
+      source_id: 'x',
+      name: url.includes('map=') ? 'My map' : 'Core diabetes',
+      member_count: 2,
+    })
   if (url.startsWith('/bibliometrics/authors')) return Promise.resolve(authorMetrics)
   if (url.startsWith('/bibliometrics/sources')) return Promise.resolve(sourceMetrics)
   if (url.startsWith('/bibliometrics/countries'))

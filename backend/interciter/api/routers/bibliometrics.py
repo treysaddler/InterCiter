@@ -17,7 +17,7 @@ from ...schemas import (
     CountryMetrics,
     SourceMetrics,
 )
-from ...services import bibliometrics, collections, maps
+from ...services import bibliometrics, cohort
 from ...services.projection import NotFound
 from ..deps import db_session
 from ..security import get_optional_principal
@@ -37,30 +37,26 @@ def _resolve_cohort(
     map_id: str | None,
     principal: Principal | None,
 ) -> list[str] | None:
-    """Resolve the analysis cohort.
+    """Resolve the analysis cohort via the shared saved-set base.
 
-    A ``collection`` or ``map`` id selects a saved, owner-private work set *by
-    reference* (so hundreds of ids need not travel in the URL). Those sets are
-    owner-scoped: a principal is required and a set owned by someone else 404s.
-    With no cohort reference, the explicit ``work_ids`` (else the whole corpus)
-    is used.
+    Delegates to :func:`interciter.services.cohort.resolve_cohort` — a ``collection``
+    or ``map`` id selects a saved, owner-private work set *by reference* (so hundreds
+    of ids need not travel in the URL). Owner-scoped: a principal is required (401)
+    and a set owned by someone else 404s. With no cohort reference, the explicit
+    ``work_ids`` (else the whole corpus) is used.
     """
-    if collection is None and map_id is None:
-        return work_ids
-    if principal is None:
-        raise HTTPException(
-            status_code=401,
-            detail="authentication required to analyze a saved collection or map",
-        )
     try:
-        if collection is not None:
-            return collections.member_work_ids(
-                session, collection, owner_id=principal.user_id
-            )
-        assert map_id is not None
-        return maps.member_work_ids_by_id(
-            session, map_id, owner_id=principal.user_id
+        return cohort.resolve_cohort(
+            session,
+            work_ids=work_ids,
+            collection=collection,
+            map_id=map_id,
+            principal=principal,
         )
+    except cohort.CohortAuthRequired as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except cohort.AmbiguousCohort as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

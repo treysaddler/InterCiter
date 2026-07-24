@@ -16,6 +16,7 @@ from .routers import (
     alerts,
     bibliometrics,
     claims,
+    cohorts,
     collections,
     discovery,
     graph,
@@ -51,6 +52,7 @@ app.include_router(papers.router, prefix="/v1", tags=["papers", "jobs"])
 app.include_router(claims.router, prefix="/v1", tags=["claims"])
 app.include_router(collections.router, prefix="/v1", tags=["collections"])
 app.include_router(maps.router, prefix="/v1", tags=["maps"])
+app.include_router(cohorts.router, prefix="/v1", tags=["cohorts"])
 app.include_router(alerts.router, prefix="/v1", tags=["alerts"])
 app.include_router(search.router, prefix="/v1", tags=["search"])
 app.include_router(bibliometrics.router, prefix="/v1", tags=["bibliometrics"])

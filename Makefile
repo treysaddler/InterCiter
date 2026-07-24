@@ -108,6 +108,7 @@ docker-seed: ## Seed the bundled sample corpus into the running stack
 	$(COMPOSE) exec backend interciter seed
 
 docker-admin: ## Bootstrap an admin user (NAME=<username>)
+	@test -n "$(NAME)" || { echo "Usage: make docker-admin NAME=<username>"; exit 2; }
 	$(COMPOSE) exec backend interciter useradd $(NAME) --role admin
 
 # --- Docker (self-contained dev stack: no Traefik / NAS deps) ----------------
@@ -125,6 +126,7 @@ dev-seed: ## Seed the bundled sample corpus into the running dev stack
 	$(DEV_COMPOSE) exec backend interciter seed
 
 dev-admin: ## Bootstrap an admin user in the dev stack (NAME=<username>)
+	@test -n "$(NAME)" || { echo "Usage: make dev-admin NAME=<username>"; exit 2; }
 	$(DEV_COMPOSE) exec backend interciter useradd $(NAME) --role admin
 
 # --- Aggregate --------------------------------------------------------------

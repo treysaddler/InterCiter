@@ -8,3 +8,10 @@ _site/
 !.env.example
 
 **/.DS_Store
+
+# Python bytecode caches
+**/__pycache__/
+*.pyc
+
+# Scratch LLM batch export dirs (contain copied paper full-text XML — do not commit)
+/batch-smoke/
